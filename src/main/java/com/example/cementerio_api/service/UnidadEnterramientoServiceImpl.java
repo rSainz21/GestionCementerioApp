@@ -5,12 +5,12 @@ import com.example.cementerio_api.entity.CemenBloque;
 import com.example.cementerio_api.entity.CemenUnidadEnterramiento;
 import com.example.cementerio_api.repository.UnidadEnterramientoRepository;
 import com.example.cementerio_api.repository.BloqueRepository;
-import com.example.cementerio_api.service.UnidadEnterramientoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class UnidadEnterramientoServiceImpl implements UnidadEnterramientoService {
@@ -32,7 +32,7 @@ public class UnidadEnterramientoServiceImpl implements UnidadEnterramientoServic
     }
 
     @Override
-    public CemenUnidadEnterramiento buscarPorCodigo(String codigo) {
+    public Optional<CemenUnidadEnterramiento> buscarPorCodigo(String codigo) {
         return unidadRepo.findByCodigo(codigo);
     }
 
