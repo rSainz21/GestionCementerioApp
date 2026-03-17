@@ -4,6 +4,7 @@ package com.example.cementerio_api.repository;
 
 import com.example.cementerio_api.entity.CemenRestos;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 
@@ -15,5 +16,6 @@ public interface RestosRepository extends JpaRepository<CemenRestos, Integer> {
 
     List<CemenRestos> findByNombreApellidosContainingIgnoreCase(String nombre);
 
-    List<CemenRestos> findByUnidadIdOrderByFechaInhumacionDesc(Integer unidadId);
+    @Query("SELECT r FROM Restos r WHERE r.unidadEnterramiento IS NULL")
+    List<CemenRestos> findRestosHuerfanos();
 }

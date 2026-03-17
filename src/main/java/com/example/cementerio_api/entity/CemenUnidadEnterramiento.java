@@ -21,10 +21,9 @@ public class CemenUnidadEnterramiento {
     private CemenBloque bloque;
 
     // Código único para correspondencia unívoca papel-terreno
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(unique = true)
     private String codigo;
 
-    @Column(nullable = false, length = 50)
     private String tipo; // Nicho, Tumba, Panteón, Columbario
 
     // Posicionamiento dentro del bloque paramétrico
@@ -32,7 +31,6 @@ public class CemenUnidadEnterramiento {
     private Integer numero;
 
     // Ocupado, Caducado, Libre, Reservado
-    @Column(nullable = false, length = 30)
     private String estado;
 
     // Coordenadas para que el ciudadano localice el nicho vía GPS móvil
@@ -41,7 +39,4 @@ public class CemenUnidadEnterramiento {
 
     @Column(precision = 11, scale = 8)
     private BigDecimal longitud;
-
-    @Column(name = "creado_en", insertable = false, updatable = false)
-    private LocalDateTime creadoEn;
 }

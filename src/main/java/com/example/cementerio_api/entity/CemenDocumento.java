@@ -14,7 +14,7 @@ public class CemenDocumento {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "unidad_id", nullable = false)
-    private UnidadEnterramiento unidadEnterramiento;
+    private CemenUnidadEnterramiento unidadEnterramiento;
 
     @Column(nullable = false, length = 50)
     private String tipo; // "Foto Lápida", "Título", "Acta" [cite: 165, 171]
