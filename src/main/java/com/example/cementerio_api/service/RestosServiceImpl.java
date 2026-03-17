@@ -22,19 +22,11 @@ public class RestosServiceImpl implements RestosService {
     @Autowired
     private UnidadEnterramientoRepository unidadRepo;
 
-    /**
-     * Devuelve la 'Bandeja de Regularización' con los 2,108 registros huérfanos[cite: 49].
-     * Estos registros proceden de libros antiguos y carecen de ubicación[cite: 128].
-     */
     @Override
     public List<CemenRestos> listarHuerfanos() {
         return restosRepo.findByUnidadIsNull();
     }
-
-    /**
-     * Permite la asignación una vez identificado el resto en el campo[cite: 129].
-     * Es el factor crítico para que el software no sea una 'cáscara vacía'[cite: 187].
-     */
+     //Permite la asignación una vez identificado el resto en el campo
     @Override
     @Transactional
     public CemenRestos vincularANicho(Integer restoId, Integer unidadId) {
