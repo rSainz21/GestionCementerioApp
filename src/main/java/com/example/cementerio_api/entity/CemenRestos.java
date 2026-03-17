@@ -29,10 +29,10 @@ public class CemenRestos {
     private LocalDate fechaInhumacion;
 
     @Column(length = 150)
-    private String procedencia; // Ej: "Libro Antiguo Tomo 1", "Parte Antigua"
+    private String procedencia;
 
     @Column(name = "notas_historicas", columnDefinition = "TEXT")
-    private String notasHistoricas; // Para tachaduras o notas manuscritas detectadas [cite: 17]
+    private String notasHistoricas; // Para tachaduras o notas manuscritas detectadas
 
     @Column(name = "creado_en", insertable = false, updatable = false)
     private LocalDateTime creadoEn;
