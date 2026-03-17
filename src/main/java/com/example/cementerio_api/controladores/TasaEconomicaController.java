@@ -2,7 +2,7 @@ package com.example.cementerio_api.controladores;
 
 
 import com.example.cementerio_api.entity.CemenTasaEconomica;
-import com.example.cementerio_api.service.CemenTasaEconomicaService;
+import com.example.cementerio_api.service.TasaEconomicaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,10 +10,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/tasas-economicas")
-public class CemenTasaEconomicaController {
+public class TasaEconomicaController {
 
     @Autowired
-    private CemenTasaEconomicaService tasaService;
+    private TasaEconomicaService tasaService;
 
     @GetMapping
     public ResponseEntity<List<CemenTasaEconomica>> listarTodas() {

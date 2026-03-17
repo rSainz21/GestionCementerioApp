@@ -10,7 +10,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Service
-public class CemenTasaEconomicaServiceImpl implements CemenTasaEconomicaService {
+public class TasaEconomicaServiceImpl implements TasaEconomicaService {
 
     @Autowired
     private TasaEconomicaRepository tasaRepository;

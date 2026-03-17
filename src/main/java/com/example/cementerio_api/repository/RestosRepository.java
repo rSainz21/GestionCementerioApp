@@ -16,6 +16,6 @@ public interface RestosRepository extends JpaRepository<CemenRestos, Integer> {
 
     List<CemenRestos> findByNombreApellidosContainingIgnoreCase(String nombre);
 
-    @Query("SELECT r FROM Restos r WHERE r.unidadEnterramiento IS NULL")
+    @Query("SELECT r FROM CemenRestos r WHERE r.unidad IS NULL")
     List<CemenRestos> findRestosHuerfanos();
 }

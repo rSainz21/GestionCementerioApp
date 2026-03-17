@@ -6,7 +6,7 @@ import com.example.cementerio_api.entity.CemenTasaEconomica;
 
 import java.util.List;
 
-public interface CemenTasaEconomicaService {
+public interface TasaEconomicaService {
     List<CemenTasaEconomica> listarTodas();
     List<CemenTasaEconomica> listarImpagos();
     List<CemenTasaEconomica> listarPorUnidad(Integer unidadId);

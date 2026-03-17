@@ -15,6 +15,6 @@ public interface ConcesionRepository extends JpaRepository<CemenConcesion, Integ
     List<CemenConcesion> findByUnidadEnterramientoId(Integer unidadId);
 
     // MAGIA PARA AVISOS: Busca concesiones que caducan antes de una fecha y siguen vigentes
-    @Query("SELECT c FROM Concesion c WHERE c.fechaVencimiento <= :fecha AND c.estado = 'Vigente'")
+    @Query("SELECT c FROM CemenConcesion c WHERE c.fechaVencimiento <= :fecha AND c.estado = 'Vigente'")
     List<CemenConcesion> findProximosVencimientos(LocalDate fecha);
 }
