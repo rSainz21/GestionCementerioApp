@@ -28,7 +28,7 @@ public class CemenConcesion {
     private java.time.LocalDate fechaVencimiento;
 
     @Column(nullable = false, length = 30)
-    private String estado; // Vigente, Caducada [cite: 135]
+    private String estado; // Vigente, Caducada
 
     @Column(columnDefinition = "TEXT")
     private String observaciones;
