@@ -10,5 +10,6 @@ public interface UsuarioService {
     Optional<CemenUsuario> buscarPorId(Integer id);
     Optional<CemenUsuario> buscarPorUsername(String username);
     CemenUsuario registrarUsuario(CemenUsuario usuario);
+    CemenUsuario actualizar(Integer id, CemenUsuario usuario);
     void eliminar(Integer id);
 }
