@@ -2,6 +2,7 @@ package com.example.cementerio_api.service;
 
 
 
+import com.example.cementerio_api.entity.CemenMovimiento;
 import com.example.cementerio_api.entity.CemenRestos;
 import com.example.cementerio_api.entity.CemenUnidadEnterramiento;
 import com.example.cementerio_api.repository.RestosRepository;
@@ -21,7 +22,9 @@ public class RestosServiceImpl implements RestosService {
 
     @Autowired
     private UnidadEnterramientoRepository unidadRepo;
-
+    public CemenRestos guardar(CemenRestos resto) {
+        return restosRepo.save(resto);
+    }
     @Override
     public List<CemenRestos> listarHuerfanos() {
         return restosRepo.findByUnidadIsNull();
@@ -51,4 +54,5 @@ public class RestosServiceImpl implements RestosService {
         // Facilita la búsqueda de familiares en el portal de consulta o para operarios
         return restosRepo.findByNombreApellidosContainingIgnoreCase(nombre);
     }
+
 }

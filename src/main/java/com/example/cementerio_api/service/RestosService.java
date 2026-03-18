@@ -9,4 +9,5 @@ public interface RestosService {
     List<CemenRestos> listarHuerfanos();
     CemenRestos vincularANicho(Integer restoId, Integer unidadId);
     List<CemenRestos> buscarPorNombre(String nombre);
+    CemenRestos guardar(CemenRestos cemenRestos);
 }

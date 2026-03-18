@@ -1,4 +1,5 @@
 package com.example.cementerio_api.entity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,8 +18,10 @@ public class CemenDocumento {
     private CemenUnidadEnterramiento unidadEnterramiento;
 
     @Column(nullable = false, length = 50)
-    private String tipo; // "Foto Lápida", "Título", "Acta" [cite: 165, 171]
+    @JsonProperty("tipoDocumento")
+    private String tipo;
 
     @Column(name = "ruta_archivo", nullable = false)
-    private String rutaArchivo; // URL o path en servidor
+    @JsonProperty("urlArchivo")
+    private String rutaArchivo;
 }
