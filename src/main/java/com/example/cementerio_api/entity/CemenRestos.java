@@ -1,8 +1,11 @@
 package com.example.cementerio_api.entity;
 
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -33,7 +36,10 @@ public class CemenRestos {
 
     @Column(name = "notas_historicas", columnDefinition = "TEXT")
     private String notasHistoricas; // Para tachaduras o notas manuscritas detectadas
-
+    // @CreationTimestamp hace que la base de datos ponga la fecha actual automáticamente
+    @CreationTimestamp
+    @Column(name = "fecha_movimiento", nullable = false, updatable = false)
+    private LocalDate fechaMovimiento;
     @Column(name = "creado_en", insertable = false, updatable = false)
     private LocalDateTime creadoEn;
 }

@@ -21,6 +21,10 @@ public class BloqueController {
         return ResponseEntity.ok(bloqueService.listarPorCementerio(cementerioId));
     }
 
+    @GetMapping
+    public List<CemenBloque> listarTodos() {
+        return bloqueService.listarTodos();
+    }
     // Crear un nuevo bloque (Inicia el Generador Dinámico de Estructuras)
     @PostMapping
     public ResponseEntity<CemenBloque> crear(@RequestBody CemenBloque bloque) {
