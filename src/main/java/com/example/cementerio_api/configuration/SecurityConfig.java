@@ -20,18 +20,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Desactivamos CSRF porque para APIs REST con tokens no es necesario
-                // y bloquea las peticiones POST de Postman.
-                .csrf(csrf -> csrf.disable())
-
-                // 2. Configuramos los permisos de las rutas
+                .csrf(csrf -> csrf.disable()) // Vital para POST/PUT/DELETE
                 .authorizeHttpRequests(auth -> auth
-                        // Permitimos acceso libre a TODO lo que empiece por /api/usuarios/
-                        // para que puedas registrar y listar sin estar logueado aún.
-                        .requestMatchers("/api/usuarios/**").permitAll()
-                        // El resto de la API seguirá pidiendo autenticación
-                        .anyRequest().authenticated()
-                );
+                        .anyRequest().permitAll() // ESTO DESACTIVA LA SEGURIDAD EN TODA LA API
+                )
+                .headers(headers -> headers.frameOptions(f -> f.disable()));
 
         return http.build();
     }
