@@ -38,6 +38,18 @@ public class UsuarioController {
         }
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<CemenUsuario> actualizar(@PathVariable Integer id, @RequestBody CemenUsuario usuario) {
+        try {
+            CemenUsuario actualizado = usuarioService.actualizar(id, usuario);
+            return ResponseEntity.ok(actualizado);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Integer id) {
         usuarioService.eliminar(id);

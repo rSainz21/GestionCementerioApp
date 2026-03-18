@@ -2,6 +2,7 @@ package com.example.cementerio_api.service;
 
 import com.example.cementerio_api.entity.CemenUsuario;
 import com.example.cementerio_api.repository.UsuarioRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,27 @@ public class UsuarioServiceImpl implements UsuarioService {
         usuario.setPassword(passEncriptada);
 
         return usuarioRepository.save(usuario);
+    }
+
+    @Override
+    @Transactional
+    public CemenUsuario actualizar(Integer id, CemenUsuario datosNuevos) {
+        CemenUsuario usuarioExistente = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + id));
+
+        // Actualizamos el nombre de usuario (username)
+        usuarioExistente.setUsername(datosNuevos.getUsername());
+
+        // Actualizamos el rol (ADMIN, OPERARIO, etc.)
+        usuarioExistente.setRol(datosNuevos.getRol());
+
+        // LOGICA DE CONTRASEÑA: Solo si el JSON trae una contraseña, la encriptamos y cambiamos
+        if (datosNuevos.getPassword() != null && !datosNuevos.getPassword().isEmpty()) {
+            String passEncriptada = passwordEncoder.encode(datosNuevos.getPassword());
+            usuarioExistente.setPassword(passEncriptada);
+        }
+
+        return usuarioRepository.save(usuarioExistente);
     }
 
     @Override
