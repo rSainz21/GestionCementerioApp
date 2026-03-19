@@ -1,0 +1,29 @@
+CAMBIOS NECESARIOS EN LA API SPRING BOOT
+==========================================
+
+Estos 4 ficheros deben reemplazar a los equivalentes en tu proyecto Spring Boot
+antes de volver a compilar y ejecutar el servidor.
+
+1. ConcesionController_NUEVO.java
+   → Reemplaza: src/main/java/com/example/cementerio_api/controladores/ConcesionController.java
+   → Añade:     POST /api/concesiones  (crear nueva concesión)
+
+2. UnidadController_NUEVO.java
+   → Reemplaza: src/main/java/com/example/cementerio_api/controladores/UnidadController.java
+   → Añade:     GET  /api/unidades/{id}   (obtener por ID)
+                PUT  /api/unidades/{id}   (actualizar estado)
+
+3. UnidadEnterramientoService_NUEVO.java
+   → Reemplaza: src/main/java/com/example/cementerio_api/service/UnidadEnterramientoService.java
+   → Añade:     buscarPorId(Integer id) al interface
+
+4. UnidadEnterramientoServiceImpl_NUEVO.java
+   → Reemplaza: src/main/java/com/example/cementerio_api/service/UnidadEnterramientoServiceImpl.java
+   → Añade:     implementación de buscarPorId
+
+FLUJO COMPLETO DE "NUEVA INHUMACIÓN" en la app:
+  1. POST /api/titulares          → crea titular/concesionario
+  2. POST /api/restos             → registra difunto
+  3. PUT  /api/restos/{id}/vincular/{unidadId} → ubica en nicho
+  4. PUT  /api/unidades/{id}      → cambia estado a "Ocupado"
+  5. POST /api/concesiones        → crea contrato de concesión
