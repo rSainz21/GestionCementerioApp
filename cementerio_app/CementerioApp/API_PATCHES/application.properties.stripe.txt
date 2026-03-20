@@ -1,0 +1,12 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# AÑADIR a application.properties de la API Spring Boot
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Claves de Stripe (TEST - cambia por LIVE en producción)
+# Obtenlas en: https://dashboard.stripe.com/test/apikeys
+stripe.secret.key=sk_test_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+stripe.publishable.key=pk_test_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Para producción real:
+# stripe.secret.key=sk_live_...
+# stripe.publishable.key=pk_live_...
