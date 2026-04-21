@@ -26,6 +26,159 @@ app.get('/health', async (_req, res) => {
   }
 });
 
+// ---- Lecturas y búsquedas (para que móvil pueda “ver todo”) ----
+
+app.get('/catalogo', requireToken, async (_req, res) => {
+  try {
+    const [zonas] = await pool.query(
+      'SELECT id, cementerio_id, nombre, codigo, descripcion FROM cemn_zonas ORDER BY id'
+    );
+    const [bloques] = await pool.query(
+      'SELECT id, zona_id, nombre, codigo, tipo, filas, columnas, descripcion FROM cemn_bloques ORDER BY id'
+    );
+    return res.json({ ok: true, zonas, bloques });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.get('/bloques/:id/sepulturas', requireToken, async (req, res) => {
+  const bloqueId = Number(req.params.id);
+  if (!Number.isFinite(bloqueId) || bloqueId <= 0) return res.status(400).json({ ok: false, error: 'bloque id inválido' });
+  try {
+    const [items] = await pool.query(
+      `SELECT id, bloque_id, zona_id, tipo, numero, fila, columna, codigo, estado, notas
+       FROM cemn_sepulturas
+       WHERE bloque_id = :bid
+       ORDER BY columna ASC, fila ASC`,
+      { bid: bloqueId }
+    );
+    return res.json({ ok: true, items });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.get('/sepulturas/:id', requireToken, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ ok: false, error: 'sepultura id inválido' });
+  try {
+    const [[sep]] = await pool.query(
+      `SELECT id, zona_id, bloque_id, tipo, numero, fila, columna, codigo, estado, ubicacion_texto, lat, lon, imagen, notas
+       FROM cemn_sepulturas WHERE id = :id LIMIT 1`,
+      { id }
+    );
+    if (!sep) return res.status(404).json({ ok: false, error: 'No encontrada' });
+
+    const [[zona]] = await pool.query('SELECT id, nombre, codigo FROM cemn_zonas WHERE id=:id LIMIT 1', { id: sep.zona_id });
+    const [[bloque]] = await pool.query(
+      'SELECT id, zona_id, nombre, codigo, tipo, filas, columnas FROM cemn_bloques WHERE id=:id LIMIT 1',
+      { id: sep.bloque_id }
+    );
+
+    const [difuntos] = await pool.query(
+      'SELECT id, tercero_id, nombre_completo, fecha_fallecimiento, fecha_inhumacion, sepultura_id, es_titular, parentesco, notas, foto_path FROM cemn_difuntos WHERE sepultura_id=:sid ORDER BY es_titular DESC, fecha_inhumacion DESC',
+      { sid: id }
+    );
+    const difunto_titular = Array.isArray(difuntos) ? difuntos.find((d) => Number(d.es_titular) === 1) ?? null : null;
+
+    const [concesiones] = await pool.query(
+      'SELECT id, sepultura_id, numero_expediente, tipo, fecha_concesion, fecha_vencimiento, duracion_anos, estado, importe, moneda, concesion_previa_id, notas FROM cemn_concesiones WHERE sepultura_id=:sid AND estado=\"vigente\" ORDER BY fecha_concesion DESC LIMIT 1',
+      { sid: id }
+    );
+    const concesion_vigente = concesiones?.[0] ?? null;
+
+    let terceros = [];
+    if (concesion_vigente?.id) {
+      const [t] = await pool.query(
+        `SELECT t.id, t.dni, t.nombre, t.apellido1, t.apellido2, t.email, t.telefono, ct.rol
+         FROM cemn_concesion_terceros ct
+         JOIN cemn_terceros t ON t.id = ct.tercero_id
+         WHERE ct.concesion_id = :cid
+         ORDER BY (ct.rol='concesionario') DESC, t.id ASC`,
+        { cid: concesion_vigente.id }
+      );
+      terceros = t ?? [];
+    }
+
+    const [movimientos] = difunto_titular?.id
+      ? await pool.query(
+          'SELECT id, difunto_id, tipo, fecha, sepultura_origen_id, sepultura_destino_id, numero_expediente, notas FROM cemn_movimientos WHERE difunto_id=:did ORDER BY fecha DESC, id DESC',
+          { did: difunto_titular.id }
+        )
+      : [[]];
+
+    const [documentos] = await pool.query(
+      'SELECT id, sepultura_id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes, descripcion, created_at FROM cemn_documentos WHERE sepultura_id=:sid ORDER BY created_at DESC, id DESC',
+      { sid: id }
+    );
+
+    return res.json({
+      ok: true,
+      item: {
+        ...sep,
+        zona: zona ?? null,
+        bloque: bloque ?? null,
+        difunto_titular,
+        difuntos,
+        concesion_vigente: concesion_vigente ? { ...concesion_vigente, terceros } : null,
+        movimientos,
+        documentos
+      }
+    });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.get('/search/difuntos', requireToken, async (req, res) => {
+  const q = String(req.query.q ?? '').trim();
+  if (q.length < 2) return res.json({ ok: true, items: [] });
+  try {
+    const [items] = await pool.query(
+      `SELECT d.id, d.nombre_completo, d.fecha_fallecimiento, d.fecha_inhumacion, d.sepultura_id, t.dni,
+              s.codigo AS sepultura_codigo, b.nombre AS bloque_nombre, z.nombre AS zona_nombre
+       FROM cemn_difuntos d
+       LEFT JOIN cemn_terceros t ON t.id = d.tercero_id
+       LEFT JOIN cemn_sepulturas s ON s.id = d.sepultura_id
+       LEFT JOIN cemn_bloques b ON b.id = s.bloque_id
+       LEFT JOIN cemn_zonas z ON z.id = s.zona_id
+       WHERE d.nombre_completo LIKE :qq OR t.dni LIKE :qq
+       ORDER BY d.id DESC
+       LIMIT 20`,
+      { qq: `%${q}%` }
+    );
+    return res.json({ ok: true, items });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+app.get('/search/concesiones', requireToken, async (req, res) => {
+  const q = String(req.query.q ?? '').trim();
+  if (q.length < 2) return res.json({ ok: true, items: [] });
+  try {
+    const [items] = await pool.query(
+      `SELECT c.id, c.sepultura_id, c.numero_expediente, c.tipo, c.fecha_concesion, c.fecha_vencimiento, c.duracion_anos, c.estado,
+              s.codigo AS sepultura_codigo, b.nombre AS bloque_nombre, z.nombre AS zona_nombre,
+              CONCAT_WS(' ', t.nombre, t.apellido1, t.apellido2) AS concesionario, t.dni AS concesionario_dni
+       FROM cemn_concesiones c
+       LEFT JOIN cemn_sepulturas s ON s.id = c.sepultura_id
+       LEFT JOIN cemn_bloques b ON b.id = s.bloque_id
+       LEFT JOIN cemn_zonas z ON z.id = s.zona_id
+       LEFT JOIN cemn_concesion_terceros ct ON ct.concesion_id = c.id AND ct.rol='concesionario'
+       LEFT JOIN cemn_terceros t ON t.id = ct.tercero_id
+       WHERE t.dni LIKE :qq OR t.nombre LIKE :qq OR t.apellido1 LIKE :qq OR t.apellido2 LIKE :qq
+       ORDER BY c.id DESC
+       LIMIT 20`,
+      { qq: `%${q}%` }
+    );
+    return res.json({ ok: true, items });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
 // ---- Workflows transaccionales (MySQL) ----
 
 const InhumacionBody = z.object({
