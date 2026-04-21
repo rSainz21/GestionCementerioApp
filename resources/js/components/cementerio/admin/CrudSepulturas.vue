@@ -9,6 +9,8 @@
       </div>
     </div>
 
+    <div v-if="loadError" class="error">{{ loadError }}</div>
+
     <DataTable :value="items" stripedRows :loading="loading" paginator :rows="15">
       <Column field="id" header="ID" style="width:90px" />
       <Column field="codigo" header="Código" style="width:160px" />
@@ -28,7 +30,7 @@
       </Column>
     </DataTable>
 
-    <Dialog v-model:visible="viewDialog" modal header="Detalle de unidad" :style="{ width: '840px' }">
+    <Dialog v-model:visible="viewDialog" modal header="Detalle de unidad" :style="{ width: 'min(1400px, 96vw)' }">
       <SepulturaInfoPanel :sepulturaId="viewSepulturaId" />
       <template #footer>
         <Button label="Cerrar" severity="secondary" @click="viewDialog=false" />
@@ -109,6 +111,7 @@ const bloques = ref([]);
 const estados = ['libre', 'ocupada', 'reservada', 'clausurada'];
 
 const loading = ref(false);
+const loadError = ref(null);
 const dialog = ref(false);
 const saving = ref(false);
 const error = ref(null);
@@ -140,20 +143,26 @@ watch(
 );
 
 async function loadCatalogos() {
-  const [rz, rb] = await Promise.all([
-    api.get('/api/cementerio/admin/zonas'),
-    api.get('/api/cementerio/admin/bloques'),
-  ]);
-  zonas.value = rz.data?.items?.map((z) => ({ id: z.id, nombre: z.nombre })) ?? [];
-  bloques.value =
-    rb.data?.items?.map((b) => ({ id: b.id, nombre: b.nombre, zona_id: b.zona_id })) ?? [];
+  try {
+    const [rz, rb] = await Promise.all([
+      api.get('/api/cementerio/admin/zonas'),
+      api.get('/api/cementerio/admin/bloques'),
+    ]);
+    zonas.value = rz.data?.items?.map((z) => ({ id: z.id, nombre: z.nombre })) ?? [];
+    bloques.value = rb.data?.items?.map((b) => ({ id: b.id, nombre: b.nombre, zona_id: b.zona_id })) ?? [];
+  } catch (e) {
+    loadError.value = toApiErrorMessage(e, 'No se pudieron cargar los catálogos (¿permisos?).');
+  }
 }
 
 async function load() {
   loading.value = true;
+  loadError.value = null;
   try {
     const res = await api.get('/api/cementerio/admin/sepulturas');
     items.value = res.data?.items ?? [];
+  } catch (e) {
+    loadError.value = toApiErrorMessage(e, 'No se pudieron cargar las unidades (¿permisos?).');
   } finally {
     loading.value = false;
   }

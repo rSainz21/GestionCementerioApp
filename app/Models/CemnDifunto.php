@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class CemnDifunto extends Model
 {
@@ -19,6 +20,11 @@ class CemnDifunto extends Model
         'es_titular',
         'parentesco',
         'notas',
+        'foto_path',
+    ];
+
+    protected $appends = [
+        'foto_url',
     ];
 
     protected $casts = [
@@ -26,6 +32,17 @@ class CemnDifunto extends Model
         'fecha_inhumacion'    => 'date',
         'es_titular'          => 'boolean',
     ];
+
+    public function getFotoUrlAttribute(): ?string
+    {
+        if (!$this->foto_path) {
+            return null;
+        }
+
+        // Devolver ruta relativa para que funcione en cualquier dispositivo (misma origin).
+        // Si devolvemos URL absoluta basada en APP_URL, en LAN suele quedar como http://localhost/...
+        return '/storage/' . ltrim($this->foto_path, '/');
+    }
 
     public function tercero(): BelongsTo
     {

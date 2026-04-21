@@ -1,0 +1,63 @@
+###
+# Imagen de producción:
+# - instala dependencias PHP (vendor) sin dev
+# - compila assets Vite (public/build)
+# - NO monta el repo como volumen: reproducible y estable para LAN
+###
+
+FROM node:20-alpine AS vite-build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY resources ./resources
+COPY public ./public
+COPY vite.config.* ./
+COPY postcss.config.* ./
+COPY tailwind.config.* ./
+RUN npm run build
+
+FROM composer:2 AS composer-build
+WORKDIR /app
+COPY . .
+RUN mkdir -p bootstrap/cache storage && chmod -R 777 bootstrap/cache storage
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress
+RUN composer dump-autoload --optimize
+
+FROM php:8.2-fpm-alpine
+WORKDIR /var/www/html
+
+RUN apk add --no-cache \
+    bash \
+    icu-dev \
+    libpng-dev \
+    libzip-dev \
+    oniguruma-dev \
+    zip \
+    unzip \
+  && docker-php-ext-configure intl \
+  && docker-php-ext-install -j"$(nproc)" \
+    bcmath \
+    intl \
+    mbstring \
+    pdo \
+    pdo_mysql \
+    zip \
+  && rm -rf /tmp/*
+
+# Copiamos aplicación (incluye vendor ya preparado)
+COPY --from=composer-build /app /var/www/html
+
+# Guardamos una copia "de imagen" del public para poder poblar el volumen app_public
+# (si montamos un volumen en /var/www/html/public, el contenido de la imagen queda oculto).
+RUN mkdir -p /opt/app-public
+COPY --from=composer-build /app/public /opt/app-public
+COPY --from=vite-build /app/public/build /opt/app-public/build
+
+# Entrypoint de producción
+COPY docker/php/entrypoint-prod.sh /usr/local/bin/entrypoint-prod.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint-prod.sh && chmod +x /usr/local/bin/entrypoint-prod.sh
+
+ENV APP_ENV=production
+ENV APP_DEBUG=false
+
+ENTRYPOINT ["/usr/local/bin/entrypoint-prod.sh"]

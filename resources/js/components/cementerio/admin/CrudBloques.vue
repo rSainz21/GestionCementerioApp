@@ -9,6 +9,8 @@
       </div>
     </div>
 
+    <div v-if="loadError" class="error">{{ loadError }}</div>
+
     <DataTable :value="items" stripedRows :loading="loading">
       <Column field="id" header="ID" style="width:90px" />
       <Column field="zona_nombre" header="Zona" />
@@ -95,6 +97,7 @@ const items = ref([]);
 const zonas = ref([]);
 const tipos = ['nichos', 'columbarios', 'fosas', 'panteones', 'otros'];
 const loading = ref(false);
+const loadError = ref(null);
 const dialog = ref(false);
 const saving = ref(false);
 const error = ref(null);
@@ -111,15 +114,22 @@ const form = reactive({
 });
 
 async function loadCatalogos() {
-  const res = await api.get('/api/cementerio/admin/zonas');
-  zonas.value = res.data?.items?.map((z) => ({ id: z.id, nombre: z.nombre })) ?? [];
+  try {
+    const res = await api.get('/api/cementerio/admin/zonas');
+    zonas.value = res.data?.items?.map((z) => ({ id: z.id, nombre: z.nombre })) ?? [];
+  } catch (e) {
+    loadError.value = toApiErrorMessage(e, 'No se pudieron cargar los catálogos (¿permisos?).');
+  }
 }
 
 async function load() {
   loading.value = true;
+  loadError.value = null;
   try {
     const res = await api.get('/api/cementerio/admin/bloques');
     items.value = res.data?.items ?? [];
+  } catch (e) {
+    loadError.value = toApiErrorMessage(e, 'No se pudieron cargar los bloques (¿permisos?).');
   } finally {
     loading.value = false;
   }

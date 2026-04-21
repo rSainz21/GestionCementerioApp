@@ -9,6 +9,8 @@
       </div>
     </div>
 
+    <div v-if="loadError" class="error">{{ loadError }}</div>
+
     <DataTable :value="items" stripedRows :loading="loading">
       <Column field="id" header="ID" style="width:90px" />
       <Column field="nombre" header="Nombre" />
@@ -65,6 +67,7 @@ import InputText from 'primevue/inputtext';
 
 const items = ref([]);
 const loading = ref(false);
+const loadError = ref(null);
 const dialog = ref(false);
 const saving = ref(false);
 const error = ref(null);
@@ -79,9 +82,12 @@ const form = reactive({
 
 async function load() {
   loading.value = true;
+  loadError.value = null;
   try {
     const res = await api.get('/api/cementerio/admin/cementerios');
     items.value = res.data?.items ?? [];
+  } catch (e) {
+    loadError.value = toApiErrorMessage(e, 'No se pudieron cargar los cementerios (¿permisos?).');
   } finally {
     loading.value = false;
   }

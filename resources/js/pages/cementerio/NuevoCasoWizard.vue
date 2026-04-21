@@ -106,6 +106,15 @@
             <input v-model="form.difunto.fecha_inhumacion" class="input" type="date" />
           </div>
           <div class="field span2">
+            <label class="label">Foto (opcional)</label>
+            <input class="input" type="file" accept="image/*" @change="onFotoChange" />
+            <div v-if="fotoPreviewUrl" class="preview">
+              <img :src="fotoPreviewUrl" alt="Previsualización de foto" />
+              <button class="btn btn--ghost" type="button" @click="clearFoto">Quitar foto</button>
+            </div>
+            <div v-else class="help muted">Puedes adjuntarla ahora o más adelante desde el detalle de la unidad.</div>
+          </div>
+          <div class="field span2">
             <label class="label">Observaciones</label>
             <textarea v-model="form.difunto.notas" class="textarea" rows="4" />
           </div>
@@ -231,6 +240,8 @@ const form = reactive({
 const saving = ref(false);
 const saveError = ref(null);
 const saveOk = ref(false);
+const fotoFile = ref(null);
+const fotoPreviewUrl = ref(null);
 
 const idx = computed(() => steps.findIndex((s) => s.id === step.value));
 const isFirst = computed(() => idx.value <= 0);
@@ -296,7 +307,25 @@ async function guardar() {
   saveError.value = null;
   saveOk.value = false;
   try {
-    await api.post('/api/cementerio/nuevo-caso', form);
+    if (fotoFile.value) {
+      const fd = new FormData();
+      fd.append('sepultura_id', String(form.sepultura_id ?? ''));
+
+      for (const [k, v] of Object.entries(form.titular || {})) {
+        if (v !== null && v !== undefined && v !== '') fd.append(`titular[${k}]`, String(v));
+      }
+      for (const [k, v] of Object.entries(form.difunto || {})) {
+        if (v !== null && v !== undefined && v !== '') fd.append(`difunto[${k}]`, String(v));
+      }
+      for (const [k, v] of Object.entries(form.concesion || {})) {
+        if (v !== null && v !== undefined && v !== '') fd.append(`concesion[${k}]`, String(v));
+      }
+
+      fd.append('difunto[foto]', fotoFile.value);
+      await api.post('/api/cementerio/nuevo-caso', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    } else {
+      await api.post('/api/cementerio/nuevo-caso', form);
+    }
     saveOk.value = true;
   } catch (e) {
     saveError.value =
@@ -305,6 +334,20 @@ async function guardar() {
   } finally {
     saving.value = false;
   }
+}
+
+function onFotoChange(ev) {
+  const file = ev?.target?.files?.[0] ?? null;
+  if (!file) return;
+  fotoFile.value = file;
+  if (fotoPreviewUrl.value) URL.revokeObjectURL(fotoPreviewUrl.value);
+  fotoPreviewUrl.value = URL.createObjectURL(file);
+}
+
+function clearFoto() {
+  fotoFile.value = null;
+  if (fotoPreviewUrl.value) URL.revokeObjectURL(fotoPreviewUrl.value);
+  fotoPreviewUrl.value = null;
 }
 
 onMounted(async () => {
@@ -486,6 +529,20 @@ onMounted(async () => {
 }
 .dropdown__item:hover {
   background: rgba(17, 134, 82, 0.08);
+}
+
+.preview {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+  max-width: 360px;
+}
+.preview img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(23, 35, 31, 0.12);
 }
 
 .summary {

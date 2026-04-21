@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Cementerio\CementerioStatsController;
 use App\Http\Controllers\Cementerio\TercerosSearchController;
 use App\Http\Controllers\Cementerio\SepulturaDetalleController;
+use App\Http\Controllers\Cementerio\ConcesionesSearchController;
+use App\Http\Controllers\Cementerio\DifuntoFotoController;
+use App\Http\Controllers\Cementerio\DifuntosSearchController;
+use App\Http\Controllers\Cementerio\SepulturaDocumentoController;
 use App\Http\Controllers\Cementerio\Admin\CementeriosAdminController;
 use App\Http\Controllers\Cementerio\Admin\ZonasAdminController;
 use App\Http\Controllers\Cementerio\Admin\BloquesAdminController;
@@ -25,14 +29,22 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('permission:cementerio.ver');
         Route::get('/terceros', [TercerosSearchController::class, 'index'])
             ->middleware('permission:cementerio.ver');
+        Route::get('/concesiones', [ConcesionesSearchController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
+        Route::get('/difuntos', [DifuntosSearchController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
         Route::get('/catalogo', [CementerioCatalogoController::class, 'catalogo'])
             ->middleware('permission:cementerio.ver');
         Route::get('/bloques/{bloque}/sepulturas', [BloqueSepulturasController::class, 'index'])
             ->middleware('permission:cementerio.ver');
         Route::get('/sepulturas/{id}', [SepulturaDetalleController::class, 'show'])
             ->middleware('permission:cementerio.ver');
+        Route::post('/sepulturas/{id}/documentos', [SepulturaDocumentoController::class, 'store'])
+            ->middleware('permission:cementerio.editar');
         Route::post('/nuevo-caso', [NuevoCasoController::class, 'store'])
             ->middleware('permission:cementerio.crear');
+        Route::post('/difuntos/{id}/foto', [DifuntoFotoController::class, 'store'])
+            ->middleware('permission:cementerio.editar');
 
         Route::prefix('admin')->group(function () {
             Route::get('/cementerios', [CementeriosAdminController::class, 'index'])

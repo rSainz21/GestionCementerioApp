@@ -27,11 +27,13 @@ class BloqueSepulturasController extends Controller
                 'estado',
             ])
             ->with([
-                'difuntoTitular:id,sepultura_id,nombre_completo,fecha_inhumacion,es_titular',
+                'difuntoTitular:id,sepultura_id,nombre_completo,fecha_inhumacion,es_titular,foto_path',
             ])
             ->get();
 
         return response()->json([
+            // El frontend espera `items`; mantenemos también `data` por compatibilidad.
+            'items' => $sepulturas,
             'data' => $sepulturas,
         ]);
     }

@@ -14,7 +14,8 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import api from '@/services/api';
 import SelectorNichosGrid from '@/components/cementerio/SelectorNichosGrid.vue';
 import SepulturaInfoPanel from '@/components/cementerio/SepulturaInfoPanel.vue';
@@ -22,6 +23,7 @@ import SepulturaInfoPanel from '@/components/cementerio/SepulturaInfoPanel.vue';
 const zonas = ref([]);
 const bloques = ref([]);
 const selectedId = ref(null);
+const route = useRoute();
 
 async function loadCatalogo() {
   const res = await api.get('/api/cementerio/catalogo');
@@ -34,12 +36,24 @@ function onSelected(sepultura) {
 }
 
 onMounted(loadCatalogo);
+
+watch(
+  () => route.query?.sepultura,
+  (v) => {
+    const id = Number(v);
+    if (Number.isFinite(id) && id > 0) {
+      selectedId.value = id;
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>
 .grid {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  /* Muchísimo más espacio al panel de detalle (derecha) */
+  grid-template-columns: minmax(420px, 0.7fr) minmax(760px, 2.3fr);
   gap: 14px;
   padding: 12px;
 }

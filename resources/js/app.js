@@ -22,7 +22,7 @@ const routes = [
     component: DefaultLayout,
     meta: { requiresAuth: true },
     children: [
-      { path: '', component: DashboardPage, meta: { title: 'Cementerio · Dashboard' } },
+      { path: '', component: DashboardPage, meta: { title: 'Cementerio · Inicio' } },
       { path: 'gestion', component: GestionPage, meta: { title: 'Cementerio · Gestión' } },
       { path: 'nuevo', component: NuevoCasoWizard, meta: { title: 'Cementerio · Nuevo caso' } },
     ],

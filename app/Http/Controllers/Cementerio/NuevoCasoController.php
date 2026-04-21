@@ -11,6 +11,7 @@ use App\Models\CemnSepultura;
 use App\Models\CemnTercero;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class NuevoCasoController extends Controller
@@ -41,6 +42,7 @@ class NuevoCasoController extends Controller
             'difunto.fecha_inhumacion' => ['nullable', 'date'],
             'difunto.parentesco' => ['nullable', 'string', 'max:60'],
             'difunto.notas' => ['nullable', 'string'],
+            'difunto.foto' => ['nullable', 'file', 'image', 'max:5120'], // 5MB
 
             // Selección de unidad
             'sepultura_id' => ['required', 'integer', 'exists:cemn_sepulturas,id'],
@@ -57,7 +59,9 @@ class NuevoCasoController extends Controller
             'concesion.notas' => ['nullable', 'string'],
         ]);
 
-        $result = DB::transaction(function () use ($data) {
+        $fotoFile = $request->file('difunto.foto');
+
+        $result = DB::transaction(function () use ($data, $fotoFile) {
             // Bloquea la sepultura para evitar carreras en asignación
             /** @var CemnSepultura $sepultura */
             $sepultura = CemnSepultura::query()
@@ -125,6 +129,15 @@ class NuevoCasoController extends Controller
                 'parentesco' => data_get($data, 'difunto.parentesco'),
                 'notas' => data_get($data, 'difunto.notas'),
             ]);
+
+            if ($fotoFile) {
+                $ext = strtolower($fotoFile->getClientOriginalExtension() ?: 'jpg');
+                $filename = Str::uuid()->toString().'.'.$ext;
+                $dir = 'cementerio/difuntos/'.$difunto->id;
+                $path = $fotoFile->storePubliclyAs($dir, $filename, 'public');
+                $difunto->foto_path = $path;
+                $difunto->save();
+            }
 
             // Marcar como ocupada
             $sepultura->estado = CemnSepultura::ESTADO_OCUPADA;
