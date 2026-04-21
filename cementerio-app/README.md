@@ -1,9 +1,9 @@
-# Cementerio Somahoz (Expo / React Native + Supabase)
+# Cementerio Somahoz (Expo / React Native)
 
 Aplicación móvil/tablet para **gestión y trabajo de campo** del cementerio municipal de Somahoz.
 
 - **Frontend**: Expo SDK ~54 + React Native + Expo Router
-- **Backend**: Supabase (Postgres, Auth, Storage, Edge Functions)
+- **Backend**: API HTTP (`mysql-api`) contra MySQL (misma BD que la web)
 
 ## Requisitos
 
@@ -12,11 +12,11 @@ Aplicación móvil/tablet para **gestión y trabajo de campo** del cementerio mu
 
 ## Variables de entorno
 
-Crear `cementerio-app/.env`:
+Crear `cementerio-app/.env` (copia desde `.env.example`):
 
 ```env
-EXPO_PUBLIC_SUPABASE_URL=https://<tu-proyecto>.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon_key>
+EXPO_PUBLIC_API_BASE=http://192.168.100.69:8000/mysql-api
+EXPO_PUBLIC_API_TOKEN=dev-token-cambia-esto
 ```
 
 ## Instalar y ejecutar
@@ -82,32 +82,18 @@ npx.cmd expo start --web --port 8082
 
 - Solo permite liberar si **no hay difuntos vinculados**.
 
-## Backend Supabase
+## Backend `mysql-api`
 
-### Esquema
+El servicio corre junto a la web en Docker y se expone por Nginx:
 
-- Archivo: `supabase/schema.sql`
-- Tablas clave: `cemn_sepulturas`, `cemn_difuntos`, `cemn_terceros`, `cemn_concesiones`, `cemn_documentos`, `cemn_audit_events`
-- RLS: políticas para rol `authenticated`
+- Healthcheck: `GET /mysql-api/health`
+- Workflows:
+  - `POST /mysql-api/workflows/inhumacion`
+  - `POST /mysql-api/workflows/exhumacion`
 
-### RPC (transacciones)
+Todos requieren header:
 
-Incluidas en `supabase/schema.sql`:
-
-- `cemn_workflow_inhumacion(...)`
-- `cemn_workflow_exhumacion(...)`
-
-> Para que funcionen en tu proyecto, aplica el SQL en Supabase (SQL editor/migraciones) y vuelve a abrir la app.
-
-### Edge Function
-
-- Ruta repo: `supabase/functions/sepulturas-auditoria/index.ts`
-
-## Notas operativas
-
-- Si el registro en `/login` muestra `email rate limit exceeded`, Supabase está limitando el envío de emails:
-  - espera un rato o crea usuarios desde **Authentication → Users → Add user**
-  - para producción, configura **SMTP** propio.
+- `Authorization: Bearer <EXPO_PUBLIC_API_TOKEN>`
 
 ## Documentación extendida
 
