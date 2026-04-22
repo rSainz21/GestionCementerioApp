@@ -47,11 +47,10 @@ if ($SeedDemo) {
 Write-Host ""
 Write-Host "Backend OK." -ForegroundColor Green
 Write-Host "URL: http://localhost:8000" -ForegroundColor Green
-Write-Host "API base móvil: http://<TU-IP-LAN-o-localhost>:8000" -ForegroundColor Green
+Write-Host "Nota móvil (futuro): si se vuelve a incorporar una app móvil, debería consumir el backend por LAN (p. ej. http://<TU-IP>:8000) y/o la API HTTP /mysql-api (si se mantiene)." -ForegroundColor Green
 Write-Host "Credenciales: admin / admin2026" -ForegroundColor Green
 Write-Host ""
 Write-Host "== FASE 1: Móvil ==" -ForegroundColor Cyan
-Write-Host "1) En 'cementerio-app/.env' pon:" -ForegroundColor Yellow
-Write-Host "   EXPO_PUBLIC_LARAVEL_BASE=http://localhost:8000" -ForegroundColor Yellow
-Write-Host "2) Luego, desde 'cementerio-app/': npm install ; npm run start" -ForegroundColor Yellow
+Write-Host "Esta rama es SOLO WEB. La carpeta 'cementerio-app/' no se incluye aquí por estar desactualizada." -ForegroundColor Yellow
+Write-Host "Para móvil, revisar 'docs/MOVIL.md' (mysql-api + proxy /mysql-api/)." -ForegroundColor Yellow
 

@@ -53,6 +53,22 @@ services:
     # ports:
     #   - "3307:3306"
 
+  mysql-api:
+    image: gestioncementerioapp-mysql-api
+    environment:
+      PORT: 8787
+      # Token que debe enviar el móvil (Authorization: Bearer <token>)
+      API_TOKEN: ${MYSQL_API_TOKEN:-dev-token-cambia-esto}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${DB_DATABASE:-cementerio}
+      MYSQL_USER: ${DB_USERNAME:-cementerio}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-cementerio}
+      # Ajusta según tu dominio/IP final
+      CORS_ORIGIN: ${APP_URL:-http://localhost}
+    depends_on:
+      - mysql
+
   phpmyadmin:
     profiles: ["admin"]
     image: phpmyadmin:5
