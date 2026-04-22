@@ -1443,6 +1443,28 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/pwa/sw.js').catch(()=>{});
 }
+
+// Reset “de una” (borra SW + caches) para evitar 419/recursos viejos.
+// Usar: /movil?reset=1
+(async function(){
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    if (!sp.has('reset')) return;
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (window.caches?.keys) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    ['smz_tok','smz_usr','smz_scr'].forEach(k => localStorage.removeItem(k));
+    window.location.replace('/movil');
+  } catch(e) {
+    // si algo falla, forzamos igualmente recarga limpia
+    window.location.replace('/movil');
+  }
+})();
 </script>
 @endverbatim
 </body>
