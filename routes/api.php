@@ -4,6 +4,7 @@ use App\Http\Controllers\Cementerio\BloqueSepulturasController;
 use App\Http\Controllers\Cementerio\CementerioCatalogoController;
 use App\Http\Controllers\Cementerio\NuevoCasoController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\ApiProxyController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Cementerio\CementerioStatsController;
 use App\Http\Controllers\Cementerio\TercerosSearchController;
@@ -24,6 +25,19 @@ use App\Http\Controllers\Cementerio\SepulturaDifuntosController;
 use App\Http\Controllers\Cementerio\WorkflowInhumacionController;
 use App\Http\Controllers\Cementerio\WorkflowExhumacionController;
 use App\Http\Controllers\Cementerio\SepulturasGeoController;
+
+/**
+ * Proxy opcional: tu PC sirve la PWA, pero los datos vienen del servidor del compañero.
+ * Actívalo con:
+ * - USE_REMOTE_API_PROXY=true
+ * - REMOTE_API_BASE=http://192.168.100.69:8000
+ *
+ * Esto evita CORS sin tocar el servidor remoto.
+ */
+if (filter_var(env('USE_REMOTE_API_PROXY', false), FILTER_VALIDATE_BOOL)) {
+    Route::any('/{path}', ApiProxyController::class)->where('path', '.*');
+    return;
+}
 
 Route::post('/login', [AuthController::class, 'login']);
 
