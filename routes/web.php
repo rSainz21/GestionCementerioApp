@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ApiProxyController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -18,14 +19,18 @@ Route::get('/movil/{any}', fn () => view('movil'))
     ->name('pwa.movil.fallback');
 
 /**
- * Si por cualquier motivo las rutas API no cargan (cache/syntax), evitamos que el
- * fallback web intente renderizar la SPA (y casque por Vite) cuando se pide /api/*.
+ * Proxy opcional: tu PC sirve la PWA, pero los datos vienen del servidor del compañero.
  *
- * Nota: cuando `routes/api.php` está bien, esta ruta NO se usa (las rutas API
- * se registran con prioridad al prefijo /api).
+ * Lo definimos también en `web.php` para que funcione incluso si `/api/*` acaba
+ * pasando por el stack web (nginx/rewrites/cachés), evitando el 500 por Vite.
  */
-Route::any('/api/{any}', fn () => response('API no disponible (rutas API no cargadas).', 500))
-    ->where('any', '.*');
+if (filter_var(env('USE_REMOTE_API_PROXY', false), FILTER_VALIDATE_BOOL)) {
+    Route::any('/api/{path}', ApiProxyController::class)->where('path', '.*');
+} else {
+    // Fallback claro si /api llega a web y el proxy no está activo.
+    Route::any('/api/{any}', fn () => response('API no disponible (proxy desactivado).', 500))
+        ->where('any', '.*');
+}
 
 // SPA fallback (excluye /movil y /api)
 Route::get('/{any}', fn () => view('app'))->where('any', '^(?!(movil|api)).*$');
