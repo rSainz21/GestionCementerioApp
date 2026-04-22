@@ -36,6 +36,12 @@ class ApiProxyController extends Controller
                 $headers[$h] = $v;
             }
         }
+        // Si el cliente (PWA/PowerShell) no manda Accept, Laravel remoto puede intentar
+        // responder HTML en vez de JSON (y acabar devolviendo un 500 genérico).
+        // Forzamos JSON por defecto para endpoints /api/*.
+        if (!array_key_exists('accept', $headers) || trim((string) $headers['accept']) === '') {
+            $headers['accept'] = 'application/json';
+        }
 
         $client = Http::withoutVerifying()
             ->withOptions(['http_errors' => false])
