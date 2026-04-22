@@ -17,6 +17,6 @@ Route::get('/movil/{any}', fn () => view('movil'))
     ->where('any', '.*')
     ->name('pwa.movil.fallback');
 
-// SPA fallback (excluye /movil)
-Route::get('/{any}', fn () => view('app'))->where('any', '^(?!movil).*$');
+// SPA fallback (excluye /movil y /api)
+Route::get('/{any}', fn () => view('app'))->where('any', '^(?!(movil|api)).*$');
 
