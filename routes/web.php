@@ -6,8 +6,17 @@ Route::get('/', function () {
     return view('app');
 });
 
-// SPA fallback (para /cementerio/*)
-Route::get('/{any}', function () {
-    return view('app');
-})->where('any', '.*');
+/**
+ * PWA móvil.
+ *
+ * Importante: estas rutas deben ir ANTES del fallback general,
+ * o `/movil` quedará capturada por el SPA principal.
+ */
+Route::get('/movil', fn () => view('movil'))->name('pwa.movil');
+Route::get('/movil/{any}', fn () => view('movil'))
+    ->where('any', '.*')
+    ->name('pwa.movil.fallback');
+
+// SPA fallback (excluye /movil)
+Route::get('/{any}', fn () => view('app'))->where('any', '^(?!movil).*$');
 
