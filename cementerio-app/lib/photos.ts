@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Alert, Platform } from 'react-native';
-import { supabase } from './supabase';
+import { apiFetch } from './laravel-api';
 
 export interface Foto {
   id: number;
@@ -99,92 +99,53 @@ export async function subirDocumentoFoto(
   descripcion?: string
 ): Promise<{ ok: true; url: string; documentoId?: number } | { ok: false; error: string }> {
   try {
-    const filename = `sep_${sepulturaId}_${Date.now()}.jpg`;
-    const path = `sepulturas/${sepulturaId}/${filename}`;
+    const fd = new FormData();
+    fd.append('tipo', 'fotografia');
+    if (descripcion) fd.append('descripcion', descripcion);
 
-    const response = await fetch(localUri);
-    const blob = await response.blob();
-
-    const { error: uploadError } = await supabase.storage
-      .from('fotos-cementerio')
-      .upload(path, blob, { contentType: 'image/jpeg', upsert: false });
-
-    if (uploadError) {
-      return { ok: false, error: `Storage: ${uploadError.message}` };
+    if (Platform.OS === 'web') {
+      const blob = await fetch(localUri).then((r) => r.blob());
+      fd.append('archivo', blob, 'foto.jpg');
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fd.append('archivo', { uri: localUri, name: 'foto.jpg', type: 'image/jpeg' } as any);
     }
 
-    const { data: urlData } = supabase.storage.from('fotos-cementerio').getPublicUrl(path);
-    const url = urlData.publicUrl;
+    const res = await apiFetch<{ item: any }>(`/api/cementerio/sepulturas/${sepulturaId}/documentos`, {
+      method: 'POST',
+      body: fd,
+      isMultipart: true,
+    });
 
-    // Preferente: documentos
-    const docRes = await supabase
-      .from('cemn_documentos')
-      .insert({
-        sepultura_id: sepulturaId,
-        tipo: 'fotografia',
-        nombre_original: filename,
-        ruta_archivo: url,
-        mime_type: 'image/jpeg',
-        tamano_bytes: (blob as any)?.size ?? null,
-        descripcion: descripcion ?? null,
-      })
-      .select('id, ruta_archivo, url')
-      .single();
+    if (!res.ok) return { ok: false, error: String(res.error ?? 'No se pudo subir el documento') };
 
-    if (!docRes.error && docRes.data) {
-      const u = (docRes.data as any).ruta_archivo ?? (docRes.data as any).url ?? url;
-      return { ok: true, url: u, documentoId: docRes.data.id };
-    }
-
-    // Fallback legacy: fotos
-    const fotoRes = await supabase
-      .from('cemn_fotos')
-      .insert({ sepultura_id: sepulturaId, url, descripcion: descripcion ?? null })
-      .select('id, url')
-      .single();
-
-    if (fotoRes.error || !fotoRes.data) {
-      return { ok: false, error: `DB: ${(docRes.error?.message ?? '').trim()} ${(fotoRes.error?.message ?? '').trim()}`.trim() };
-    }
-
-    return { ok: true, url: fotoRes.data.url ?? url };
+    const item = (res.data as any).item;
+    const url = item?.url ? String(item.url) : '';
+    return { ok: true, url, documentoId: item?.id };
   } catch (e: any) {
     return { ok: false, error: e?.message ?? String(e) };
   }
 }
 
 export async function obtenerFotos(sepulturaId: number): Promise<Foto[]> {
-  // Preferente: `cemn_documentos` tipo=fotografia
-  const docRes = await supabase
-    .from('cemn_documentos')
-    .select('*')
-    .eq('sepultura_id', sepulturaId)
-    .eq('tipo', 'fotografia')
-    .order('created_at', { ascending: false });
+  const r = await apiFetch<any>(`/api/cementerio/sepulturas/${sepulturaId}`);
+  if (!r.ok) return [];
 
-  if (!docRes.error) {
-    const docs = (docRes.data ?? []) as unknown as DocumentoFoto[];
-    return docs.map((d) => ({
+  const docs = (r.data as any)?.item?.documentos ?? [];
+  const fotos = (docs as DocumentoFoto[])
+    .filter((d) => String(d?.tipo ?? '').toLowerCase() === 'fotografia' || String(d?.tipo ?? '').toLowerCase() === 'foto')
+    .map((d) => ({
       id: d.id,
-      sepultura_id: d.sepultura_id,
-      url: String(d.ruta_archivo ?? d.url ?? ''),
+      sepultura_id: sepulturaId,
+      url: String((d as any).url ?? d.ruta_archivo ?? d.url ?? ''),
       descripcion: d.descripcion,
-      tomada_en: String(d.created_at ?? d.creado_en ?? ''),
+      tomada_en: String((d as any).created_at ?? d.created_at ?? d.creado_en ?? ''),
     }));
-  }
 
-  // Fallback legacy: `cemn_fotos`
-  const { data } = await supabase
-    .from('cemn_fotos')
-    .select('*')
-    .eq('sepultura_id', sepulturaId)
-    .order('tomada_en', { ascending: false });
-  return (data ?? []) as Foto[];
+  return fotos;
 }
 
 export async function eliminarFoto(fotoId: number): Promise<void> {
-  // Intentar borrar primero en documentos, luego en fotos legacy
-  const d1 = await supabase.from('cemn_documentos').delete().eq('id', fotoId);
-  if (!d1.error) return;
-  await supabase.from('cemn_fotos').delete().eq('id', fotoId);
+  // Todavía no hay endpoint de borrado: no-op (fase 1 pruebas).
+  void fotoId;
 }

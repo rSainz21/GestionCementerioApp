@@ -17,6 +17,13 @@ use App\Http\Controllers\Cementerio\Admin\ZonasAdminController;
 use App\Http\Controllers\Cementerio\Admin\BloquesAdminController;
 use App\Http\Controllers\Cementerio\Admin\SepulturasAdminController;
 use App\Http\Controllers\Cementerio\Admin\ConcesionesAdminController;
+use App\Http\Controllers\Cementerio\BloquesController;
+use App\Http\Controllers\Cementerio\SepulturasSearchController;
+use App\Http\Controllers\Cementerio\SepulturaUpdateController;
+use App\Http\Controllers\Cementerio\SepulturaDifuntosController;
+use App\Http\Controllers\Cementerio\WorkflowInhumacionController;
+use App\Http\Controllers\Cementerio\WorkflowExhumacionController;
+use App\Http\Controllers\Cementerio\SepulturasGeoController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -25,6 +32,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
 
     Route::prefix('cementerio')->group(function () {
+        Route::get('/bloques', [BloquesController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
+        Route::get('/sepulturas/search', [SepulturasSearchController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
+        Route::get('/sepulturas/geo', [SepulturasGeoController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
         Route::get('/stats', [CementerioStatsController::class, 'index'])
             ->middleware('permission:cementerio.ver');
         Route::get('/terceros', [TercerosSearchController::class, 'index'])
@@ -39,11 +52,19 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('permission:cementerio.ver');
         Route::get('/sepulturas/{id}', [SepulturaDetalleController::class, 'show'])
             ->middleware('permission:cementerio.ver');
+        Route::get('/sepulturas/{id}/difuntos', [SepulturaDifuntosController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
+        Route::put('/sepulturas/{id}', [SepulturaUpdateController::class, 'update'])
+            ->middleware('permission:cementerio.editar');
         Route::post('/sepulturas/{id}/documentos', [SepulturaDocumentoController::class, 'store'])
             ->middleware('permission:cementerio.editar');
         Route::post('/nuevo-caso', [NuevoCasoController::class, 'store'])
             ->middleware('permission:cementerio.crear');
         Route::post('/difuntos/{id}/foto', [DifuntoFotoController::class, 'store'])
+            ->middleware('permission:cementerio.editar');
+        Route::post('/workflows/inhumacion', [WorkflowInhumacionController::class, 'store'])
+            ->middleware('permission:cementerio.crear');
+        Route::post('/workflows/exhumacion', [WorkflowExhumacionController::class, 'store'])
             ->middleware('permission:cementerio.editar');
 
         Route::prefix('admin')->group(function () {

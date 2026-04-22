@@ -13,10 +13,10 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { supabase } from '@/lib/supabase';
 import type { Bloque, Sepultura } from '@/lib/types';
 import { etiquetaEstadoVisible, normalizarEstadoEditable } from '@/lib/estado-sepultura';
 import { NichoGrid } from '@/components/NichoGrid';
+import { apiFetch } from '@/lib/laravel-api';
 type SepListRow = Sepultura & { cemn_bloques?: { codigo: string } | null; cemn_zonas?: { nombre: string } | null };
 
 function isNumeric(s: string) {
@@ -39,16 +39,12 @@ export default function CampoScreen() {
   const [loadingBloque, setLoadingBloque] = useState(false);
 
   const seleccionarSepultura = useCallback(async (sepulturaId: number) => {
-    const res = await supabase
-      .from('cemn_sepulturas')
-      .select('*, cemn_bloques(codigo), cemn_zonas(nombre)')
-      .eq('id', sepulturaId)
-      .single();
-    if (res.error) {
-      Alert.alert('Error', res.error.message);
+    const res = await apiFetch<any>(`/api/cementerio/sepulturas/${sepulturaId}`);
+    if (!res.ok) {
+      Alert.alert('Error', String(res.error ?? 'No se pudo cargar la sepultura.'));
       return;
     }
-    if (res.data) setSelected(res.data as SepListRow);
+    if ((res.data as any)?.item) setSelected((res.data as any).item as SepListRow);
   }, []);
 
   const labelSelected = useMemo(() => {
@@ -68,17 +64,14 @@ export default function CampoScreen() {
 
     setLoading(true);
     try {
-      const base = supabase
-        .from('cemn_sepulturas')
-        .select('*, cemn_bloques(codigo), cemn_zonas(nombre)')
-        .limit(20);
-
-      const res = isNumeric(t)
-        ? await base.or(`numero.eq.${Number(t)},id.eq.${Number(t)}`)
-        : await base.or(`codigo.ilike.%${t}%,ubicacion_texto.ilike.%${t}%`);
-
-      if (res.error) throw res.error;
-      setRows((res.data ?? []) as SepListRow[]);
+      const res = await apiFetch<{ items: any[] }>(`/api/cementerio/sepulturas/search?q=${encodeURIComponent(t)}`);
+      if (!res.ok) throw new Error(String(res.error ?? 'Error de búsqueda'));
+      const mapped = (res.data.items ?? []).map((it) => ({
+        ...it,
+        cemn_bloques: it.bloque_codigo ? { codigo: it.bloque_codigo } : null,
+        cemn_zonas: it.zona_nombre ? { nombre: it.zona_nombre } : null,
+      }));
+      setRows(mapped as SepListRow[]);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? String(e));
       setRows([]);
@@ -88,49 +81,36 @@ export default function CampoScreen() {
   }, []);
 
   const fetchBloques = useCallback(async () => {
-    const [zonasRes, bloquesRes] = await Promise.all([
-      supabase.from('cemn_zonas').select('id, nombre').order('id'),
-      supabase.from('cemn_bloques').select('*').order('id'),
-    ]);
-
-    if (zonasRes.error) Alert.alert('Error', zonasRes.error.message);
-    if (bloquesRes.error) Alert.alert('Error', bloquesRes.error.message);
-
-    const zonasMap = new Map<number, string>((zonasRes.data ?? []).map((z: any) => [z.id as number, z.nombre as string]));
-    const mapped = (bloquesRes.data ?? []).map((b: any) => ({ ...b, zona_nombre: zonasMap.get(b.zona_id) ?? '' }));
+    const bloquesRes = await apiFetch<{ items: any[] }>('/api/cementerio/bloques');
+    if (!bloquesRes.ok) {
+      Alert.alert('Error', String(bloquesRes.error ?? 'No se pudieron cargar bloques'));
+      setBloques([]);
+      return;
+    }
+    const mapped = (bloquesRes.data.items ?? []) as any[];
     setBloques(mapped);
     if (mapped.length > 0) setBloqueActivo((prev) => prev ?? mapped[0].id);
   }, []);
 
   const fetchSepulturasBloque = useCallback(async (bid: number) => {
     setLoadingBloque(true);
-    const res = await supabase
-      .from('cemn_sepulturas')
-      .select('*')
-      .eq('bloque_id', bid)
-      .order('columna')
-      .order('fila');
+    const res = await apiFetch<{ items: Sepultura[] }>(`/api/cementerio/bloques/${bid}/sepulturas`);
     setLoadingBloque(false);
-    if (res.error) {
-      Alert.alert('Error', res.error.message);
+    if (!res.ok) {
+      Alert.alert('Error', String(res.error ?? 'No se pudieron cargar sepulturas'));
       setSepulturasBloque([]);
       return;
     }
-    setSepulturasBloque((res.data ?? []) as Sepultura[]);
+    setSepulturasBloque((res.data.items ?? []) as Sepultura[]);
   }, []);
 
   // refresco al volver (p.ej. después de registrar un suceso)
   useFocusEffect(
     useCallback(() => {
       if (!selected) return;
-      supabase
-        .from('cemn_sepulturas')
-        .select('*, cemn_bloques(codigo), cemn_zonas(nombre)')
-        .eq('id', selected.id)
-        .single()
-        .then((r) => {
-          if (!r.error && r.data) setSelected(r.data as SepListRow);
-        });
+      apiFetch<any>(`/api/cementerio/sepulturas/${selected.id}`).then((r) => {
+        if (r.ok && (r.data as any)?.item) setSelected((r.data as any).item as SepListRow);
+      });
     }, [selected?.id])
   );
 

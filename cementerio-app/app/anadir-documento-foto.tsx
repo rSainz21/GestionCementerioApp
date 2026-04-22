@@ -12,8 +12,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { tomarFoto, elegirDeGaleria, subirDocumentoFoto } from '@/lib/photos';
-import { patchSepulturaWithFoto } from '@/lib/auditoria-api';
-import { supabase } from '@/lib/supabase';
 
 export default function AnadirDocumentoFotoModal() {
   const { sepultura_id, numero } = useLocalSearchParams<{ sepultura_id?: string; numero?: string }>();
@@ -38,35 +36,8 @@ export default function AnadirDocumentoFotoModal() {
       if (!Number.isFinite(sepulturaId) || sepulturaId <= 0) throw new Error('sepultura_id no válido.');
       if (!fotoUri) throw new Error('Primero añade una foto.');
       setSaving(true);
-      const actorUid = (await supabase.auth.getUser()).data.user?.id ?? null;
-      const res = await patchSepulturaWithFoto({
-        sepulturaId,
-        fotoLocalUri: fotoUri,
-        guardarEnDocumentos: true,
-        fotoDescripcion: descripcion.trim() ? descripcion.trim() : 'Evidencia',
-        actorUid,
-        source: 'app',
-      });
-      if (!res.ok) {
-        // Fallback: si la Edge Function no está desplegada (404) o falla, intentamos subir desde el cliente.
-        const msg = String(res.error ?? '');
-        const m = msg.toLowerCase();
-        const looksLikeMissingFn = m.includes('http 404') || m.includes(' 404') || m.includes('not found');
-        // En web, si la función no existe o no está accesible, el navegador puede fallar en el preflight (CORS)
-        // y fetch lanza "Failed to fetch" / "Network request failed" sin darnos el status.
-        const looksLikeCorsOrNetwork =
-          m.includes('cors') ||
-          m.includes('failed to fetch') ||
-          m.includes('network request failed') ||
-          m.includes('err_failed');
-
-        if (looksLikeMissingFn || looksLikeCorsOrNetwork) {
-          const up = await subirDocumentoFoto(sepulturaId, fotoUri, descripcion.trim() ? descripcion.trim() : 'Evidencia');
-          if (!up.ok) throw new Error(`Edge Function no disponible y fallback falló: ${up.error}`);
-        } else {
-          throw new Error(res.error);
-        }
-      }
+      const up = await subirDocumentoFoto(sepulturaId, fotoUri, descripcion.trim() ? descripcion.trim() : 'Evidencia');
+      if (!up.ok) throw new Error(up.error);
       Alert.alert('Guardado', 'Documento/foto añadido.');
       router.back();
     } catch (e: any) {

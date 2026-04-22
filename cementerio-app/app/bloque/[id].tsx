@@ -10,9 +10,9 @@ import {
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { NichoGrid } from '@/components/NichoGrid';
-import { supabase } from '@/lib/supabase';
 import { normalizarEstadoEditable } from '@/lib/estado-sepultura';
 import type { Bloque, EstadoSepultura, Sepultura } from '@/lib/types';
+import { apiFetch } from '@/lib/laravel-api';
 
 export default function BloqueScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,36 +29,34 @@ export default function BloqueScreen() {
     const numericId = Number(rawId);
     const isNumericId = rawId !== '' && !Number.isNaN(numericId);
 
-    const bRes = isNumericId
-      ? await supabase.from('cemn_bloques').select('*, cemn_zonas(nombre)').eq('id', numericId).single()
-      : await supabase.from('cemn_bloques').select('*, cemn_zonas(nombre)').eq('codigo', rawId).single();
-
-    if (bRes.error) {
-      console.error('[bloque] ', bRes.error);
+    const bloquesRes = await apiFetch<{ items: any[] }>('/api/cementerio/bloques');
+    if (!bloquesRes.ok) {
+      console.error('[bloque] ', bloquesRes.error);
       setBloque(null);
       setSepulturas([]);
       setLoading(false);
       return;
     }
 
-    const b = bRes.data as any as Bloque;
+    const all = (bloquesRes.data.items ?? []) as any[];
+    const b = (isNumericId ? all.find((x) => Number(x.id) === numericId) : all.find((x) => String(x.codigo) === rawId)) as any;
+    if (!b) {
+      setBloque(null);
+      setSepulturas([]);
+      setLoading(false);
+      return;
+    }
     setBloque(b);
 
-    const sRes = await supabase
-      .from('cemn_sepulturas')
-      .select('*')
-      .eq('bloque_id', b.id)
-      .order('columna')
-      .order('fila');
-
-    if (sRes.error) {
+    const sRes = await apiFetch<{ items: Sepultura[] }>(`/api/cementerio/bloques/${b.id}/sepulturas`);
+    if (!sRes.ok) {
       console.error('[sepulturas] ', sRes.error);
       setSepulturas([]);
     } else {
-      setSepulturas((sRes.data ?? []) as Sepultura[]);
+      setSepulturas((sRes.data.items ?? []) as Sepultura[]);
     }
 
-    navigation.setOptions({ title: `${b.codigo} — ${(b as any).cemn_zonas?.nombre ?? ''}` });
+    navigation.setOptions({ title: `${b.codigo} — ${b.zona_nombre ?? ''}` });
     setLoading(false);
   }, [id, navigation]);
 
@@ -83,7 +81,7 @@ export default function BloqueScreen() {
         {
           text: 'Marcar ocupada (sin difunto)',
           onPress: async () => {
-            await supabase.from('cemn_sepulturas').update({ estado: 'ocupada' }).eq('id', sep.id);
+            await apiFetch(`/api/cementerio/sepulturas/${sep.id}`, { method: 'PUT', body: { estado: 'ocupada' } });
             fetchData();
           },
         },
@@ -96,7 +94,7 @@ export default function BloqueScreen() {
       ...estados.map((e) => ({
         text: e.charAt(0).toUpperCase() + e.slice(1),
         onPress: async () => {
-          await supabase.from('cemn_sepulturas').update({ estado: e }).eq('id', sep.id);
+          await apiFetch(`/api/cementerio/sepulturas/${sep.id}`, { method: 'PUT', body: { estado: e } });
           fetchData();
         },
       })),

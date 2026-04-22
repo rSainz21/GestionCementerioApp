@@ -14,56 +14,35 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/lib/auth-context';
 
 export default function LoginScreen() {
-  const { signIn, signUp } = useAuth();
+  const { signIn } = useAuth();
   const router = useRouter();
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isRegister, setIsRegister] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusKind, setStatusKind] = useState<'error' | 'info' | null>(null);
 
   const handleSubmit = async () => {
     try {
-      if (!email.trim() || !password.trim()) {
+      if (!username.trim() || !password.trim()) {
         setStatusKind('error');
-        setStatusMessage('Introduce email y contraseña');
-        Alert.alert('Error', 'Introduce email y contraseña');
+        setStatusMessage('Introduce usuario/email y contraseña');
+        Alert.alert('Error', 'Introduce usuario/email y contraseña');
         return;
       }
 
       setStatusMessage(null);
       setStatusKind(null);
       setLoading(true);
-      const trimmedEmail = email.trim();
-      const result = isRegister
-        ? await signUp(trimmedEmail, password)
-        : await signIn(trimmedEmail, password);
+      const result = await signIn(username.trim(), password);
 
       if (result.error) {
         setStatusKind('error');
         setStatusMessage(result.error.message || 'Error desconocido al autenticar.');
         Alert.alert('Error', result.error.message);
       } else {
-        if (isRegister) {
-          // Si Supabase requiere confirmación por email, puede no crear sesión todavía.
-          if (!('session' in result) || !result.session) {
-            setStatusKind('info');
-            setStatusMessage(
-              'Cuenta creada. Revisa tu correo para confirmar el email y después inicia sesión.'
-            );
-            Alert.alert(
-              'Cuenta creada',
-              'Tu cuenta se ha creado. Revisa tu correo para confirmar el email y después inicia sesión.'
-            );
-            setIsRegister(false);
-          } else {
-            router.replace('/(tabs)/campo');
-          }
-        } else {
-          router.replace('/(tabs)/campo');
-        }
+        router.replace('/(tabs)/campo');
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -88,11 +67,11 @@ export default function LoginScreen() {
         <View style={styles.form}>
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder="Usuario o email"
             placeholderTextColor="#9CA3AF"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            value={username}
+            onChangeText={setUsername}
+            keyboardType="default"
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -125,15 +104,9 @@ export default function LoginScreen() {
               <ActivityIndicator color="#FFF" />
             ) : (
               <Text style={styles.buttonText}>
-                {isRegister ? 'Crear cuenta' : 'Iniciar sesión'}
+                Iniciar sesión
               </Text>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
-            <Text style={styles.switchText}>
-              {isRegister ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
-            </Text>
           </TouchableOpacity>
         </View>
       </View>

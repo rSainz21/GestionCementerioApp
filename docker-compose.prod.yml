@@ -28,25 +28,6 @@ services:
     depends_on:
       - mysql
 
-  mysql-api:
-    build:
-      context: ./mysql-api
-      dockerfile: Dockerfile
-    environment:
-      PORT: 8787
-      API_TOKEN: ${MYSQL_API_TOKEN:-dev-token-cambia-esto}
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_USER: ${DB_USERNAME:-cementerio}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-cementerio}
-      MYSQL_DATABASE: ${DB_DATABASE:-cementerio}
-      # Opcional: limitar CORS a tu web
-      CORS_ORIGIN: ${APP_URL:-}
-    ports:
-      - "8787:8787"
-    depends_on:
-      - mysql
-
   nginx:
     image: nginx:1.27-alpine
     ports:

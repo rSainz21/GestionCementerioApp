@@ -20,7 +20,6 @@ import * as Sharing from 'expo-sharing';
 import * as Location from 'expo-location';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
-import { supabase } from '@/lib/supabase';
 import { ESTADO_COLORS } from '@/constants/Colors';
 import { colorParaEstadoSepultura, etiquetaEstadoVisible, normalizarEstadoEditable } from '@/lib/estado-sepultura';
 import { generarHTMLExpediente } from '@/lib/pdf';
@@ -29,6 +28,7 @@ import { NichoGrid } from '@/components/NichoGrid';
 import { enqueueAuditPatch, getQueueCount, processAuditQueue } from '@/lib/auditoria-queue';
 import type { Concesion, Difunto, EstadoSepultura, Sepultura } from '@/lib/types';
 import { useFocusEffect } from '@react-navigation/native';
+import { apiFetch } from '@/lib/laravel-api';
 
 type SepFull = Sepultura & { cemn_bloques?: { codigo: string }; cemn_zonas?: { nombre: string } };
 type DifFull = Difunto & { cemn_terceros?: { dni: string | null; nombre: string; apellido1: string | null; apellido2: string | null } };
@@ -76,16 +76,38 @@ export default function SepulturaScreen() {
   });
 
   const fetchAll = async () => {
-    const [sRes, dRes, cRes, docRes] = await Promise.all([
-      supabase.from('cemn_sepulturas').select('*, cemn_bloques(codigo), cemn_zonas(nombre)').eq('id', Number(id)).single(),
-      supabase.from('cemn_difuntos').select('*, cemn_terceros(dni, nombre, apellido1, apellido2)').eq('sepultura_id', Number(id)),
-      supabase.from('cemn_concesiones').select('*').eq('sepultura_id', Number(id)),
-      supabase.from('cemn_documentos').select('*').eq('sepultura_id', Number(id)).order('created_at', { ascending: false }),
-    ]);
-    setSep(sRes.data as SepFull);
-    setDifuntos((dRes.data ?? []) as DifFull[]);
-    setConcesiones((cRes.data ?? []) as Concesion[]);
-    setDocumentos((docRes.data ?? []) as any[]);
+    const res = await apiFetch<any>(`/api/cementerio/sepulturas/${Number(id)}`);
+    if (!res.ok) {
+      setSep(null);
+      setDifuntos([]);
+      setConcesiones([]);
+      setDocumentos([]);
+      setLoading(false);
+      return;
+    }
+
+    const item = (res.data as any).item ?? null;
+    if (!item) {
+      setSep(null);
+      setDifuntos([]);
+      setConcesiones([]);
+      setDocumentos([]);
+      setLoading(false);
+      return;
+    }
+
+    const bloqueCodigo = item?.bloque?.codigo ? String(item.bloque.codigo) : undefined;
+    const zonaNombre = item?.zona?.nombre ? String(item.zona.nombre) : undefined;
+
+    setSep({
+      ...(item as any),
+      cemn_bloques: bloqueCodigo ? { codigo: bloqueCodigo } : undefined,
+      cemn_zonas: zonaNombre ? { nombre: zonaNombre } : undefined,
+    } as SepFull);
+
+    setDifuntos(((item?.difuntos ?? []) as DifFull[]) ?? []);
+    setConcesiones(item?.concesion_vigente ? [item.concesion_vigente as Concesion] : []);
+    setDocumentos((item?.documentos ?? []) as any[]);
     setLoading(false);
   };
 
@@ -101,12 +123,8 @@ export default function SepulturaScreen() {
     const run = async () => {
       if (!sep?.bloque_id) return;
       setListLoading(true);
-      const res = await supabase
-        .from('cemn_sepulturas')
-        .select('id')
-        .eq('bloque_id', sep.bloque_id)
-        .order('numero');
-      const ids = (res.data ?? []).map((x: any) => x.id as number);
+      const res = await apiFetch<{ items: any[] }>(`/api/cementerio/bloques/${sep.bloque_id}/sepulturas`);
+      const ids = res.ok ? (res.data.items ?? []).map((x: any) => Number(x.id)) : [];
       setSiblings(ids);
       const cur = Number(id);
       setSiblingIdx(ids.indexOf(cur));
@@ -124,15 +142,13 @@ export default function SepulturaScreen() {
         return;
       }
 
-      const [bRes, sRes] = await Promise.all([
-        supabase.from('cemn_bloques').select('id, filas, columnas, codigo').eq('id', sep.bloque_id).single(),
-        supabase.from('cemn_sepulturas').select('*').eq('bloque_id', sep.bloque_id),
-      ]);
-
-      if (!bRes.error && bRes.data) setBloqueMeta(bRes.data as any);
+      const bloquesRes = await apiFetch<{ items: any[] }>('/api/cementerio/bloques');
+      const meta = bloquesRes.ok ? (bloquesRes.data.items ?? []).find((b: any) => Number(b.id) === Number(sep.bloque_id)) : null;
+      if (meta) setBloqueMeta({ id: Number(meta.id), filas: Number(meta.filas), columnas: Number(meta.columnas), codigo: meta.codigo ?? null });
       else setBloqueMeta(null);
 
-      if (!sRes.error) setBloqueSepulturas((sRes.data ?? []) as Sepultura[]);
+      const sRes = await apiFetch<{ items: Sepultura[] }>(`/api/cementerio/bloques/${sep.bloque_id}/sepulturas`);
+      if (sRes.ok) setBloqueSepulturas((sRes.data.items ?? []) as Sepultura[]);
       else setBloqueSepulturas([]);
     };
     run();
@@ -248,23 +264,10 @@ export default function SepulturaScreen() {
         throw new Error('GPS no válido: se requiere precisión < 5 m antes de guardar.');
       }
 
-      // Patch simple (sin foto). Las evidencias se suben desde "Nuevo suceso" -> Documento/Foto.
-      const res = await supabase.from('cemn_sepulturas').update(payload).eq('id', sep.id).select('*').single();
-      if (res.error) {
-        // Fallback si la BD aún no tiene lat/lon
-        const msg = (res.error.message ?? '').toLowerCase();
-        if ((msg.includes('lat') || msg.includes('lon') || msg.includes('column')) && (payload.lat || payload.lon)) {
-          delete payload.lat;
-          delete payload.lon;
-          const res2 = await supabase.from('cemn_sepulturas').update(payload).eq('id', sep.id).select('*').single();
-          if (res2.error) throw res2.error;
-          setSep(res2.data as any);
-        } else {
-          throw res.error;
-        }
-      } else {
-        setSep(res.data as any);
-      }
+      // Patch simple (sin foto). Evidencias: "Documento/Foto".
+      const res = await apiFetch<any>(`/api/cementerio/sepulturas/${sep.id}`, { method: 'PUT', body: payload });
+      if (!res.ok) throw new Error(typeof res.error === 'string' ? res.error : 'No se pudo guardar la auditoría');
+      await fetchAll();
       Alert.alert('Guardado', 'Auditoría guardada.');
     } catch (e: any) {
       // Offline: guardamos en cola

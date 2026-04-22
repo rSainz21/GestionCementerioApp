@@ -12,9 +12,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { supabase } from '@/lib/supabase';
 import type { Difunto } from '@/lib/types';
-import { apiExhumacion } from '@/lib/mysql-api';
+import { apiFetch } from '@/lib/laravel-api';
 
 type Tipo = 'exhumacion' | 'traslado';
 
@@ -49,17 +48,13 @@ export default function ExhumacionTrasladoModal() {
         Alert.alert('Error', 'Falta `sepultura_id` válido.');
         return;
       }
-      const res = await supabase
-        .from('cemn_difuntos')
-        .select('*')
-        .eq('sepultura_id', sepulturaId)
-        .order('id', { ascending: true });
-      if (res.error) {
+      const r = await apiFetch<{ items: Difunto[] }>(`/api/cementerio/sepulturas/${sepulturaId}/difuntos`);
+      if (!r.ok) {
         setLoading(false);
-        Alert.alert('Error', res.error.message);
+        Alert.alert('Error', String(r.error ?? 'No se pudieron cargar difuntos.'));
         return;
       }
-      const rows = (res.data ?? []) as Difunto[];
+      const rows = (r.data.items ?? []) as Difunto[];
       setDifuntos(rows);
       setDifuntoId(rows[0]?.id ?? null);
       setLoading(false);
@@ -76,36 +71,25 @@ export default function ExhumacionTrasladoModal() {
 
       setSaving(true);
 
-      // Si hay API MySQL configurada, usarla primero.
-      const api = await apiExhumacion({
-        sepultura_id: sepulturaId,
-        difunto_id: difuntoId,
-        tipo,
-        fecha,
-        notas: obs.trim() ? obs.trim() : null,
-        sepultura_destino_id: null,
-      });
-      if (api.ok) {
-        Alert.alert(
-          'Movimiento registrado',
-          `Se registró ${tipo.toUpperCase()}.\nDifuntos restantes: ${api.restantes ?? '—'}`
-        );
-        router.back();
-        return;
-      }
-
-      const res = await supabase.rpc('cemn_workflow_exhumacion', {
-        p_sepultura_id: sepulturaId,
-        p_difunto_id: difuntoId,
-        p_tipo: tipo,
-        p_fecha: fecha,
-        p_observaciones: obs.trim() ? obs.trim() : null,
-      });
-      if (res.error) throw res.error;
+      const res = await apiFetch<{ ok: true; movimiento_id: number; restantes: number }>(
+        '/api/cementerio/workflows/exhumacion',
+        {
+          method: 'POST',
+          body: {
+            sepultura_id: sepulturaId,
+            difunto_id: difuntoId,
+            tipo,
+            fecha,
+            notas: obs.trim() ? obs.trim() : null,
+            sepultura_destino_id: null,
+          },
+        }
+      );
+      if (!res.ok) throw new Error(typeof res.error === 'string' ? res.error : 'No se pudo registrar el movimiento.');
 
       Alert.alert(
         'Movimiento registrado',
-        `Se registró ${tipo.toUpperCase()}.\nDifuntos restantes: ${res.data?.restantes ?? '—'}`
+        `Se registró ${tipo.toUpperCase()}.\nDifuntos restantes: ${res.data.restantes ?? '—'}`
       );
       router.back();
     } catch (e: any) {

@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { supabase } from '@/lib/supabase';
-import { patchSepulturaWithFoto } from '@/lib/auditoria-api';
 import type { EstadoSepultura } from '@/lib/types';
+import { apiFetch } from '@/lib/laravel-api';
 
 export type AuditPatch = {
   sepulturaId: number;
@@ -53,20 +52,9 @@ async function applySepulturaUpdate(p: AuditPatch) {
 
   if (Object.keys(payload).length === 0) return;
 
-  const res = await supabase.from('cemn_sepulturas').update(payload).eq('id', p.sepulturaId);
-  if (!res.error) return;
-
-  // Si la BD aún no tiene lat/lon, reintentamos sin esos campos.
-  const msg = (res.error.message ?? '').toLowerCase();
-  const mentionsLatLon = msg.includes('lat') || msg.includes('lon') || msg.includes('column');
-  if (mentionsLatLon && ('lat' in payload || 'lon' in payload)) {
-    delete payload.lat;
-    delete payload.lon;
-    const res2 = await supabase.from('cemn_sepulturas').update(payload).eq('id', p.sepulturaId);
-    if (res2.error) throw res2.error;
-    return;
-  }
-  throw res.error;
+  const res = await apiFetch(`/api/cementerio/sepulturas/${p.sepulturaId}`, { method: 'PUT', body: payload });
+  if (res.ok) return;
+  throw new Error(typeof res.error === 'string' ? res.error : 'No se pudo actualizar sepultura');
 }
 
 export async function processAuditQueue(): Promise<{ processed: number; remaining: number }> {
@@ -84,23 +72,7 @@ export async function processAuditQueue(): Promise<{ processed: number; remainin
 
   for (const item of q) {
     try {
-      if (item.fotoLocalUri) {
-        const apiRes = await patchSepulturaWithFoto({
-          sepulturaId: item.sepulturaId,
-          estado: item.estado,
-          notas: item.notas,
-          ubicacion_texto: item.ubicacion_texto,
-          lat: item.lat ?? null,
-          lon: item.lon ?? null,
-          fotoLocalUri: item.fotoLocalUri,
-          guardarEnDocumentos: true,
-          fotoDescripcion: 'Auditoría (cola)',
-          source: 'queue',
-        });
-        if (!apiRes.ok) throw new Error(apiRes.error);
-      } else {
-        await applySepulturaUpdate(item);
-      }
+      await applySepulturaUpdate(item);
       ok++;
     } catch {
       kept.push(item);

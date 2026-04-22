@@ -24,6 +24,9 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- 1. ZONAS
 -- =========================================================================
 -- NOTA: El cementerio_id = 1 corresponde a 'Cementerio Municipal de Somahoz'
+INSERT IGNORE INTO cemn_cementerios (id, nombre, direccion, municipio, notas)
+VALUES (1, 'Cementerio Municipal de Somahoz', NULL, 'Los Corrales de Buelna', 'Registro base para cargas de datos reales');
+
 INSERT IGNORE INTO cemn_zonas (id, cementerio_id, nombre, codigo, descripcion)
 VALUES
 (1, 1, 'Parte vieja', 'ZV', 'Zona original del cementerio. Sepulturas en tierra orientadas Norte-Sur y Oeste-Este...'),

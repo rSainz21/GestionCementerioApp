@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { supabase } from '@/lib/supabase';
 import { colorParaEstadoSepultura, etiquetaEstadoVisible } from '@/lib/estado-sepultura';
 import type { Difunto } from '@/lib/types';
+import { apiFetch } from '@/lib/laravel-api';
 
 interface ResultadoBusqueda {
   difunto: Difunto;
@@ -37,28 +37,17 @@ export default function BuscarScreen() {
     setLoading(true);
     setSearched(true);
 
-    const { data } = await supabase
-      .from('cemn_difuntos')
-      .select(`
-        *,
-        cemn_sepulturas!inner (
-          id, codigo, estado, fila, columna,
-          cemn_bloques ( codigo ),
-          cemn_zonas ( nombre )
-        ),
-        cemn_terceros ( dni, nombre, apellido1, apellido2 )
-      `)
-      .or(`nombre_completo.ilike.%${query}%,cemn_terceros.dni.ilike.%${query}%`);
-
-    const mapped: ResultadoBusqueda[] = (data ?? []).map((d: any) => ({
+    const r = await apiFetch<{ items: any[] }>(`/api/cementerio/difuntos?q=${encodeURIComponent(query.trim())}`);
+    const raw = r.ok ? (r.data.items ?? []) : [];
+    const mapped: ResultadoBusqueda[] = raw.map((d: any) => ({
       difunto: d,
-      sepultura_codigo: d.cemn_sepulturas?.codigo ?? null,
-      bloque_codigo: d.cemn_sepulturas?.cemn_bloques?.codigo ?? null,
-      zona_nombre: d.cemn_sepulturas?.cemn_zonas?.nombre ?? null,
-      fila: d.cemn_sepulturas?.fila ?? null,
-      columna: d.cemn_sepulturas?.columna ?? null,
-      estado: d.cemn_sepulturas?.estado ?? 'libre',
-      sepultura_id: d.cemn_sepulturas?.id ?? null,
+      sepultura_codigo: d.sepultura_codigo ?? null,
+      bloque_codigo: d.bloque_codigo ?? null,
+      zona_nombre: d.zona_nombre ?? null,
+      fila: d.fila ?? null,
+      columna: d.columna ?? null,
+      estado: d.estado ?? 'libre',
+      sepultura_id: d.sepultura_id ?? null,
     }));
 
     setResultados(mapped);

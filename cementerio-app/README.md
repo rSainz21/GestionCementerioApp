@@ -3,24 +3,16 @@
 Aplicación móvil/tablet para **gestión y trabajo de campo** del cementerio municipal de Somahoz.
 
 - **Frontend**: Expo SDK ~54 + React Native + Expo Router
-- **Backend**:
-  - Supabase (Postgres, Auth, Storage, Edge Functions) para login y algunas lecturas
-  - API HTTP (`mysql-api`) contra MySQL para workflows transaccionales y/o modo servidor
+- **Backend**: Laravel (API REST + Sanctum)
 
 ## Requisitos
 
 - Node.js + npm
-- Cuenta/proyecto de Supabase
 
 ## Variables de entorno
 
 ```env
-EXPO_PUBLIC_SUPABASE_URL=https://<tu-proyecto>.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon_key>
-
-# Opcional: si usas el backend MySQL por proxy en el mismo host (Nginx)
-EXPO_PUBLIC_API_BASE=/api
-EXPO_PUBLIC_API_TOKEN=<token>
+EXPO_PUBLIC_LARAVEL_BASE=http://192.168.100.69:8000
 ```
 
 ## Instalar y ejecutar
@@ -49,7 +41,7 @@ npx.cmd expo start --web --port 8082
 ## Autenticación (obligatoria)
 
 - La app obliga a iniciar sesión para usar casi todas las pantallas (redirige a `/login` si no hay sesión).
-- **Persistencia de sesión**: en nativo usa AsyncStorage y en web usa `localStorage` (si está disponible).
+- **Persistencia de sesión**: token en AsyncStorage.
 
 ## Pantallas principales (campo)
 
@@ -63,68 +55,27 @@ npx.cmd expo start --web --port 8082
 ### Inhumación / Añadir difunto
 
 - UI: `app/asignar-difunto.tsx`
-- Preferente: RPC `cemn_workflow_inhumacion(...)` (transaccional).
-- Fallback: inserta en `cemn_difuntos` y marca `cemn_sepulturas.estado = 'ocupada'` si el RPC no existe aún.
+- Backend: `POST /api/cementerio/workflows/inhumacion`
 
 ### Exhumación / Traslado
 
 - UI: `app/exhumacion-traslado.tsx`
-- Backend: RPC `cemn_workflow_exhumacion(...)` (transaccional)
-  - Inserta en `cemn_movimientos`
-  - Desvincula difunto de la sepultura
-  - Si queda vacía → vuelve a `estado = 'libre'`
+- Backend: `POST /api/cementerio/workflows/exhumacion`
 
 ### Añadir Documento/Foto
 
 - UI: `app/anadir-documento-foto.tsx`
-- Backend: Edge Function `supabase/functions/sepulturas-auditoria`
-  - `multipart/form-data` con `foto`
-  - Sube a Storage (`fotos-cementerio`)
-  - Inserta en `cemn_documentos` tipo `fotografia` (con fallback a `cemn_fotos`)
+- Backend:
+  - `POST /api/cementerio/sepulturas/{id}/documentos` (archivo)
+  - `POST /api/cementerio/difuntos/{id}/foto` (foto del difunto)
 
 ### Cambio de estado rápido (seguro)
 
 - Solo permite liberar si **no hay difuntos vinculados**.
 
-## Backend Supabase
-
-### Esquema
-
-- Archivo: `supabase/schema.sql`
-- Tablas clave: `cemn_sepulturas`, `cemn_difuntos`, `cemn_terceros`, `cemn_concesiones`, `cemn_documentos`, `cemn_audit_events`
-- RLS: políticas para rol `authenticated`
-
-### RPC (transacciones)
-
-Incluidas en `supabase/schema.sql`:
-
-- `cemn_workflow_inhumacion(...)`
-- `cemn_workflow_exhumacion(...)`
-
-> Para que funcionen en tu proyecto, aplica el SQL en Supabase (SQL editor/migraciones) y vuelve a abrir la app.
-
-### Edge Function
-
-- Ruta repo: `supabase/functions/sepulturas-auditoria/index.ts`
-
 ## Notas operativas
 
-- Si el registro en `/login` muestra `email rate limit exceeded`, Supabase está limitando el envío de emails:
-  - espera un rato o crea usuarios desde **Authentication → Users → Add user**
-  - para producción, configura **SMTP** propio.
-
-## Backend `mysql-api` (MySQL)
-
-Si lo despliegas en servidor, normalmente se expone por Nginx como:
-
-- Healthcheck: `GET /api/health`
-- Workflows:
-  - `POST /api/workflows/inhumacion`
-  - `POST /api/workflows/exhumacion`
-
-Todos requieren:
-
-- `Authorization: Bearer <EXPO_PUBLIC_API_TOKEN>`
+- El backend requiere usuario con permisos `cementerio.*` para operar.
 
 ## Documentación extendida
 

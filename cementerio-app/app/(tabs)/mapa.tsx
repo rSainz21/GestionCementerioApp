@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
 import type { Bloque } from '@/lib/types';
 import { NichoGrid } from '@/components/NichoGrid';
 import { BLOQUES_OFICIALES } from '@/lib/bloques-oficiales';
 import { OsmWebMap } from '@/components/OsmWebMap';
 import * as Location from 'expo-location';
+import { apiFetch } from '@/lib/laravel-api';
 
 // Ortofoto PNOA (IGN/CNIG) descargada vía WMS (recorte del recinto)
 const BASE_MAP_IMAGE = require('@/assets/images/mapa-somahoz-pnoa.jpg');
@@ -127,17 +127,17 @@ export default function MapaScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await supabase.from('cemn_bloques').select('*');
-    if (res.error) {
+    const res = await apiFetch<{ items: any[] }>('/api/cementerio/bloques');
+    if (!res.ok) {
       console.error('[mapa/bloques] ', res.error);
-      Alert.alert('Error', res.error.message);
+      Alert.alert('Error', String(res.error ?? 'No se pudieron cargar bloques'));
       setBloquesByCodigo(new Map());
       setLoading(false);
       return;
     }
     const map = new Map<string, Bloque>();
     const mapId = new Map<number, Bloque>();
-    for (const b of (res.data ?? []) as any[]) {
+    for (const b of (res.data.items ?? []) as any[]) {
       if (b?.codigo) map.set(String(b.codigo), b as Bloque);
       if (b?.id) mapId.set(Number(b.id), b as Bloque);
     }
@@ -162,13 +162,9 @@ export default function MapaScreen() {
           return;
         }
         try {
-          const base = supabase.from('cemn_sepulturas').select('id, numero, codigo, estado').limit(1);
-          const res =
-            /^\d+$/.test(t)
-              ? await base.or(`numero.eq.${Number(t)},id.eq.${Number(t)}`)
-              : await base.ilike('codigo', `%${t}%`);
-          if (res.error) throw res.error;
-          const row = (res.data ?? [])[0] as any;
+          const res = await apiFetch<{ items: any[] }>(`/api/cementerio/sepulturas/search?q=${encodeURIComponent(t)}`);
+          if (!res.ok) throw new Error();
+          const row = (res.data.items ?? [])[0] as any;
           setResult(row ? { id: row.id, numero: row.numero ?? null, codigo: row.codigo ?? null, estado: row.estado ?? null } : null);
         } catch {
           setResult(null);
@@ -193,8 +189,8 @@ export default function MapaScreen() {
           Alert.alert('Coordenadas', 'En web usa lat/lon manual (números).');
           return;
         }
-        const up = await supabase.from('cemn_sepulturas').update({ lat, lon }).eq('id', result.id).select('id').single();
-        if (up.error) throw up.error;
+        const up = await apiFetch(`/api/cementerio/sepulturas/${result.id}`, { method: 'PUT', body: { lat, lon } });
+        if (!up.ok) throw new Error(String(up.error ?? 'No se pudo guardar.'));
         Alert.alert('GPS asignado', `Nicho ${result.numero ?? result.id} guardado.`);
         return;
       }
@@ -215,8 +211,8 @@ export default function MapaScreen() {
         return;
       }
       const payload = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-      const up = await supabase.from('cemn_sepulturas').update(payload).eq('id', result.id).select('id').single();
-      if (up.error) throw up.error;
+      const up = await apiFetch(`/api/cementerio/sepulturas/${result.id}`, { method: 'PUT', body: payload });
+      if (!up.ok) throw new Error(String(up.error ?? 'No se pudo guardar.'));
       Alert.alert('GPS asignado', `Nicho ${result.numero ?? result.id} guardado con precisión ${Math.round(acc)} m.`);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? String(e));
@@ -240,12 +236,9 @@ export default function MapaScreen() {
       setLoadingPicker(true);
       setPickerError(null);
       try {
-        const res = await supabase
-          .from('cemn_sepulturas')
-          .select('id, numero, fila, columna, estado, tipo, bloque_id, zona_id, codigo')
-          .eq('bloque_id', pickerBloqueId);
-        if (res.error) throw res.error;
-        setPickerSepulturas(res.data ?? []);
+          const res = await apiFetch<{ items: any[] }>(`/api/cementerio/bloques/${pickerBloqueId}/sepulturas`);
+          if (!res.ok) throw new Error();
+          setPickerSepulturas(res.data.items ?? []);
       } catch {
         setPickerSepulturas([]);
         setPickerError('No se pudieron cargar nichos (revisa sesión/RLS o conexión).');
@@ -265,14 +258,9 @@ export default function MapaScreen() {
         if (Platform.OS !== 'web' && (!MapView || !Marker)) return;
         setLoadingGeo(true);
         try {
-          const res = await supabase
-            .from('cemn_sepulturas')
-            .select('id, numero, lat, lon, estado, bloque_id, tipo')
-            .not('lat', 'is', null)
-            .not('lon', 'is', null)
-            .limit(2000);
-          if (res.error) throw res.error;
-          const rows = (res.data ?? []) as any[];
+          const res = await apiFetch<{ items: any[] }>(`/api/cementerio/sepulturas/geo?limit=2000`);
+          if (!res.ok) throw new Error();
+          const rows = (res.data.items ?? []) as any[];
           const mapped = rows
             .map((r) => ({
               id: Number(r.id),

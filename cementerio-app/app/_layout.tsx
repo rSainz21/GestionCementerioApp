@@ -90,8 +90,7 @@ function RootLayoutNav() {
         <Stack.Screen name="renovar-concesion" options={{ title: 'Renovar concesión', presentation: 'modal' }} />
         <Stack.Screen name="editar-sepultura" options={{ title: 'Editar nicho', presentation: 'modal' }} />
         <Stack.Screen name="nueva-concesion" options={{ title: 'Nueva concesión', presentation: 'modal' }} />
-        <Stack.Screen name="admin-bloques" options={{ title: 'Gestionar bloques' }} />
-        <Stack.Screen name="gestion-registros" options={{ title: 'Difuntos y concesiones' }} />
+        {/* Pantallas de gestión avanzada se activan en Fase 2 (evitar depender de backends antiguos). */}
       </Stack>
     </ThemeProvider>
   );

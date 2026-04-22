@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { apiFetch } from '@/lib/laravel-api';
 
 export default function MasScreen() {
   const router = useRouter();
@@ -15,15 +15,28 @@ export default function MasScreen() {
     useCallback(() => {
       async function fetchStats() {
         const [sRes, bRes] = await Promise.all([
-          supabase.from('cemn_sepulturas').select('estado'),
-          supabase.from('cemn_bloques').select('id'),
+          apiFetch<{ items: any[] }>('/api/cementerio/sepulturas/search?q=__all__'),
+          apiFetch<{ items: any[] }>('/api/cementerio/bloques'),
         ]);
-        const seps = sRes.data ?? [];
+        // Nota: para fase 1 no tenemos endpoint "count" dedicado; usamos stats backend si está.
+        const statsRes = await apiFetch<any>('/api/cementerio/stats');
+        if (statsRes.ok && (statsRes.data as any)?.items) {
+          const it = (statsRes.data as any).items;
+          setStats({
+            total: Number(it.total ?? 0),
+            libres: Number(it.libres ?? 0),
+            ocupados: Number(it.ocupadas ?? it.ocupados ?? 0),
+            bloques: Number(it.bloques ?? 0),
+          });
+          return;
+        }
+
+        const seps = sRes.ok ? (sRes.data.items ?? []) : [];
         setStats({
           total: seps.length,
           libres: seps.filter((s: any) => s.estado === 'libre').length,
           ocupados: seps.filter((s: any) => s.estado !== 'libre').length,
-          bloques: (bRes.data ?? []).length,
+          bloques: bRes.ok ? (bRes.data.items ?? []).length : 0,
         });
       }
       fetchStats();
@@ -44,8 +57,18 @@ export default function MasScreen() {
 
       <Text style={styles.sectionLabel}>Gestión</Text>
 
-      <MenuItem icon="th-large" label="Gestionar bloques" sub="Crear y administrar bloques del cementerio" onPress={() => router.push('/admin-bloques')} />
-      <MenuItem icon="users" label="Difuntos y concesiones" sub="Consultar, añadir y modificar registros" onPress={() => router.push('/gestion-registros')} />
+      <MenuItem
+        icon="th-large"
+        label="Gestionar bloques"
+        sub="(Fase 2) Alta/edición avanzada desde móvil"
+        onPress={() => Alert.alert('En preparación', 'Esta pantalla se activa en la Fase 2. Para las primeras pruebas usa Campo / Buscar / Mapa.')}
+      />
+      <MenuItem
+        icon="users"
+        label="Difuntos y concesiones"
+        sub="(Fase 2) Gestión avanzada desde móvil"
+        onPress={() => Alert.alert('En preparación', 'Esta pantalla se activa en la Fase 2.')}
+      />
 
       <Text style={styles.sectionLabel}>Cuenta</Text>
 

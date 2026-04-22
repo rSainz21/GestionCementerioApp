@@ -1,55 +1,50 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { apiFetch, setToken } from './laravel-api';
 
 interface AuthState {
-  session: Session | null;
-  user: User | null;
+  user: any | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (
-    email: string,
-    password: string
-  ) => Promise<{ error: Error | null; session: Session | null; user: User | null }>;
+  signIn: (usernameOrEmail: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+    apiFetch<any>('/api/me')
+      .then((r) => {
+        if (r.ok) setUser(r.data);
+        else setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error as Error | null };
-  };
-
-  const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    return { error: error as Error | null, session: data.session, user: data.user };
+  const signIn = async (usernameOrEmail: string, password: string) => {
+    const r = await apiFetch<{ token: string; user: any }>('/api/login', {
+      method: 'POST',
+      body: { username: usernameOrEmail, password },
+    });
+    if (!r.ok) {
+      return { error: new Error(typeof r.error === 'string' ? r.error : 'No se pudo iniciar sesión') };
+    }
+    await setToken(r.data.token);
+    setUser(r.data.user);
+    return { error: null };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await apiFetch('/api/logout', { method: 'POST' }).catch(() => null);
+    await setToken(null);
+    setUser(null);
   };
 
   return (
     <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, loading, signIn, signUp, signOut }}
+      value={{ user, loading, signIn, signOut }}
     >
       {children}
     </AuthContext.Provider>
