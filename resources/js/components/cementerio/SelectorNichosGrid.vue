@@ -79,7 +79,7 @@
             :title="cell.tooltip"
             @click="onSelect(cell)"
           >
-            <span class="celda__pos">{{ cell.fila }}-{{ cell.columna }}</span>
+            <span class="celda__pos">{{ cell.label }}</span>
           </button>
         </div>
 
@@ -87,8 +87,8 @@
           <div class="selection__title">Unidad seleccionada</div>
           <div class="selection__body">
             <div>
-              <strong>Bloque</strong>:
-              {{ bloqueSeleccionado.codigo }} · F{{ seleccionActual.fila }} · C{{ seleccionActual.columna }}
+              <strong>Nicho</strong>:
+              {{ seleccionActual.numero ?? '—' }}
             </div>
             <div class="muted">
               Código: {{ seleccionActual.codigo ?? '—' }}
@@ -196,16 +196,15 @@ const celdas = computed(() => {
       const sepultura = sepulturaIndex.value.get(key) ?? null;
 
       const estado = (sepultura?.estado ?? 'libre').toLowerCase();
-      const difunto = sepultura?.difunto_titular?.nombre_completo
+      const nombre = sepultura?.tooltip_nombre
+        ?? sepultura?.difunto_titular?.nombre_completo
         ?? sepultura?.difuntoTitular?.nombre_completo
-        ?? sepultura?.difunto_titular_nombre
+        ?? sepultura?.concesion?.concesionario
         ?? null;
 
       const tooltip =
         estado === 'ocupada'
-          ? difunto
-            ? `Ocupada: ${difunto}`
-            : 'Ocupada'
+          ? nombre ? `Ocupada · ${nombre}` : 'Ocupada'
           : estado === 'reservada'
             ? 'Reservada'
             : estado === 'clausurada'
@@ -221,6 +220,9 @@ const celdas = computed(() => {
         fila,
         columna,
         sepultura,
+        // A partir de ahora SOLO mostramos el nº real de nicho/sepultura (campo `numero`).
+        // Si falta, no mostramos numeración (evita volver a "1-1", "2-2", etc).
+        label: sepultura?.numero ?? '',
         estado,
         tooltip,
         seleccionable,

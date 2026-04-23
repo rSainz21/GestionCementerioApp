@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\CemnDifunto;
 
 class CemnConcesion extends Model
 {
@@ -73,6 +74,11 @@ class CemnConcesion extends Model
         return $this->hasOne(CemnConcesionTercero::class, 'concesion_id')
                     ->where('rol', 'concesionario')
                     ->where('activo', true);
+    }
+
+    public function difuntos(): HasMany
+    {
+        return $this->hasMany(CemnDifunto::class, 'concesion_id');
     }
 
     // ── Scopes ─────────────────────────────────────────────────────────────

@@ -1,0 +1,62 @@
+﻿INSERT INTO cemn_concesiones (sepultura_id, numero_expediente, tipo, fecha_concesion, estado, importe, moneda, texto_concesion, notas) VALUES
+
+-- =========================================================================
+-- LOTE 1: EXPEDIENTES MODERNOS (ExtraÃ­dos de CSV 2021-2025)
+-- (Concesiones Temporales, en Euros, estados Vigentes o Renovadas)
+-- =========================================================================
+(1, '2859/2025', 'temporal', '2025-12-26', 'renovada', NULL, 'euros', 'RENOVACIÃN DE NICHOS 53 Y 56 DEL CEMENTERIO DE SOMAHOZ', 'Titular vinculado: Evelia Seco Postigo'),
+(1, '2763/2025', 'temporal', '2025-12-11', 'vigente', NULL, 'euros', 'SOLICITUD DE NICHOS 467 Y 468 POR FALLECIMIENTO DE MANUEL PELAYO GONZALEZ', 'Titular vinculado: Antonia Colsa San Juan'),
+(1, '1965/2025', 'temporal', '2025-08-26', 'renovada', NULL, 'euros', 'RENOVACIÃN DE NICHOS DE RAMON FERNANDEZ PEREZ Y TOMAS FERNANDEZ FERNANDEZ', 'Titular vinculado: Tomas Fernandez Fernandez'),
+(1, '967/2025', 'temporal', '2025-04-04', 'vigente', NULL, 'euros', 'SOLICITUD DE NICHO 461 POR EL FALLECIMIENTO DE JULIA GUITIAN', 'Titular vinculado: Espacio Funerario SL'),
+(1, '631/2025', 'temporal', '2025-02-25', 'vigente', NULL, 'euros', 'solicitud de nicho 460', 'Titular vinculado: Funcantabria Servicios Funerarios'),
+(1, '2938/2024', 'temporal', '2024-11-27', 'vigente', NULL, 'euros', 'concesiÃ³n de nicho 446 por fallecimiento de Vicente GonzÃ¡lez Cuevas', 'Titular vinculado: Espacio Funerario SL'),
+(1, '2548/2024', 'temporal', '2024-10-07', 'vigente', NULL, 'euros', 'concesiÃ³n del nicho 459 por el fallecimiento de Jacqueline Manrique', 'Titular vinculado: [VacÃ­o en CSV]'),
+(1, '2330/2024', 'temporal', '2024-09-11', 'vigente', NULL, 'euros', 'SOLICITUD DE NICHO 458', 'Titular vinculado: Joel Garcia Garcia'),
+(1, '2713/2023', 'temporal', '2023-12-11', 'renovada', NULL, 'euros', 'RENOVACIÃN DE NICHOS', 'Titular vinculado: Laura Perez Saiz'),
+(1, '333/2022', 'temporal', '2022-02-04', 'vigente', NULL, 'euros', 'SOLICITUD DE LOS NICHOS NÃMEROS 447 Y 448', 'Titular vinculado: Fernando Rasilla Castillo'),
+(1, '272/2022', 'temporal', '2022-02-01', 'vigente', NULL, 'euros', 'S/ CONCESIÃN DEL NICHO NÃMERO 418', 'Titular vinculado: Maria Jesus RiaÃ±o Garcia'),
+(1, '2700/2021', 'temporal', '2021-11-08', 'vigente', NULL, 'euros', 'SOLICITUD DE NICHO 414 Y 415 POR FALLECIMIENTO DE MARIA CARMEN MARTINEZ DIEGO', 'Titular vinculado: Carmen Gonzalez Martinez'),
+(1, '2581/2025', 'temporal', '2025-11-17', 'renovada', NULL, 'euros', 'renovaciÃ³n de sepultura concedida a Constancia Ceballos FernÃ¡ndez sepultura 36 fila 2', 'Titular vinculado: Emiliano SaÃ±udo Ceballos'),
+(1, '2147/2025', 'temporal', '2025-09-22', 'renovada', NULL, 'euros', 'SOLICITUD DE RENOVACION DE SEPULTURA CONCEDIDA A FROILÃN PUENTE AGUERO', 'Titular vinculado: MarÃ­a Cristina Puente GutiÃ©rrez'),
+(1, '1318/2025', 'temporal', '2025-05-19', 'renovada', NULL, 'euros', 'RENOVACIÃN DE LA SEPULTURA CONCEDIDA A NOMBRE DE MANUEL MANTILLA FERNANDEZ', 'Titular vinculado: JosÃ© Antonio Mantilla Payno'),
+(1, '2928/2024', 'temporal', '2024-11-26', 'renovada', NULL, 'euros', 'RENOACIÃN DE SEPULTURA CONCEDIDA A D RAMON LOPEZ GUTIÃRREZ EL 5 DE ABRIL DE 1967', 'Titular vinculado: Enrique Lopez Calvo'),
+(1, '2432/2024', 'temporal', '2024-09-19', 'renovada', NULL, 'euros', 'RENOVACIÃN DE SEPULTURA CONCEDIDA A D. AMADOR SECO POSTIGO', 'Titular vinculado: Maria Asuncion Seco Hernandez'),
+
+-- =========================================================================
+-- LOTE 2: EXPEDIENTES HISTÃRICOS (ExtraÃ­dos de PDF 1963-1982)
+-- (Concesiones Perpetuas, en Pesetas, con Tasas Oficiales de la Ã©poca)
+-- =========================================================================
+(1, '457-1975', 'perpetua', '1975-12-02', 'vigente', 24000.00, 'pesetas', 'nichos nÃºmeros 37, de la fila cuarta; 38, de la fila tercera; 39 de la fila segunda y 40, de la fila primera', 'Concesionario original: Aurelio Gomez Gonzalez'),
+(1, '336/82', 'perpetua', '1982-07-23', 'vigente', 5000.00, 'pesetas', 'nicho nÂº45, fila 1Âª de la parte nueva del Cementerio de Somahoz', 'Concesionario original: Angel Gerardo Muriedas Ceballos'),
+(1, '462-1976', 'perpetua', '1976-10-19', 'vigente', 7000.00, 'pesetas', 'nicho nÃºmero 19, de la Fila 3Âª.', 'Concesionario original: Geronimo Fernandez NuÃ±ez'),
+(1, '217-1975', 'perpetua', '1975-07-15', 'vigente', 10000.00, 'pesetas', 'nichos nÃºmeros 13 y 17 de la fila primera', 'Concesionario original: Juan Menocal Iturbe'),
+(1, '445-1976', 'perpetua', '1976-09-28', 'vigente', 2000.00, 'pesetas', 'sepultura nÃºmero OCHO, fila 4Âª, parte Este de citado Cementerio', 'Concesionario original: Eduardo Moro Teran'),
+(1, '1444/76', 'perpetua', '1976-09-28', 'vigente', 7000.00, 'pesetas', 'nicho nÃºmero DIEZ, fila 2Âª de citado Cementerio Municipal', 'Concesionario original: Rosalia Gonzalez Rodriguez'),
+(1, '1663/76', 'perpetua', '1976-10-19', 'vigente', 7000.00, 'pesetas', 'nicho nÃºmero SEIS, fila 2Âª de la parte nueva.', 'Concesionario original: Rosalia Gonzalez Rodriguez'),
+(1, '214-1976', 'perpetua', '1976-06-08', 'vigente', 2000.00, 'pesetas', 'sepultura nÃºmero VEINTE, de la fila segunda, parte Oeste del Cementerio Municipal de Somahoz, y parte vieja del mismo', 'Concesionario original: Luis Fernandez Salazar'),
+(1, '213-1976', 'perpetua', '1976-06-08', 'vigente', 7000.00, 'pesetas', 'nicho nÃºmero 18 de la fila SEGUNDA del citado Cementerio', 'Concesionario original: Angel Perez Alvaro'),
+(1, '164-1976', 'perpetua', '1976-05-04', 'vigente', 7000.00, 'pesetas', 'Nicho nÃºmero 63, fila tercera', 'Concesionario original: Tomas Blanco Villarroya'),
+(1, '88-1976', 'perpetua', '1976-03-23', 'vigente', 5000.00, 'pesetas', 'nicho nÃºmero 25, fila primera, parte nueva del Cementerio de Somahoz.', 'Concesionario original: Hermanos Garcia Gonzalez'),
+(1, '82-1976', 'perpetua', '1976-03-23', 'vigente', 14000.00, 'pesetas', 'nichos nÃºmeros 46 fila segunda y nÃºmero 47, fila tercera, en el Cementerio de Somahoz, parte nueva.', 'Concesionario original: Pedro Cuevas Perez'),
+(1, '13-1976', 'perpetua', '1976-01-20', 'vigente', 14000.00, 'pesetas', 'El nÃºmero 66, de la fila segunda. El nÃºmero 67, de la fila tercera.', 'Concesionario original: Jose Manuel Peredo Ponga'),
+(1, '12-1976', 'perpetua', '1976-01-20', 'vigente', 24000.00, 'pesetas', 'nichos nÃºmeros UNO, de la fila 1Âª; NÃºmero DOS, de la 2Âª; NÃºmero TRES, de la 3Âª y nÃºmero CUATRO de la 4Âª.', 'Concesionario original: Manuel Fernandez Perez'),
+(1, '108/75', 'perpetua', '1975-04-29', 'vigente', 2000.00, 'pesetas', 'sepultura en la parte vieja, Sepultura nÃºmero UNO, fila primera, parte ESTE', 'Concesionario original: Marta Venero Gonzalez'),
+(1, '107-1975', 'perpetua', '1975-04-29', 'anulada', 2000.00, 'pesetas', 'Sepultura nÃºmero VEINTE, fila segunda, parte Oeste', 'Concesionario original: Francisco Pousada Perez (Renunciada posteriormente por nicho 32 f4)'),
+(1, '457-1975b', 'perpetua', '1975-11-18', 'vigente', 2000.00, 'pesetas', 'sepultura nÃºmero 6, fila 1Âº, parte Este del Cementerio, vieja.', 'Concesionario original: Rosaura Diaz Fuentes'),
+(1, '333-1975', 'perpetua', '1975-09-23', 'vigente', 2000.00, 'pesetas', 'sepultura nÃºmero 18 de la fila tercera, parte Oeste', 'Concesionario original: Generosa Gutierrez Cuevas'),
+(1, '279/75', 'perpetua', '1975-07-29', 'vigente', 2000.00, 'pesetas', 'sepultura NUMERO 18 FILA 2Âª. parte Oeste.', 'Concesionario original: Domingo Fernandez Perez'),
+(1, '278/75', 'perpetua', '1975-07-29', 'vigente', 4000.00, 'pesetas', 'sepulturas NUMEROS 16 y 17 FILA SEGUNDA Parte OESTE.', 'Concesionario original: Venancio Ceballos Tezanos'),
+(1, '276/75', 'perpetua', '1975-07-29', 'vigente', 24000.00, 'pesetas', 'nicho NUMERO 53 FILA 1Âª, NUMERO 54 FILA 2Âª, NUMERO 55 FILA 3Âª, NUMERO 56 FILA 4Âª.', 'Concesionario original: Tomas Seco Rodriguez'),
+(1, '275/75', 'perpetua', '1975-07-29', 'vigente', 12000.00, 'pesetas', 'nicho NUMERO 33 FILA 1Âª y NUMERO 34 FILA 2Âª.', 'Concesionario original: Jesus Diaz Diaz'),
+(1, '274/75', 'perpetua', '1975-07-29', 'vigente', 12000.00, 'pesetas', 'nisho NUMERO 35 FILA 3Âª. y el NUMERO 36 FILA 4Âª.', 'Concesionario original: Manuel Doalto Fernandez'),
+(1, '189-1975', 'perpetua', '1975-06-17', 'vigente', 14000.00, 'pesetas', 'nichos nÃºmeros TREINTA Y UNO de la fila tercera y el nÃºmero VEINTISEIS de la fila segunda.', 'Concesionario original: Ramon Fernandez Perez'),
+(1, '188-1975', 'perpetua', '1975-06-17', 'vigente', 7000.00, 'pesetas', 'nicho nÃºmero TREINTA de la fila segunda', 'Concesionario original: Tomas Fernandez Fernandez'),
+(1, '159-1975', 'perpetua', '1975-05-13', 'vigente', 7000.00, 'pesetas', 'nicho nÃºmero VEINTIDOS, Fila SEGUNDA', 'Concesionario original: Angel Perez Alvaro'),
+(1, '158-1975', 'perpetua', '1975-05-13', 'vigente', 7000.00, 'pesetas', 'nicho nÃºmero CATORCE, fila SEGUNDA', 'Concesionario original: Manuel Fernandez Lopez'),
+(1, '109-1975', 'perpetua', '1975-04-29', 'vigente', 2000.00, 'pesetas', 'sepultura nÃºmero TRES, fila octava, parte Este', 'Concesionario original: Bernardino Martinez PeÃ±a'),
+(1, '452-1973', 'perpetua', '1973-12-04', 'vigente', 4000.00, 'pesetas', 'sepulturas nÃºmeros DIEZ Y DOCE, fila SEGUNDA, parte OESTE de la parte vieja', 'Concesionario original: Francisco Llacer Fernandez. Precio rebajado a 2000ptas en 1974'),
+(1, '436-1974', 'perpetua', '1974-11-26', 'vigente', 2000.00, 'pesetas', 'sepultura nÃºmero TRES, en la fila quinta, parte ESTE y vieja', 'Concesionario original: Amador Seco Postigo'),
+(1, '435-1974', 'perpetua', '1974-11-26', 'vigente', 2000.00, 'pesetas', 'sepultura nÃºmero SIETE, en la fila sÃ©ptima, parte SUR y vieja', 'Concesionario original: Benita IbaÃ±ez Ruiz'),
+(1, '434-1974', 'perpetua', '1974-11-26', 'vigente', 2000.00, 'pesetas', 'sepultura nÃºmero NUEVE, en la fila sÃ©ptima, parte SUR y vieja', 'Concesionario original: Cipriano Ruiz Castillo'),
+(1, '432-1974', 'perpetua', '1974-11-26', 'vigente', 2000.00, 'pesetas', 'sepultura nÃºmero UNO, en la fila segunda, parte NORTE y vieja', 'Concesionario original: Felix SaÃ±udo Rasilla');
+

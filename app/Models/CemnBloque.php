@@ -17,6 +17,9 @@ class CemnBloque extends Model
         'tipo',
         'filas',
         'columnas',
+        'numero_inicio',
+        'numeracion_horizontal',
+        'numeracion_vertical',
         'descripcion',
         'lat',
         'lon',
@@ -25,6 +28,7 @@ class CemnBloque extends Model
     protected $casts = [
         'filas'    => 'integer',
         'columnas' => 'integer',
+        'numero_inicio' => 'integer',
         'lat'      => 'decimal:7',
         'lon'      => 'decimal:7',
     ];

@@ -19,8 +19,9 @@ class SepulturaDetalleController extends Controller
                 'difuntoTitular.movimientos:id,difunto_id,tipo,fecha,sepultura_origen_id,sepultura_destino_id,numero_expediente,notas',
                 'difuntoTitular.movimientos.sepulturaOrigen:id,codigo',
                 'difuntoTitular.movimientos.sepulturaDestino:id,codigo',
-                'concesionVigente:id,sepultura_id,numero_expediente,tipo,fecha_concesion,fecha_vencimiento,duracion_anos,estado,importe,moneda,concesion_previa_id,notas',
-                'concesionVigente.terceros:id,dni,nombre,apellido1,apellido2,email,telefono',
+                'concesionVigente:id,sepultura_id,numero_expediente,tipo,fecha_concesion,fecha_vencimiento,duracion_anos,estado,importe,moneda,concesion_previa_id,texto_concesion,notas',
+                'concesionVigente.terceros:id,dni,nombre,apellido1,apellido2,nombre_original',
+                'concesionVigente.difuntos:id,concesion_id,nombre_completo,fecha_fallecimiento,fecha_inhumacion,es_titular,parentesco',
                 'documentos:id,sepultura_id,tipo,nombre_original,ruta_archivo,mime_type,tamano_bytes,descripcion,created_at',
             ])
             ->findOrFail($id);
@@ -43,7 +44,23 @@ class SepulturaDetalleController extends Controller
                 'bloque' => $sepultura->bloque,
                 'difunto_titular' => $sepultura->difuntoTitular,
                 'difuntos' => $sepultura->difuntos,
-                'concesion_vigente' => $sepultura->concesionVigente,
+                'concesion_vigente' => $sepultura->concesionVigente ? array_merge(
+                    $sepultura->concesionVigente->toArray(),
+                    [
+                        'concesionario' => $sepultura->concesionVigente->terceros
+                            ? ($sepultura->concesionVigente->terceros->firstWhere('pivot.rol', 'concesionario')
+                                ?? $sepultura->concesionVigente->terceros->first())
+                            : null,
+                        'difuntos_concesion' => $sepultura->concesionVigente->difuntos?->map(fn ($d) => [
+                            'id'                  => $d->id,
+                            'nombre_completo'     => $d->nombre_completo,
+                            'fecha_fallecimiento' => optional($d->fecha_fallecimiento)->toDateString(),
+                            'fecha_inhumacion'    => optional($d->fecha_inhumacion)->toDateString(),
+                            'es_titular'          => (bool) $d->es_titular,
+                            'parentesco'          => $d->parentesco,
+                        ])->values(),
+                    ]
+                ) : null,
                 'movimientos' => $sepultura->difuntoTitular?->movimientos
                     ? $sepultura->difuntoTitular->movimientos
                         ->sortByDesc('fecha')

@@ -105,13 +105,27 @@
           </ol>
 
           <div class="subcard">
-            <div class="subcard__title">Difunto titular</div>
-            <div v-if="!item.difunto_titular" class="muted">—</div>
-            <div v-else class="kv">
-              <div><span class="k">Nombre</span><span class="v">{{ item.difunto_titular.nombre_completo || '—' }}</span></div>
-              <div><span class="k">Fallecimiento</span><span class="v">{{ item.difunto_titular.fecha_fallecimiento || '—' }}</span></div>
-              <div><span class="k">Inhumación</span><span class="v">{{ item.difunto_titular.fecha_inhumacion || '—' }}</span></div>
+            <div class="subcard__title">Difuntos</div>
+            <!-- Difunto con inhumación directa en la sepultura -->
+            <div v-if="item.difunto_titular" class="difunto-row">
+              <span class="difunto-nombre">{{ item.difunto_titular.nombre_completo }}</span>
+              <span class="difunto-meta muted">
+                <span v-if="item.difunto_titular.fecha_fallecimiento">† {{ item.difunto_titular.fecha_fallecimiento }}</span>
+                <span v-if="item.difunto_titular.fecha_inhumacion"> · Inh. {{ item.difunto_titular.fecha_inhumacion }}</span>
+              </span>
             </div>
+            <!-- Difuntos vinculados a través de la concesión (datos históricos) -->
+            <template v-if="difuntosConcesion.length">
+              <div v-for="d in difuntosConcesion" :key="d.id" class="difunto-row">
+                <span class="difunto-nombre">{{ d.nombre_completo }}</span>
+                <span class="difunto-meta muted">
+                  <span v-if="d.fecha_fallecimiento">† {{ d.fecha_fallecimiento }}</span>
+                  <span v-if="d.fecha_inhumacion"> · Inh. {{ d.fecha_inhumacion }}</span>
+                  <span v-if="d.parentesco"> · {{ d.parentesco }}</span>
+                </span>
+              </div>
+            </template>
+            <div v-if="!item.difunto_titular && !difuntosConcesion.length" class="muted">Sin difuntos registrados.</div>
           </div>
         </section>
 
@@ -124,10 +138,13 @@
             <div v-else class="kv">
               <div><span class="k">Expediente</span><span class="v">{{ item.concesion_vigente.numero_expediente || '—' }}</span></div>
               <div><span class="k">Tipo</span><span class="v">{{ item.concesion_vigente.tipo || '—' }}</span></div>
-              <div><span class="k">Fecha actual</span><span class="v">{{ item.concesion_vigente.fecha_concesion || '—' }}</span></div>
-              <div><span class="k">Vencimiento</span><span class="v">{{ item.concesion_vigente.fecha_vencimiento || '—' }}</span></div>
-              <div><span class="k">Duración</span><span class="v">{{ item.concesion_vigente.duracion_anos != null ? `${item.concesion_vigente.duracion_anos} años` : '—' }}</span></div>
-              <div><span class="k">Notas</span><span class="v">{{ item.concesion_vigente.notas || '—' }}</span></div>
+              <div><span class="k">Estado</span><span class="v">{{ item.concesion_vigente.estado || '—' }}</span></div>
+              <div><span class="k">Concesionario</span><span class="v">{{ concesionarioNombre || '—' }}</span></div>
+              <div><span class="k">Fecha</span><span class="v">{{ item.concesion_vigente.fecha_concesion || '—' }}</span></div>
+              <div v-if="item.concesion_vigente.fecha_vencimiento"><span class="k">Vencimiento</span><span class="v">{{ item.concesion_vigente.fecha_vencimiento }}</span></div>
+              <div v-if="item.concesion_vigente.importe != null"><span class="k">Importe</span><span class="v">{{ item.concesion_vigente.importe }} {{ item.concesion_vigente.moneda }}</span></div>
+              <div v-if="item.concesion_vigente.texto_concesion"><span class="k">Descripción</span><span class="v" style="font-style:italic">{{ item.concesion_vigente.texto_concesion }}</span></div>
+              <div v-if="item.concesion_vigente.notas"><span class="k">Notas</span><span class="v">{{ item.concesion_vigente.notas }}</span></div>
             </div>
           </div>
 
@@ -248,9 +265,25 @@ const documentos = computed(() => {
   return Array.isArray(arr) ? arr : [];
 });
 
+const difuntosConcesion = computed(() => {
+  const arr = item.value?.concesion_vigente?.difuntos_concesion;
+  return Array.isArray(arr) ? arr : [];
+});
+
+const concesionarioNombre = computed(() => {
+  const c = item.value?.concesion_vigente;
+  if (!c) return null;
+  const t = c.concesionario;
+  if (!t) return null;
+  return t.nombre_original
+    || [t.nombre, t.apellido1, t.apellido2].filter(Boolean).join(' ')
+    || null;
+});
+
 function formatNombre(t) {
-  const parts = [t?.nombre, t?.apellido1, t?.apellido2].filter(Boolean);
-  return parts.join(' ') || '—';
+  return t?.nombre_original
+    || [t?.nombre, t?.apellido1, t?.apellido2].filter(Boolean).join(' ')
+    || '—';
 }
 
 function formatFechaHora(s) {

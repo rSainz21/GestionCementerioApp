@@ -63,12 +63,11 @@ class CemnSepultura extends Model
         return $this->hasMany(CemnConcesion::class, 'sepultura_id');
     }
 
-    /** Concesión vigente activa (la más reciente con estado=vigente). */
+    /** Concesión activa (vigente o renovada), la más reciente. */
     public function concesionVigente(): HasOne
     {
-        // Evitamos `latestOfMany()` por problemas de columnas ambiguas en SQLite.
         return $this->hasOne(CemnConcesion::class, 'sepultura_id')
-            ->where('estado', 'vigente')
+            ->whereIn('estado', ['vigente', 'renovada'])
             ->orderByDesc('fecha_concesion');
     }
 

@@ -1,0 +1,41 @@
+﻿INSERT INTO cemn_difuntos (nombre_completo, fecha_fallecimiento, sepultura_id, es_titular, notas) VALUES
+
+-- =========================================================================
+-- "RESTOS DE" EXTRAÃDOS DE EVIDENCIAS VISUALES (LÃ¡pidas)
+-- =========================================================================
+('Manuel', NULL, NULL, 0, 'Evidencia visual foto 42. InscripciÃ³n: "RESTOS DE MANUEL Y JOSEFINA" en el nicho de D. Alfonso Doalto GonzÃ¡lez [1].'),
+('Josefina', NULL, NULL, 0, 'Evidencia visual foto 42. InscripciÃ³n: "RESTOS DE MANUEL Y JOSEFINA" en el nicho de D. Alfonso Doalto GonzÃ¡lez [1].'),
+('Florencio Gonzalez', NULL, NULL, 0, 'Evidencia visual foto 47. InscripciÃ³n: "RESTOS DE FLORENCIO GONZALEZ" en el nicho de D. Victoriano Cobo Cobo [2].'),
+('Vicente Gutierrez Husillos', NULL, NULL, 0, 'Evidencia visual foto 49. InscripciÃ³n: "RESTOS DE VICENTE GUTIERREZ HUSILLOS" en el nicho de Siria Gutierrez Cossio y Jose Alberto Bartolome [3].'),
+('Restos de Familia Arozamena TerÃ¡n', NULL, NULL, 0, 'Evidencia visual foto 44. InscripciÃ³n: "RESTOS DE FAMILIA" en el nicho de Natividad Arozamena TerÃ¡n [4].'),
+
+-- =========================================================================
+-- "RESTOS DE" EXTRAÃDOS DE EXPEDIENTES HISTÃRICOS (Concesiones)
+-- =========================================================================
+('Jose Garcia Olavarri', '1915-09-20', NULL, 0, 'Restos trasladados o consolidados. Padre de Angel Garcia Sanchez [5].'),
+('Inocencia Sanchez Cos', '1925-06-20', NULL, 0, 'Restos trasladados o consolidados. Madre de Angel Garcia Sanchez [5].'),
+('Teresa Garcia Sanchez', '1949-01-25', NULL, 0, 'Restos trasladados o consolidados. Hermana de Angel Garcia Sanchez [5].'),
+('Jose Manuel Gonzalez Fernandez', NULL, NULL, 0, 'Restos mencionados en el expediente de Maria San Millan (1954) [6].'),
+('Serafin Rasilla Laguillo', NULL, NULL, 0, 'Restos mencionados en el expediente de Victoria Gonzalez Fernandez (1954) [7].'),
+('Juan Gonzalez-Anleo Noriega', NULL, NULL, 0, 'Restos del esposo de Maria Garcia Saiz (1954) [8].'),
+('Gregorio Portilla Garcia', NULL, NULL, 0, 'Restos del padre de Engracia Portilla (1952) [9].'),
+('Sofia LiaÃ±o Fernandez', NULL, NULL, 0, 'Restos de la madre de Luis Rasilla LiaÃ±o (1952) [10].'),
+('Agustina Gutierrez Fernandez', NULL, NULL, 0, 'Restos de la madre de Moises Cosio Gutierrez (1952) [11].'),
+('Pio Gonzalez', NULL, NULL, 0, 'Restos mencionados en concesiÃ³n a Pio Gonzalez Unamuno (1955) [12].'),
+('Jose Gonzalez PeÃ±a', NULL, NULL, 0, 'Restos del esposo de Agustina Gonzalez Santiago (1962) [13].'),
+('Teodoro Perez Marcano', NULL, NULL, 0, 'Restos del esposo de Maria Vela Fernandez (1962) [14].'),
+('Magdalena Herrera Alonso', NULL, NULL, 0, 'Restos de la hija de Bonifacia Alonso Ruiz (1962) [15].'),
+('Gregorio Gallardo', NULL, NULL, 0, 'Restos del esposo de Carolina Rodriguez Vivero (1966) [16].'),
+('Genoveva Gonzalez y Gonzalez', NULL, NULL, 0, 'Restos de la madre polÃ­tica de Jesus Espada Aznar (1966) [17].'),
+('David Retuerto Anivarro', NULL, NULL, 0, 'Restos del esposo de Aureliana Gonzalez Quevedo (1966) [18].'),
+('Alfredo Corral', NULL, NULL, 0, 'Restos del esposo de Virginia Obregon Perales (1966) [19].'),
+('Jose Gonzalez Quevedo', NULL, NULL, 0, 'Restos del esposo de Ubaldina Santandres Santandres (1966) [20].'),
+('Manuel Fernandez Teran', NULL, NULL, 0, 'Restos del esposo de Maria Retuerto Olavarri (1965) [21].'),
+('Rafael Alonso Aguado', NULL, NULL, 0, 'Restos del padre de Rafael Alonso Unamuno (1963) [22].'),
+('Josefa Gonzalez Fernandez', NULL, NULL, 0, 'Restos de la esposa de Felipe Alonso Arenal (1964) [23].'),
+('Paula (esposa de Angel)', NULL, NULL, 0, 'Restos de la esposa de Angel Garcia Sanchez (1963) [24].'),
+('Ubalda Gonzalez Olavarri', NULL, NULL, 0, 'Restos de la madre de Guadalupe Venero Gonzalez (1962) [25].'),
+('Maria Cobo Perez', NULL, NULL, 0, 'Restos de la madre de Gloria Gutierrez Cobo (1962) [26].'),
+('Julian Diaz de la Pedrosa', NULL, NULL, 0, 'Restos del esposo de Clementina Gonzalez Rubin (1961) [27].'),
+('Eloisa Marcano Abad', NULL, NULL, 0, 'Restos de la esposa de Elias Perez Marcano (1955) [28].');
+

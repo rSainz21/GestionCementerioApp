@@ -13,6 +13,7 @@ class CemnDifunto extends Model
 
     protected $fillable = [
         'tercero_id',
+        'concesion_id',
         'nombre_completo',
         'fecha_fallecimiento',
         'fecha_inhumacion',
@@ -42,6 +43,11 @@ class CemnDifunto extends Model
         // Devolver ruta relativa para que funcione en cualquier dispositivo (misma origin).
         // Si devolvemos URL absoluta basada en APP_URL, en LAN suele quedar como http://localhost/...
         return '/storage/' . ltrim($this->foto_path, '/');
+    }
+
+    public function concesion(): BelongsTo
+    {
+        return $this->belongsTo(CemnConcesion::class, 'concesion_id');
     }
 
     public function tercero(): BelongsTo

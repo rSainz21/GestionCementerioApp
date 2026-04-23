@@ -17,6 +17,12 @@
         <TabPanel header="Concesiones">
           <CrudConcesiones />
         </TabPanel>
+        <TabPanel header="Terceros">
+          <CrudTerceros />
+        </TabPanel>
+        <TabPanel header="Difuntos">
+          <CrudDifuntos />
+        </TabPanel>
       </TabView>
     </div>
   </div>
@@ -30,6 +36,8 @@ import CrudZonas from '@/components/cementerio/admin/CrudZonas.vue';
 import CrudBloques from '@/components/cementerio/admin/CrudBloques.vue';
 import CrudSepulturas from '@/components/cementerio/admin/CrudSepulturas.vue';
 import CrudConcesiones from '@/components/cementerio/admin/CrudConcesiones.vue';
+import CrudTerceros from '@/components/cementerio/admin/CrudTerceros.vue';
+import CrudDifuntos from '@/components/cementerio/admin/CrudDifuntos.vue';
 </script>
 
 <style scoped>

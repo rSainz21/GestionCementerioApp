@@ -17,6 +17,9 @@ use App\Http\Controllers\Cementerio\Admin\ZonasAdminController;
 use App\Http\Controllers\Cementerio\Admin\BloquesAdminController;
 use App\Http\Controllers\Cementerio\Admin\SepulturasAdminController;
 use App\Http\Controllers\Cementerio\Admin\ConcesionesAdminController;
+use App\Http\Controllers\Cementerio\Admin\TercerosAdminController;
+use App\Http\Controllers\Cementerio\Admin\DifuntosAdminController;
+use App\Http\Controllers\Cementerio\Admin\TerceroConcesionesController;
 use App\Http\Controllers\Cementerio\BloquesController;
 use App\Http\Controllers\Cementerio\SepulturasSearchController;
 use App\Http\Controllers\Cementerio\SepulturaUpdateController;
@@ -105,6 +108,14 @@ Route::middleware('auth:sanctum')->group(function () {
                 ->middleware('permission:cementerio.admin');
 
             Route::get('/concesiones', [ConcesionesAdminController::class, 'index'])
+                ->middleware('permission:cementerio.ver');
+
+            Route::get('/terceros', [TercerosAdminController::class, 'index'])
+                ->middleware('permission:cementerio.ver');
+            Route::get('/terceros/{id}/concesiones', [TerceroConcesionesController::class, 'index'])
+                ->middleware('permission:cementerio.ver');
+
+            Route::get('/difuntos', [DifuntosAdminController::class, 'index'])
                 ->middleware('permission:cementerio.ver');
         });
     });
