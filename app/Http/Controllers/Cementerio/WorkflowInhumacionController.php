@@ -30,6 +30,10 @@ class WorkflowInhumacionController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($data['sepultura_id']);
 
+            if ($sepultura->estado === CemnSepultura::ESTADO_CLAUSURADA) {
+                abort(422, 'No se puede inhumar en una sepultura clausurada.');
+            }
+
             $difunto = CemnDifunto::query()->create([
                 'tercero_id' => null,
                 'nombre_completo' => $data['nombre_completo'],

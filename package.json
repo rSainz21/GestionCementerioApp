@@ -9,9 +9,10 @@
         "@primevue/themes": "^4.5.0",
         "apexcharts": ">=5.10.0",
         "axios": "^1.7.0",
+        "leaflet": "^1.9.4",
         "pinia": "^2.2.0",
-        "primevue": "^4.5.0",
         "primeicons": "^7.0.0",
+        "primevue": "^4.5.0",
         "vue": "^3.5.0",
         "vue-router": "^4.4.0",
         "vue3-apexcharts": "^1.11.1"

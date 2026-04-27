@@ -40,6 +40,7 @@ class SepulturaDetalleController extends Controller
                 'lat' => $sepultura->lat,
                 'lon' => $sepultura->lon,
                 'imagen' => $sepultura->imagen,
+                'imagen_url' => $sepultura->imagen_url,
                 'zona' => $sepultura->zona,
                 'bloque' => $sepultura->bloque,
                 'difunto_titular' => $sepultura->difuntoTitular,

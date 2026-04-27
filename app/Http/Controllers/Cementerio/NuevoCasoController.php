@@ -72,6 +72,18 @@ class NuevoCasoController extends Controller
                 abort(422, 'La unidad seleccionada no está libre.');
             }
 
+            // Evita concesiones duplicadas si la sepultura quedó libre por exhumación
+            // pero su concesión anterior no fue cerrada.
+            $concesionActiva = CemnConcesion::query()
+                ->where('sepultura_id', $sepultura->id)
+                ->whereIn('estado', ['vigente', 'renovada'])
+                ->lockForUpdate()
+                ->exists();
+
+            if ($concesionActiva) {
+                abort(422, 'La unidad ya tiene una concesión activa. Ciérrela antes de crear un nuevo caso.');
+            }
+
             // Titular: existente o nuevo
             $titularId = data_get($data, 'titular.id');
             if ($titularId) {

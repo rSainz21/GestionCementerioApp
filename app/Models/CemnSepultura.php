@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Storage;
 
 class CemnSepultura extends Model
 {
@@ -39,6 +40,25 @@ class CemnSepultura extends Model
         'lat'      => 'decimal:7',
         'lon'      => 'decimal:7',
     ];
+
+    protected $appends = [
+        'imagen_url',
+    ];
+
+    public function getImagenUrlAttribute(): ?string
+    {
+        if (!$this->imagen) {
+            return null;
+        }
+
+        // Si ya viene como URL absoluta o relativa pública, no tocarla.
+        if (str_starts_with($this->imagen, 'http://') || str_starts_with($this->imagen, 'https://') || str_starts_with($this->imagen, '/')) {
+            return $this->imagen;
+        }
+
+        // Ruta relativa para LAN (mismo origin), consistente con CemnDifunto::foto_url
+        return '/storage/' . ltrim($this->imagen, '/');
+    }
 
     // ── Constantes de estado ───────────────────────────────────────────────
     const ESTADO_LIBRE      = 'libre';

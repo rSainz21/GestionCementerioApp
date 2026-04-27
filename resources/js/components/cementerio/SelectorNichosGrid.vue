@@ -74,10 +74,15 @@
             :class="[
               `celda--${cell.estado}`,
               selectedSepulturaId === cell.sepultura?.id ? 'celda--selected' : null,
+              draggingDifunto && cell.sepultura?.id && cell.estado !== 'clausurada' ? 'celda--droppable' : null,
+              dragOverCellKey === cell.key && draggingDifunto ? 'celda--drag-over' : null,
             ]"
-            :disabled="!cell.seleccionable"
+            :disabled="!cell.seleccionable && !draggingDifunto"
             :title="cell.tooltip"
             @click="onSelect(cell)"
+            @dragover.prevent="onDragOver(cell)"
+            @dragleave="onDragLeave(cell)"
+            @drop.prevent="onDrop(cell)"
           >
             <span class="celda__pos">{{ cell.label }}</span>
           </button>
@@ -114,25 +119,14 @@ import api from '@/services/api';
 const props = defineProps({
   zonas: { type: Array, required: true },
   bloques: { type: Array, required: true },
-  /**
-   * Si se pasa, el componente funcionará en modo “controlado”.
-   * En caso contrario, emitirá el objeto seleccionado igualmente.
-   */
   selectedSepulturaId: { type: Number, default: null },
-  /**
-   * Endpoint base para cargar sepulturas por bloque.
-   * Debe responder un JSON con { data: [...] } o directamente [...].
-   */
   endpointSepulturasByBloque: { type: String, default: '/api/cementerio/bloques' },
-  /**
-   * Modo de selección:
-   * - 'libres': solo permite seleccionar unidades libres (modo wizard “nuevo caso”).
-   * - 'todas': permite seleccionar cualquier unidad existente para ver detalle.
-   */
   selectionMode: { type: String, default: 'libres' },
+  // Difunto que se está arrastrando actualmente (null si no hay drag activo)
+  draggingDifunto: { type: Object, default: null },
 });
 
-const emit = defineEmits(['update:selectedSepulturaId', 'selected']);
+const emit = defineEmits(['update:selectedSepulturaId', 'selected', 'drop-difunto']);
 
 const zonaId = ref(null);
 const bloqueId = ref(null);
@@ -237,10 +231,28 @@ const seleccionActual = computed(() => {
   return sepulturas.value.find((s) => s.id === props.selectedSepulturaId) ?? null;
 });
 
+const dragOverCellKey = ref(null);
+
 function onSelect(cell) {
   if (!cell.seleccionable) return;
   emit('update:selectedSepulturaId', cell.sepultura.id);
   emit('selected', cell.sepultura);
+}
+
+function onDragOver(cell) {
+  if (!props.draggingDifunto) return;
+  if (!cell.sepultura?.id || cell.estado === 'clausurada') return;
+  dragOverCellKey.value = cell.key;
+}
+
+function onDragLeave(cell) {
+  if (dragOverCellKey.value === cell.key) dragOverCellKey.value = null;
+}
+
+function onDrop(cell) {
+  dragOverCellKey.value = null;
+  if (!props.draggingDifunto || !cell.sepultura?.id || cell.estado === 'clausurada') return;
+  emit('drop-difunto', { difunto: props.draggingDifunto, sepultura: cell.sepultura });
 }
 </script>
 
@@ -400,6 +412,17 @@ function onSelect(cell) {
 .celda--ocupada { background: var(--c2-danger, #A61B1B); }
 .celda--reservada { background: var(--c2-secondary, #C9A227); }
 .celda--clausurada { background: rgba(23, 35, 31, 0.40); }
+
+/* Estados drag & drop */
+.celda--droppable { ring: 2px; cursor: copy; }
+.celda--drag-over {
+  outline: 3px solid #fff !important;
+  outline-offset: 2px;
+  transform: scale(1.12) translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+  z-index: 10;
+  position: relative;
+}
 
 .celda--selected {
   outline: 3px solid rgba(18, 102, 163, 0.55);
