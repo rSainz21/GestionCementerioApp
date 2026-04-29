@@ -2,9 +2,11 @@
   <div class="wrap">
     <div class="toolbar">
       <div class="toolbar__left">
-        <span class="title">Unidades (sepulturas)</span>
+        <span class="title">Sepulturas</span>
+        <span class="count" v-if="!loading">{{ items.length }} registros</span>
       </div>
       <div class="toolbar__right">
+        <Button label="Exportar CSV" icon="pi pi-download" severity="secondary" @click="exportCsv" />
         <Button label="Nueva" icon="pi pi-plus" @click="openNew" />
       </div>
     </div>
@@ -30,14 +32,14 @@
       </Column>
     </DataTable>
 
-    <Dialog v-model:visible="viewDialog" modal header="Detalle de unidad" :style="{ width: 'min(1400px, 96vw)' }">
+    <Dialog v-model:visible="viewDialog" modal header="Detalle de sepultura" :style="{ width: 'min(1400px, 96vw)' }">
       <SepulturaInfoPanel :sepulturaId="viewSepulturaId" />
       <template #footer>
         <Button label="Cerrar" severity="secondary" @click="viewDialog=false" />
       </template>
     </Dialog>
 
-    <Dialog v-model:visible="dialog" modal header="Unidad" :style="{ width: '700px' }">
+    <Dialog v-model:visible="dialog" modal header="Sepultura" :style="{ width: '700px' }">
       <div class="form">
         <div class="grid2">
           <div class="field">
@@ -108,7 +110,7 @@ import SepulturaInfoPanel from '@/components/cementerio/SepulturaInfoPanel.vue';
 const items = ref([]);
 const zonas = ref([]);
 const bloques = ref([]);
-const estados = ['libre', 'ocupada', 'reservada', 'clausurada'];
+const estados = ['libre', 'ocupada'];
 
 const loading = ref(false);
 const loadError = ref(null);
@@ -162,7 +164,7 @@ async function load() {
     const res = await api.get('/api/cementerio/admin/sepulturas');
     items.value = res.data?.items ?? [];
   } catch (e) {
-    loadError.value = toApiErrorMessage(e, 'No se pudieron cargar las unidades (¿permisos?).');
+    loadError.value = toApiErrorMessage(e, 'No se pudieron cargar las sepulturas (¿permisos?).');
   } finally {
     loading.value = false;
   }
@@ -221,6 +223,22 @@ async function save() {
   } finally {
     saving.value = false;
   }
+}
+
+function exportCsv() {
+  const headers = ['ID', 'Código', 'Zona', 'Bloque', 'Fila', 'Columna', 'Tipo', 'Estado', 'Notas'];
+  const rows = items.value.map((r) => [r.id, r.codigo, r.zona_nombre, r.bloque_nombre, r.fila, r.columna, r.tipo, r.estado, r.notas ?? '']);
+  downloadCsv('sepulturas.csv', headers, rows);
+}
+
+function downloadCsv(filename, headers, rows) {
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 async function remove(row) {

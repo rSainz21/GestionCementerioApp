@@ -61,10 +61,8 @@ class CemnSepultura extends Model
     }
 
     // ── Constantes de estado ───────────────────────────────────────────────
-    const ESTADO_LIBRE      = 'libre';
-    const ESTADO_OCUPADA    = 'ocupada';
-    const ESTADO_RESERVADA  = 'reservada';
-    const ESTADO_CLAUSURADA = 'clausurada';
+    const ESTADO_LIBRE   = 'libre';
+    const ESTADO_OCUPADA = 'ocupada';
 
     // ── Relaciones ─────────────────────────────────────────────────────────
 

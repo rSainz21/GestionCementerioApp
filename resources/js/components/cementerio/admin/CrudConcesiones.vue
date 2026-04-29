@@ -7,6 +7,7 @@
       </div>
       <div class="toolbar__right">
         <InputText v-model="q" placeholder="Buscar expediente, concesionario…" class="search" />
+        <Button label="Exportar CSV" icon="pi pi-download" severity="secondary" @click="exportCsv" />
         <Button label="Refrescar" icon="pi pi-refresh" severity="secondary" @click="load" />
       </div>
     </div>
@@ -15,7 +16,7 @@
 
     <DataTable :value="filtered" stripedRows :loading="loading" paginator :rows="15">
       <Column field="id" header="ID" style="width:70px" />
-      <Column field="sepultura_codigo" header="Unidad" style="width:150px">
+      <Column field="sepultura_codigo" header="Sepultura" style="width:150px">
         <template #body="{ data }">
           <span v-if="data.sepultura_codigo" class="badge-codigo">{{ data.sepultura_codigo }}</span>
           <span v-else class="muted">—</span>
@@ -123,6 +124,28 @@ async function load() {
   } finally {
     loading.value = false;
   }
+}
+
+function exportCsv() {
+  const headers = ['ID', 'Sepultura', 'Zona', 'Concesionario', 'Expediente', 'Tipo', 'Estado', 'F. Concesión', 'F. Vencimiento', 'Importe', 'Moneda'];
+  const rows = filtered.value.map((r) => [
+    r.id, r.sepultura_codigo ?? '', r.zona_nombre ?? '',
+    concesionario(r) ?? '', r.numero_expediente ?? '',
+    r.tipo ?? '', r.estado ?? '',
+    r.fecha_concesion ?? '', r.fecha_vencimiento ?? '',
+    r.importe ?? '', r.moneda ?? '',
+  ]);
+  downloadCsv('concesiones.csv', headers, rows);
+}
+
+function downloadCsv(filename, headers, rows) {
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 onMounted(load);

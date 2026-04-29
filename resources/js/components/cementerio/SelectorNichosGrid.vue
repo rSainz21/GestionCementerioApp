@@ -1,9 +1,9 @@
 <template>
   <div class="c2-card">
     <div class="c2-card__header">
-      <div class="c2-card__title">Asignación de unidad</div>
+      <div class="c2-card__title">Asignación de sepultura</div>
       <div class="c2-card__subtitle">
-        Selecciona una zona, un bloque y luego haz clic en un nicho libre.
+        Selecciona una zona, un bloque y haz clic en una sepultura libre.
       </div>
     </div>
 
@@ -35,12 +35,6 @@
           </div>
           <div class="legend__item">
             <span class="dot dot--ocupada" /> Ocupada
-          </div>
-          <div class="legend__item">
-            <span class="dot dot--reservada" /> Reservada
-          </div>
-          <div class="legend__item">
-            <span class="dot dot--clausurada" /> Clausurada
           </div>
         </div>
       </div>
@@ -74,7 +68,7 @@
             :class="[
               `celda--${cell.estado}`,
               selectedSepulturaId === cell.sepultura?.id ? 'celda--selected' : null,
-              draggingDifunto && cell.sepultura?.id && cell.estado !== 'clausurada' ? 'celda--droppable' : null,
+              draggingDifunto && cell.sepultura?.id ? 'celda--droppable' : null,
               dragOverCellKey === cell.key && draggingDifunto ? 'celda--drag-over' : null,
             ]"
             :disabled="!cell.seleccionable && !draggingDifunto"
@@ -89,7 +83,7 @@
         </div>
 
         <div v-if="seleccionActual" class="selection">
-          <div class="selection__title">Unidad seleccionada</div>
+          <div class="selection__title">Sepultura seleccionada</div>
           <div class="selection__body">
             <div>
               <strong>Nicho</strong>:
@@ -102,7 +96,7 @@
         </div>
 
         <div v-if="loading" class="loading">
-          Cargando unidades…
+          Cargando sepulturas…
         </div>
         <div v-else-if="error" class="error">
           {{ error }}
@@ -122,6 +116,9 @@ const props = defineProps({
   selectedSepulturaId: { type: Number, default: null },
   endpointSepulturasByBloque: { type: String, default: '/api/cementerio/bloques' },
   selectionMode: { type: String, default: 'libres' },
+  // Preselección opcional (por ejemplo, desde Navegación espacial)
+  initialZonaId: { type: Number, default: null },
+  initialBloqueId: { type: Number, default: null },
   // Difunto que se está arrastrando actualmente (null si no hay drag activo)
   draggingDifunto: { type: Object, default: null },
 });
@@ -170,6 +167,16 @@ watch(zonaId, () => {
   error.value = null;
 });
 
+// Aplicar preselección cuando llega desde fuera
+watch(
+  () => [props.initialZonaId, props.initialBloqueId],
+  ([z, b]) => {
+    if (z != null && zonaId.value !== z) zonaId.value = z;
+    if (b != null && bloqueId.value !== b) bloqueId.value = b;
+  },
+  { immediate: true }
+);
+
 const sepulturaIndex = computed(() => {
   const map = new Map();
   for (const s of sepulturas.value) {
@@ -197,13 +204,9 @@ const celdas = computed(() => {
         ?? null;
 
       const tooltip =
-        estado === 'ocupada'
-          ? nombre ? `Ocupada · ${nombre}` : 'Ocupada'
-          : estado === 'reservada'
-            ? 'Reservada'
-            : estado === 'clausurada'
-              ? 'Clausurada'
-              : 'Libre';
+        estado !== 'libre'
+          ? (nombre ? `Ocupada · ${nombre}` : 'Ocupada')
+          : 'Libre';
 
       const seleccionable = props.selectionMode === 'todas'
         ? !!sepultura?.id
@@ -241,7 +244,7 @@ function onSelect(cell) {
 
 function onDragOver(cell) {
   if (!props.draggingDifunto) return;
-  if (!cell.sepultura?.id || cell.estado === 'clausurada') return;
+  if (!cell.sepultura?.id) return;
   dragOverCellKey.value = cell.key;
 }
 
@@ -251,7 +254,7 @@ function onDragLeave(cell) {
 
 function onDrop(cell) {
   dragOverCellKey.value = null;
-  if (!props.draggingDifunto || !cell.sepultura?.id || cell.estado === 'clausurada') return;
+  if (!props.draggingDifunto || !cell.sepultura?.id) return;
   emit('drop-difunto', { difunto: props.draggingDifunto, sepultura: cell.sepultura });
 }
 </script>
@@ -341,8 +344,6 @@ function onDrop(cell) {
 
 .dot--libre { background: var(--c2-success, #0F7A4A); }
 .dot--ocupada { background: var(--c2-danger, #A61B1B); }
-.dot--reservada { background: var(--c2-secondary, #C9A227); }
-.dot--clausurada { background: rgba(23, 35, 31, 0.35); }
 
 .empty {
   margin-top: 14px;
@@ -410,8 +411,6 @@ function onDrop(cell) {
 
 .celda--libre { background: var(--c2-success, #0F7A4A); }
 .celda--ocupada { background: var(--c2-danger, #A61B1B); }
-.celda--reservada { background: var(--c2-secondary, #C9A227); }
-.celda--clausurada { background: rgba(23, 35, 31, 0.40); }
 
 /* Estados drag & drop */
 .celda--droppable { ring: 2px; cursor: copy; }

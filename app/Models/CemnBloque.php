@@ -59,3 +59,6 @@ class CemnBloque extends Model
         return $this->sepulturas()->where('estado', 'libre')->count();
     }
 }
+
+
+

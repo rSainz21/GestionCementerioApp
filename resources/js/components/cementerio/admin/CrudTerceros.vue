@@ -7,6 +7,7 @@
       </div>
       <div class="toolbar__right">
         <InputText v-model="q" placeholder="Buscar nombre, DNI, CIF…" class="search" />
+        <Button label="Exportar CSV" icon="pi pi-download" severity="secondary" @click="exportCsv" />
         <Button label="Refrescar" icon="pi pi-refresh" severity="secondary" @click="load" />
       </div>
     </div>
@@ -167,6 +168,26 @@ function estadoLabel(estado) {
 function estadoSeverity(estado) {
   const map = { vigente: 'success', vencida: 'danger', renovada: 'warn', cancelada: 'secondary' };
   return map[estado] ?? 'info';
+}
+
+function exportCsv() {
+  const headers = ['ID', 'Nombre', 'DNI/CIF', 'Teléfono', 'Email', 'Dirección', 'Tipo', 'Notas'];
+  const rows = filtered.value.map((r) => [
+    r.id, r.nombre_original ?? [r.nombre, r.apellido1, r.apellido2].filter(Boolean).join(' '),
+    r.dni ?? '', r.telefono ?? '', r.email ?? '', r.direccion ?? '',
+    r.es_empresa ? 'Empresa' : 'Persona', r.notas ?? '',
+  ]);
+  downloadCsv('terceros.csv', headers, rows);
+}
+
+function downloadCsv(filename, headers, rows) {
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 onMounted(load);

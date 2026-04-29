@@ -4,7 +4,7 @@
     <!-- CABECERA ─────────────────────────────────────────────────────────── -->
     <div class="head">
       <div class="head__left">
-        <div class="head__kicker">Expediente Digital de Unidad de Enterramiento</div>
+        <div class="head__kicker">Expediente Digital de Sepultura</div>
         <div class="head__title">
           <span class="head__big">NICHO {{ item?.codigo || '—' }}</span>
           <span class="head__sep">|</span>
@@ -42,7 +42,7 @@
 
     <div v-if="loading" class="loading muted">Cargando…</div>
     <div v-else-if="error" class="loading error">{{ error }}</div>
-    <div v-else-if="!item" class="loading muted">Selecciona una unidad para ver su información.</div>
+    <div v-else-if="!item" class="loading muted">Selecciona una sepultura para ver su información.</div>
 
     <div v-else class="body">
       <div class="grid">
@@ -65,8 +65,6 @@
               <select v-model="draftUnidad.estado" class="ef-select">
                 <option value="libre">Libre</option>
                 <option value="ocupada">Ocupada</option>
-                <option value="reservada">Reservada</option>
-                <option value="clausurada">Clausurada</option>
               </select>
             </div>
             <div class="ef-row">
@@ -119,7 +117,7 @@
             </div>
             <div class="idv__info">
               <div class="box">
-                <div class="box__title">Datos de la unidad</div>
+                <div class="box__title">Datos de la sepultura</div>
                 <div class="kv">
                   <div><span class="k">Código</span><span class="v">{{ item.codigo || '—' }}</span></div>
                   <div><span class="k">Fila</span><span class="v">{{ item.fila ?? '—' }}</span></div>
@@ -240,6 +238,93 @@
               </template>
               <div v-if="!item.difunto_titular && !difuntosConcesion.length" class="muted">Sin difuntos registrados.</div>
             </template>
+          </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- CARD 2b: Registros huérfanos                                  -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <section class="card">
+          <button class="card__collapse-btn" type="button" @click="huerfanosOpen = !huerfanosOpen">
+            <div class="card__title" style="margin:0">
+              Registros sin asignar
+              <span v-if="huerfanosTotales" class="badge-warn">{{ huerfanosTotales }}</span>
+            </div>
+            <i :class="huerfanosOpen ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" class="collapse-icon" />
+          </button>
+
+          <div v-if="huerfanosOpen" class="huerfanos-body">
+
+            <!-- Difuntos sin sepultura -->
+            <div class="subcard">
+              <div class="subcard__title-row">
+                <div class="subcard__title">
+                  Difuntos sin sepultura
+                  <span v-if="difuntosSinSep.length" class="badge-warn">{{ difuntosSinSep.length }}</span>
+                </div>
+                <input
+                  v-model="difSinQ"
+                  class="ef-input ef-input--sm"
+                  placeholder="Buscar…"
+                  @input="fetchDifSin"
+                />
+              </div>
+              <div v-if="difSinLoading" class="muted" style="padding:8px">Cargando…</div>
+              <div v-else-if="!difuntosSinSep.length" class="muted" style="padding:8px">
+                {{ difSinQ ? 'Sin resultados.' : 'No hay difuntos sin asignar.' }}
+              </div>
+              <div v-else class="hlist">
+                <div v-for="d in difuntosSinSep" :key="d.id" class="hitem">
+                  <div class="hitem__body">
+                    <span class="hitem__name">{{ d.nombre_completo }}</span>
+                    <span class="hitem__meta muted" v-if="d.fecha_fallecimiento">† {{ d.fecha_fallecimiento }}</span>
+                  </div>
+                  <button
+                    class="btnsmall btnsmall--primary"
+                    :disabled="savingDifHuerfano === d.id"
+                    @click="vincularDifunto(d)"
+                  >
+                    <i class="pi pi-link" />
+                    {{ savingDifHuerfano === d.id ? 'Vinculando…' : 'Vincular aquí' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Concesiones con sepultura placeholder -->
+            <div class="subcard" style="margin-top:10px">
+              <div class="subcard__title-row">
+                <div class="subcard__title">
+                  Concesiones sin sepultura asignada
+                  <span v-if="concesionesSinSep.length" class="badge-warn">{{ concesionesSinSep.length }}</span>
+                </div>
+              </div>
+              <div v-if="concSinLoading" class="muted" style="padding:8px">Cargando…</div>
+              <div v-else-if="!concesionesSinSep.length" class="muted" style="padding:8px">
+                No hay concesiones pendientes de asignación.
+              </div>
+              <div v-else class="hlist">
+                <div v-for="c in concesionesSinSep" :key="c.id" class="hitem">
+                  <div class="hitem__body">
+                    <span class="hitem__name">{{ c.concesionario || `Concesión #${c.id}` }}</span>
+                    <span class="hitem__meta muted">{{ c.numero_expediente || '—' }} · {{ c.tipo || '—' }}</span>
+                  </div>
+                  <button
+                    class="btnsmall btnsmall--primary"
+                    :disabled="savingConcHuerfano === c.id"
+                    @click="vincularConcesion(c)"
+                  >
+                    <i class="pi pi-link" />
+                    {{ savingConcHuerfano === c.id ? 'Vinculando…' : 'Vincular aquí' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="huerfanoMsg" :class="['horf-msg', huerfanoMsg.ok ? 'horf-msg--ok' : 'horf-msg--err']">
+              <i :class="huerfanoMsg.ok ? 'pi pi-check-circle' : 'pi pi-times-circle'" />
+              {{ huerfanoMsg.text }}
+            </div>
           </div>
         </section>
 
@@ -728,8 +813,6 @@ const showPreviewHint = computed(() => Boolean(fotoPreviewUrl.value && !item.val
 const estadoLabel = computed(() => {
   const e = (item.value?.estado || '').toLowerCase();
   if (e === 'ocupada') return 'OCUPADO';
-  if (e === 'reservada') return 'RESERVADO';
-  if (e === 'clausurada') return 'CLAUSURADO';
   return 'LIBRE';
 });
 const hasCoords = computed(() => Number.isFinite(Number(item.value?.lat)) && Number.isFinite(Number(item.value?.lon)));
@@ -844,6 +927,82 @@ async function onUploadDocumento(ev) {
   }
 }
 
+// ── Huérfanos ─────────────────────────────────────────────────────────────────
+const huerfanosOpen       = ref(false);
+const difuntosSinSep      = ref([]);
+const difSinLoading       = ref(false);
+const difSinQ             = ref('');
+const concesionesSinSep   = ref([]);
+const concSinLoading      = ref(false);
+const savingDifHuerfano   = ref(null);
+const savingConcHuerfano  = ref(null);
+const huerfanoMsg         = ref(null);
+let hMsgTimer             = null;
+
+const huerfanosTotales = computed(() => difuntosSinSep.value.length + concesionesSinSep.value.length);
+
+let fetchDifSinTimer = null;
+function fetchDifSin() {
+  clearTimeout(fetchDifSinTimer);
+  fetchDifSinTimer = setTimeout(_doFetchDifSin, 280);
+}
+
+async function _doFetchDifSin() {
+  difSinLoading.value = true;
+  try {
+    const res = await api.get('/api/cementerio/difuntos/sin-asignar', {
+      params: { q: difSinQ.value || undefined },
+    });
+    difuntosSinSep.value = res.data?.items ?? [];
+  } finally { difSinLoading.value = false; }
+}
+
+async function loadConcesionesSinSep() {
+  concSinLoading.value = true;
+  try {
+    const res = await api.get('/api/cementerio/admin/concesiones');
+    const all = res.data?.items ?? [];
+    concesionesSinSep.value = all.filter((c) => !c.sepultura_id || c.sepultura_id === 1);
+  } finally { concSinLoading.value = false; }
+}
+
+watch(huerfanosOpen, (open) => {
+  if (open && !difuntosSinSep.value.length && !difSinLoading.value) _doFetchDifSin();
+  if (open && !concesionesSinSep.value.length && !concSinLoading.value) loadConcesionesSinSep();
+});
+
+function showHuerfanoMsg(ok, text) {
+  huerfanoMsg.value = { ok, text };
+  clearTimeout(hMsgTimer);
+  hMsgTimer = setTimeout(() => { huerfanoMsg.value = null; }, 4000);
+}
+
+async function vincularDifunto(d) {
+  if (!item.value?.id) return;
+  savingDifHuerfano.value = d.id;
+  try {
+    await api.put(`/api/cementerio/difuntos/${d.id}/asignar-sepultura`, { sepultura_id: item.value.id });
+    difuntosSinSep.value = difuntosSinSep.value.filter((x) => x.id !== d.id);
+    await load(item.value.id);
+    showHuerfanoMsg(true, `${d.nombre_completo} vinculado correctamente.`);
+  } catch (e) {
+    showHuerfanoMsg(false, e?.response?.data?.message ?? 'Error al vincular el difunto.');
+  } finally { savingDifHuerfano.value = null; }
+}
+
+async function vincularConcesion(c) {
+  if (!item.value?.id) return;
+  savingConcHuerfano.value = c.id;
+  try {
+    await api.put(`/api/cementerio/concesiones/${c.id}`, { sepultura_id: item.value.id });
+    concesionesSinSep.value = concesionesSinSep.value.filter((x) => x.id !== c.id);
+    await load(item.value.id);
+    showHuerfanoMsg(true, `Concesión #${c.id} vinculada correctamente.`);
+  } catch (e) {
+    showHuerfanoMsg(false, e?.response?.data?.message ?? 'Error al vincular la concesión.');
+  } finally { savingConcHuerfano.value = null; }
+}
+
 // ── Watchers ──────────────────────────────────────────────────────────────────
 watch(() => props.sepulturaId, (id) => load(id), { immediate: true });
 watch(() => item.value?.difunto_titular?.foto_url, () => { if (item.value?.difunto_titular?.foto_url) setFotoPreview(null); });
@@ -875,8 +1034,6 @@ onBeforeUnmount(() => setFotoPreview(null));
 .pill i { font-size: 9px; }
 .pill--libre i { color: #34D399; }
 .pill--ocupada i { color: #F87171; }
-.pill--reservada i { color: #FBBF24; }
-.pill--clausurada i { color: #D1D5DB; }
 
 /* Navegación */
 .nav-bar { display: flex; align-items: center; justify-content: space-between; background: rgba(11,58,74,0.07); border-bottom: 1px solid rgba(23,35,31,0.08); padding: 6px 10px; gap: 10px; }
@@ -980,6 +1137,28 @@ onBeforeUnmount(() => setFotoPreview(null));
 .doc__name { font-weight: 900; }
 .doc__meta { font-size: 12px; margin-top: 2px; }
 .doc__desc { font-size: 12px; margin-top: 6px; color: rgba(23,35,31,0.85); }
+
+/* Huérfanos */
+.card__collapse-btn { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px; border: none; background: none; cursor: pointer; text-align: left; }
+.card__collapse-btn:hover { background: rgba(245,247,244,0.8); }
+.collapse-icon { font-size: 12px; color: rgba(23,35,31,0.55); flex-shrink: 0; }
+
+.badge-warn { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--c2-secondary,#C9A227); color: white; font-size: 10px; font-weight: 900; margin-left: 6px; }
+
+.huerfanos-body { padding: 0 12px 12px; }
+
+.hlist { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-top: 8px; }
+
+.hitem { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(23,35,31,0.10); background: white; }
+.hitem__body { flex: 1; min-width: 0; }
+.hitem__name { display: block; font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hitem__meta { display: block; font-size: 11px; margin-top: 1px; }
+
+.ef-input--sm { height: 30px; font-size: 12px; }
+
+.horf-msg { margin-top: 10px; padding: 8px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.horf-msg--ok  { background: rgba(15,122,74,0.10); color: var(--c2-success,#0F7A4A); }
+.horf-msg--err { background: rgba(166,27,27,0.10); color: var(--c2-danger,#A61B1B); }
 
 /* Responsive */
 @media (max-width: 1250px) {

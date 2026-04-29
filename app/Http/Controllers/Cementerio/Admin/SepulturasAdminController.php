@@ -45,7 +45,7 @@ class SepulturasAdminController extends Controller
             'columna' => 'nullable|integer|min:1|max:500',
             'codigo' => 'nullable|string|max:80',
             'tipo' => 'nullable|string|max:50',
-            'estado' => 'required|string|in:libre,ocupada,reservada,clausurada',
+            'estado' => 'required|string|in:libre,ocupada',
             'notas' => 'nullable|string|max:2000',
         ]);
 
@@ -64,7 +64,7 @@ class SepulturasAdminController extends Controller
             'columna' => 'nullable|integer|min:1|max:500',
             'codigo' => 'nullable|string|max:80',
             'tipo' => 'nullable|string|max:50',
-            'estado' => 'required|string|in:libre,ocupada,reservada,clausurada',
+            'estado' => 'required|string|in:libre,ocupada',
             'notas' => 'nullable|string|max:2000',
         ]);
 

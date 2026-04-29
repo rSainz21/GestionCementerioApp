@@ -34,6 +34,7 @@ use App\Http\Controllers\Cementerio\DifuntoUpdateController;
 use App\Http\Controllers\Cementerio\ConcesionUpdateController;
 use App\Http\Controllers\Cementerio\DifuntosSinAsignarController;
 use App\Http\Controllers\Cementerio\DifuntoAsignarController;
+use App\Http\Controllers\Cementerio\CementerioStatsBloqueController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::prefix('auth')->group(function () {
@@ -58,6 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/sepulturas/geo', [SepulturasGeoController::class, 'index'])
             ->middleware('permission:cementerio.ver');
         Route::get('/stats', [CementerioStatsController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
+        Route::get('/stats/bloques', [CementerioStatsBloqueController::class, 'index'])
             ->middleware('permission:cementerio.ver');
         Route::get('/terceros', [TercerosSearchController::class, 'index'])
             ->middleware('permission:cementerio.ver');

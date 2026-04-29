@@ -3,7 +3,7 @@
     <header class="page__header">
       <div>
         <h2 class="title">Nuevo caso</h2>
-        <div class="subtitle">Wizard guiado para alta de concesión y asignación de unidad.</div>
+        <div class="subtitle">Wizard guiado para alta de concesión y asignación de sepultura.</div>
       </div>
       <button class="btn btn--ghost" type="button" @click="$router?.back?.()">
         Volver
@@ -121,9 +121,9 @@
         </div>
       </div>
 
-      <!-- Paso 3: Unidad -->
+      <!-- Paso 3: Sepultura -->
       <div v-else-if="step === 'unidad'" class="card__body">
-        <h3 class="h3">3) Asignación de unidad</h3>
+        <h3 class="h3">3) Asignación de sepultura</h3>
         <SelectorNichosGrid
           :zonas="catalogo.zonas"
           :bloques="catalogo.bloques"
@@ -190,7 +190,7 @@ import api from '@/services/api';
 const steps = [
   { id: 'titular', num: 1, label: 'Titular' },
   { id: 'difunto', num: 2, label: 'Difunto' },
-  { id: 'unidad', num: 3, label: 'Unidad' },
+  { id: 'unidad', num: 3, label: 'Sepultura' },
   { id: 'resumen', num: 4, label: 'Resumen' },
 ];
 

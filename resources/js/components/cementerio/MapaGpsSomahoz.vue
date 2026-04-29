@@ -30,18 +30,17 @@
 <script setup>
 import { computed } from 'vue';
 
-// Coordenadas de la localidad de Somahoz (aprox.).
-// Si tenéis las coordenadas exactas del cementerio, sustituir estos valores.
-const lat = 43.2488042;
-const lon = -4.0637827;
+// Coordenadas del cementerio de Somahoz (recinto, Barrio de San Andrés, Los Corrales de Buelna).
+const lat = 43.25445;
+const lon = -4.04920;
 
 const osmUrl = computed(() => `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}`);
 const googleMapsUrl = computed(() => `https://www.google.com/maps?q=${lat},${lon}`);
 
 const embedUrl = computed(() => {
-  // BBOX alrededor del punto: ~1.2km (aprox) según el delta.
-  const dLat = 0.006;
-  const dLon = 0.006;
+  // BBOX ajustado al recinto del cementerio (zoom más cerrado).
+  const dLat = 0.0012;
+  const dLon = 0.0018;
   const left = lon - dLon;
   const right = lon + dLon;
   const top = lat + dLat;

@@ -16,6 +16,7 @@ class ConcesionUpdateController extends Controller
         $concesion = CemnConcesion::query()->findOrFail($id);
 
         $data = $request->validate([
+            'sepultura_id'      => ['nullable', 'integer', 'exists:cemn_sepulturas,id'],
             'numero_expediente' => ['nullable', 'string', 'max:30'],
             'tipo'              => ['nullable', Rule::in(['temporal', 'perpetua'])],
             'estado'            => ['nullable', Rule::in(['vigente', 'renovada', 'vencida', 'rescindida'])],

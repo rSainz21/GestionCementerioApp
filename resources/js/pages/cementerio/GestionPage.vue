@@ -11,7 +11,7 @@
         <TabPanel header="Bloques">
           <CrudBloques />
         </TabPanel>
-        <TabPanel header="Unidades">
+        <TabPanel header="Sepulturas">
           <CrudSepulturas />
         </TabPanel>
         <TabPanel header="Concesiones">
