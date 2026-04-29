@@ -21,7 +21,13 @@
         </div>
       </div>
       <div class="head__right">
-        <button class="btn btn--ghost" type="button" @click="scrollToMapa">
+        <button
+          class="btn btn--ghost"
+          type="button"
+          :disabled="!hasCoords"
+          :title="hasCoords ? 'Abrir ubicación en Google Maps' : 'Sin coordenadas GPS'"
+          @click="openGoogleMaps"
+        >
           <i class="pi pi-map-marker" /> Ver en mapa
         </button>
       </div>
@@ -136,9 +142,6 @@
                   <div><span class="k">Lat</span><span class="v">{{ item.lat }}</span></div>
                   <div><span class="k">Lon</span><span class="v">{{ item.lon }}</span></div>
                 </div>
-                <a v-if="hasCoords" class="link" :href="mapsUrl" target="_blank" rel="noreferrer">
-                  Abrir en Google Maps
-                </a>
               </div>
             </div>
           </div>
@@ -238,93 +241,6 @@
               </template>
               <div v-if="!item.difunto_titular && !difuntosConcesion.length" class="muted">Sin difuntos registrados.</div>
             </template>
-          </div>
-        </section>
-
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <!-- CARD 2b: Registros huérfanos                                  -->
-        <!-- ══════════════════════════════════════════════════════════════ -->
-        <section class="card">
-          <button class="card__collapse-btn" type="button" @click="huerfanosOpen = !huerfanosOpen">
-            <div class="card__title" style="margin:0">
-              Registros sin asignar
-              <span v-if="huerfanosTotales" class="badge-warn">{{ huerfanosTotales }}</span>
-            </div>
-            <i :class="huerfanosOpen ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" class="collapse-icon" />
-          </button>
-
-          <div v-if="huerfanosOpen" class="huerfanos-body">
-
-            <!-- Difuntos sin sepultura -->
-            <div class="subcard">
-              <div class="subcard__title-row">
-                <div class="subcard__title">
-                  Difuntos sin sepultura
-                  <span v-if="difuntosSinSep.length" class="badge-warn">{{ difuntosSinSep.length }}</span>
-                </div>
-                <input
-                  v-model="difSinQ"
-                  class="ef-input ef-input--sm"
-                  placeholder="Buscar…"
-                  @input="fetchDifSin"
-                />
-              </div>
-              <div v-if="difSinLoading" class="muted" style="padding:8px">Cargando…</div>
-              <div v-else-if="!difuntosSinSep.length" class="muted" style="padding:8px">
-                {{ difSinQ ? 'Sin resultados.' : 'No hay difuntos sin asignar.' }}
-              </div>
-              <div v-else class="hlist">
-                <div v-for="d in difuntosSinSep" :key="d.id" class="hitem">
-                  <div class="hitem__body">
-                    <span class="hitem__name">{{ d.nombre_completo }}</span>
-                    <span class="hitem__meta muted" v-if="d.fecha_fallecimiento">† {{ d.fecha_fallecimiento }}</span>
-                  </div>
-                  <button
-                    class="btnsmall btnsmall--primary"
-                    :disabled="savingDifHuerfano === d.id"
-                    @click="vincularDifunto(d)"
-                  >
-                    <i class="pi pi-link" />
-                    {{ savingDifHuerfano === d.id ? 'Vinculando…' : 'Vincular aquí' }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Concesiones con sepultura placeholder -->
-            <div class="subcard" style="margin-top:10px">
-              <div class="subcard__title-row">
-                <div class="subcard__title">
-                  Concesiones sin sepultura asignada
-                  <span v-if="concesionesSinSep.length" class="badge-warn">{{ concesionesSinSep.length }}</span>
-                </div>
-              </div>
-              <div v-if="concSinLoading" class="muted" style="padding:8px">Cargando…</div>
-              <div v-else-if="!concesionesSinSep.length" class="muted" style="padding:8px">
-                No hay concesiones pendientes de asignación.
-              </div>
-              <div v-else class="hlist">
-                <div v-for="c in concesionesSinSep" :key="c.id" class="hitem">
-                  <div class="hitem__body">
-                    <span class="hitem__name">{{ c.concesionario || `Concesión #${c.id}` }}</span>
-                    <span class="hitem__meta muted">{{ c.numero_expediente || '—' }} · {{ c.tipo || '—' }}</span>
-                  </div>
-                  <button
-                    class="btnsmall btnsmall--primary"
-                    :disabled="savingConcHuerfano === c.id"
-                    @click="vincularConcesion(c)"
-                  >
-                    <i class="pi pi-link" />
-                    {{ savingConcHuerfano === c.id ? 'Vinculando…' : 'Vincular aquí' }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="huerfanoMsg" :class="['horf-msg', huerfanoMsg.ok ? 'horf-msg--ok' : 'horf-msg--err']">
-              <i :class="huerfanoMsg.ok ? 'pi pi-check-circle' : 'pi pi-times-circle'" />
-              {{ huerfanoMsg.text }}
-            </div>
           </div>
         </section>
 
@@ -535,6 +451,94 @@
         </section>
 
       </div>
+
+      <!-- Registros sin asignar: desplegable a ancho completo (debajo del grid) -->
+      <section class="card card--full card--collapse-outer">
+        <button class="card__collapse-btn card__collapse-btn--outer" type="button" @click="huerfanosOpen = !huerfanosOpen">
+          <div>
+            <div class="collapse-outer__title">
+              Registros sin asignar
+              <span v-if="huerfanosTotales" class="badge-warn">{{ huerfanosTotales }}</span>
+            </div>
+            <div class="collapse-outer__sub muted">
+              Vincular difuntos o concesiones pendientes a esta sepultura
+            </div>
+          </div>
+          <i :class="huerfanosOpen ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" class="collapse-icon" />
+        </button>
+
+        <div v-if="huerfanosOpen" class="huerfanos-body huerfanos-body--outer">
+
+          <div class="subcard">
+            <div class="subcard__title-row">
+              <div class="subcard__title">
+                Difuntos sin sepultura
+                <span v-if="difuntosSinSep.length" class="badge-warn">{{ difuntosSinSep.length }}</span>
+              </div>
+              <input
+                v-model="difSinQ"
+                class="ef-input ef-input--sm"
+                placeholder="Buscar…"
+                @input="fetchDifSin"
+              />
+            </div>
+            <div v-if="difSinLoading" class="muted" style="padding:8px">Cargando…</div>
+            <div v-else-if="!difuntosSinSep.length" class="muted" style="padding:8px">
+              {{ difSinQ ? 'Sin resultados.' : 'No hay difuntos sin asignar.' }}
+            </div>
+            <div v-else class="hlist">
+              <div v-for="d in difuntosSinSep" :key="d.id" class="hitem">
+                <div class="hitem__body">
+                  <span class="hitem__name">{{ d.nombre_completo }}</span>
+                  <span class="hitem__meta muted" v-if="d.fecha_fallecimiento">† {{ d.fecha_fallecimiento }}</span>
+                </div>
+                <button
+                  class="btnsmall btnsmall--primary"
+                  :disabled="savingDifHuerfano === d.id"
+                  @click="vincularDifunto(d)"
+                >
+                  <i class="pi pi-link" />
+                  {{ savingDifHuerfano === d.id ? 'Vinculando…' : 'Vincular aquí' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="subcard">
+            <div class="subcard__title-row">
+              <div class="subcard__title">
+                Concesiones sin sepultura asignada
+                <span v-if="concesionesSinSep.length" class="badge-warn">{{ concesionesSinSep.length }}</span>
+              </div>
+            </div>
+            <div v-if="concSinLoading" class="muted" style="padding:8px">Cargando…</div>
+            <div v-else-if="!concesionesSinSep.length" class="muted" style="padding:8px">
+              No hay concesiones pendientes de asignación.
+            </div>
+            <div v-else class="hlist">
+              <div v-for="c in concesionesSinSep" :key="c.id" class="hitem">
+                <div class="hitem__body">
+                  <span class="hitem__name">{{ c.concesionario || `Concesión #${c.id}` }}</span>
+                  <span class="hitem__meta muted">{{ c.numero_expediente || '—' }} · {{ c.tipo || '—' }}</span>
+                </div>
+                <button
+                  class="btnsmall btnsmall--primary"
+                  :disabled="savingConcHuerfano === c.id"
+                  @click="vincularConcesion(c)"
+                >
+                  <i class="pi pi-link" />
+                  {{ savingConcHuerfano === c.id ? 'Vinculando…' : 'Vincular aquí' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="huerfanoMsg" :class="['horf-msg', huerfanoMsg.ok ? 'horf-msg--ok' : 'horf-msg--err']">
+            <i :class="huerfanoMsg.ok ? 'pi pi-check-circle' : 'pi pi-times-circle'" />
+            {{ huerfanoMsg.text }}
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -852,8 +856,10 @@ function movimientoLabel(tipo) {
   if (t.includes('traslad')) return 'Traslado';
   return tipo || 'Movimiento';
 }
-function scrollToMapa() {
-  document.getElementById('mapa-unidades')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+function openGoogleMaps() {
+  const url = mapsUrl.value;
+  if (!url) return;
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 // ── Carga ─────────────────────────────────────────────────────────────────────
@@ -1046,13 +1052,46 @@ onBeforeUnmount(() => setFotoPreview(null));
 
 /* Botón cabecera */
 .btn { height: 36px; padding: 0 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.10); color: white; cursor: pointer; font-weight: 900; display: inline-flex; align-items: center; gap: 8px; }
-.btn--ghost:hover { background: rgba(255,255,255,0.16); }
+.btn--ghost:hover:not(:disabled) { background: rgba(255,255,255,0.16); }
+.btn:disabled { opacity: 0.42; cursor: not-allowed; }
 
 .loading { padding: 12px 14px; background: white; }
 
 /* Body */
-.body { padding: 12px; }
+.body { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 .grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 12px; }
+
+.card--full { width: 100%; }
+.card--collapse-outer { padding: 0; overflow: hidden; }
+.card__collapse-btn--outer {
+  padding: 14px 16px;
+  align-items: center;
+  border-bottom: 1px solid rgba(23, 35, 31, 0.06);
+}
+.collapse-outer__title {
+  font-weight: 900;
+  font-size: 15px;
+  color: rgba(23, 35, 31, 0.92);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.collapse-outer__sub { margin-top: 4px; font-size: 12px; line-height: 1.35; }
+.huerfanos-body--outer {
+  padding: 0 16px 16px;
+  display: grid;
+  gap: 12px;
+}
+.huerfanos-body--outer > .horf-msg {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 1100px) {
+  .huerfanos-body--outer {
+    grid-template-columns: 1fr 1fr;
+  }
+}
 
 /* Cards */
 .card { background: white; border-radius: 14px; border: 1px solid rgba(23,35,31,0.10); box-shadow: 0 6px 18px rgba(23,35,31,0.06); padding: 12px; }
@@ -1101,8 +1140,6 @@ onBeforeUnmount(() => setFotoPreview(null));
 .idv__info { display: grid; gap: 10px; }
 .box { border: 1px solid rgba(23,35,31,0.10); border-radius: 12px; padding: 10px; background: rgba(245,247,244,0.45); }
 .box__title { font-weight: 900; margin-bottom: 8px; }
-.link { display: inline-flex; margin-top: 8px; font-weight: 900; font-size: 12px; color: var(--c2-primary,#118652); text-decoration: none; }
-.link:hover { text-decoration: underline; }
 
 .kv { display: grid; gap: 6px; font-size: 13px; }
 .k { display: inline-block; width: 120px; color: rgba(23,35,31,0.70); font-weight: 900; }
@@ -1146,7 +1183,6 @@ onBeforeUnmount(() => setFotoPreview(null));
 .badge-warn { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--c2-secondary,#C9A227); color: white; font-size: 10px; font-weight: 900; margin-left: 6px; }
 
 .huerfanos-body { padding: 0 12px 12px; }
-
 .hlist { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-top: 8px; }
 
 .hitem { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(23,35,31,0.10); background: white; }

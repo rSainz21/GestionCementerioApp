@@ -34,7 +34,11 @@ use App\Http\Controllers\Cementerio\DifuntoUpdateController;
 use App\Http\Controllers\Cementerio\ConcesionUpdateController;
 use App\Http\Controllers\Cementerio\DifuntosSinAsignarController;
 use App\Http\Controllers\Cementerio\DifuntoAsignarController;
+use App\Http\Controllers\Cementerio\ConcesionesSinAsignarController;
+use App\Http\Controllers\Cementerio\ConcesionAsignarController;
 use App\Http\Controllers\Cementerio\CementerioStatsBloqueController;
+use App\Http\Controllers\Cementerio\CementerioStatsTipoController;
+use App\Http\Controllers\Cementerio\CementerioStatsZonaController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::prefix('auth')->group(function () {
@@ -62,6 +66,10 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('permission:cementerio.ver');
         Route::get('/stats/bloques', [CementerioStatsBloqueController::class, 'index'])
             ->middleware('permission:cementerio.ver');
+        Route::get('/stats/tipos', [CementerioStatsTipoController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
+        Route::get('/stats/zonas', [CementerioStatsZonaController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
         Route::get('/terceros', [TercerosSearchController::class, 'index'])
             ->middleware('permission:cementerio.ver');
         Route::put('/terceros/{id}', [TerceroUpdateController::class, 'update'])
@@ -72,7 +80,11 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('permission:cementerio.ver');
         Route::get('/difuntos/sin-asignar', [DifuntosSinAsignarController::class, 'index'])
             ->middleware('permission:cementerio.ver');
+        Route::get('/concesiones/sin-asignar', [ConcesionesSinAsignarController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
         Route::put('/difuntos/{id}/asignar-sepultura', [DifuntoAsignarController::class, 'update'])
+            ->middleware('permission:cementerio.editar');
+        Route::put('/concesiones/{id}/asignar-sepultura', [ConcesionAsignarController::class, 'update'])
             ->middleware('permission:cementerio.editar');
         Route::get('/catalogo', [CementerioCatalogoController::class, 'catalogo'])
             ->middleware('permission:cementerio.ver');

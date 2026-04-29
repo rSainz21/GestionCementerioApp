@@ -1,95 +1,142 @@
 <template>
   <div class="mapa-wrap">
-
-    <!-- Fila superior: nichos + lista difuntos -->
     <div class="grid-top">
       <SelectorNichosGrid
         :zonas="zonas"
         :bloques="bloques"
         selectionMode="todas"
         :selectedSepulturaId="selectedId"
-        :draggingDifunto="draggingDifunto"
+        :draggingDifunto="draggingEntity"
         @update:selectedSepulturaId="(v) => (selectedId = v)"
         @selected="onSelected"
         @drop-difunto="onDropDifunto"
       />
 
-      <!-- Panel: difuntos sin asignar ──────────────────────────────────── -->
-    <div class="asign-panel">
-      <div class="asign-panel__head">
-        <div>
+      <div class="asign-panel">
+        <div class="asign-panel__head">
+          <div class="asign-tabs">
+            <button
+              type="button"
+              class="asign-tab"
+              :class="{ 'asign-tab--active': panelMode === 'difuntos' }"
+              @click="setPanelMode('difuntos')"
+            >
+              DIFUNTOS
+            </button>
+            <button
+              type="button"
+              class="asign-tab"
+              :class="{ 'asign-tab--active': panelMode === 'concesiones' }"
+              @click="setPanelMode('concesiones')"
+            >
+              CONCESIONES
+            </button>
+          </div>
+
           <div class="asign-panel__title">
             <i class="pi pi-users" />
-            Difuntos sin asignar
-            <span v-if="sinAsignar.length" class="badge">{{ sinAsignar.length }}</span>
+            {{ panelMode === 'difuntos' ? 'Difuntos sin asignar' : 'Concesiones sin asignar' }}
+            <span v-if="activeItems.length" class="badge">{{ activeItems.length }}</span>
           </div>
           <div class="asign-panel__sub">
-            Arrastra un difunto sobre un nicho del mapa para asignarlo.
+            Arrastra un elemento sobre un nicho libre del mapa para asignarlo.
           </div>
-        </div>
-        <div class="asign-panel__search">
           <input
             v-model="busqueda"
             type="text"
             class="search-input"
             placeholder="Buscar por nombre…"
-            @input="fetchSinAsignar"
+            @input="fetchPanelItems"
           />
         </div>
-      </div>
 
-      <div v-if="loadingSin" class="asign-empty muted">Cargando…</div>
-      <div v-else-if="!sinAsignar.length" class="asign-empty muted">
-        {{ busqueda ? 'Sin resultados.' : 'Todos los difuntos están asignados a un nicho.' }}
-      </div>
+        <div v-if="loadingPanel" class="asign-empty muted">Cargando…</div>
+        <div v-else-if="!activeItems.length" class="asign-empty muted">
+          {{ busqueda ? 'Sin resultados.' : 'No hay elementos pendientes de asignar.' }}
+        </div>
 
-      <div v-else class="asign-list">
-        <div
-          v-for="d in sinAsignar"
-          :key="d.id"
-          class="asign-card"
-          draggable="true"
-          :class="{ 'asign-card--dragging': draggingDifunto?.id === d.id }"
-          @dragstart="onDragStart(d)"
-          @dragend="onDragEnd"
-        >
-          <div class="asign-card__icon">
-            <i class="pi pi-user" />
-          </div>
-          <div class="asign-card__body">
-            <div class="asign-card__nombre">{{ d.nombre_completo }}</div>
-            <div class="asign-card__meta muted">
-              <span v-if="d.fecha_fallecimiento">† {{ d.fecha_fallecimiento }}</span>
-              <span v-if="d.parentesco"> · {{ d.parentesco }}</span>
+        <div v-else class="asign-list">
+          <div
+            v-for="item in activeItems"
+            :key="`${panelMode}-${item.id}`"
+            class="asign-card"
+            draggable="true"
+            :class="{ 'asign-card--dragging': draggingEntity?.id === item.id }"
+            @dragstart="onDragStart(item)"
+            @dragend="onDragEnd"
+          >
+            <div class="asign-card__icon">
+              <i :class="panelMode === 'difuntos' ? 'pi pi-user' : 'pi pi-file'" />
+            </div>
+            <div class="asign-card__body">
+              <div class="asign-card__nombre">{{ item.nombre }}</div>
+              <div class="asign-card__meta muted">{{ item.meta }}</div>
+            </div>
+            <div class="asign-card__drag">
+              <i class="pi pi-arrows-alt" />
             </div>
           </div>
-          <div class="asign-card__drag">
-            <i class="pi pi-arrows-alt" />
+        </div>
+
+        <div v-if="asignMsg" :class="['asign-toast', asignMsg.ok ? 'asign-toast--ok' : 'asign-toast--err']">
+          <i :class="asignMsg.ok ? 'pi pi-check-circle' : 'pi pi-times-circle'" />
+          {{ asignMsg.text }}
+        </div>
+      </div>
+    </div>
+
+    <div class="mapa-row">
+      <section class="mapa-card">
+        <div class="mapa-card__head">
+          <div class="mapa-card__title">Mapa del cementerio</div>
+          <div class="capas">
+            <span class="capas__label">Capas:</span>
+            <label v-for="capa in capas" :key="capa.key" class="capa-check">
+              <input type="checkbox" v-model="capasActivas" :value="capa.key" />
+              {{ capa.label }}
+            </label>
           </div>
         </div>
-      </div>
 
-      <!-- Toast de asignación -->
-      <div v-if="asignMsg" :class="['asign-toast', asignMsg.ok ? 'asign-toast--ok' : 'asign-toast--err']">
-        <i :class="asignMsg.ok ? 'pi pi-check-circle' : 'pi pi-times-circle'" />
-        {{ asignMsg.text }}
-      </div>
-    </div>
-    </div><!-- /grid-top -->
+        <MapaCementerioSomahoz
+          :centerLat="LAT"
+          :centerLon="LON"
+          :zoom="18"
+          :items="geoItems"
+          :capasActivas="capasActivas"
+          @select="onMapSelect"
+        />
 
-    <!-- Fila inferior: mapa GPS -->
-    <div class="mapa-gps">
-      <div class="mapa-gps__inner">
-        <MapaGpsSomahoz />
-        <div class="mapa-gps__btn">
-          <button class="btn" type="button" :disabled="!selectedId" @click="openDetail(selectedId)">
-            <i class="pi pi-eye" /> Ver expediente
+        <div class="mapa-foot muted">Cementerio de Somahoz</div>
+      </section>
+
+      <section class="sep-panel">
+        <div class="sep-panel__head">
+          <div class="sep-panel__title">Sepulturas</div>
+          <input
+            v-model="sepSearch"
+            class="search-input"
+            placeholder="Buscar código o número…"
+          />
+        </div>
+        <div v-if="sepLoading" class="asign-empty muted">Cargando…</div>
+        <div v-else-if="!sepFiltradas.length" class="asign-empty muted">Sin resultados.</div>
+        <div v-else class="sep-list">
+          <button
+            v-for="s in sepFiltradas"
+            :key="s.id"
+            type="button"
+            class="sep-item"
+            :class="{ 'sep-item--active': selectedId === s.id }"
+            @click="openDetail(s.id)"
+          >
+            <span class="sep-dot" :class="`sep-dot--${(s.estado || 'libre').toLowerCase()}`" />
+            <span class="sep-code">{{ s.codigo || s.id }}</span>
           </button>
         </div>
-      </div>
+      </section>
     </div>
 
-    <!-- Dialog detalle ───────────────────────────────────────────────────── -->
     <Dialog v-model:visible="detailDialog" modal header="Detalle de unidad" :style="{ width: 'min(1400px, 96vw)' }">
       <SepulturaInfoPanel
         :sepulturaId="detailSepulturaId"
@@ -103,16 +150,15 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import api from '@/services/api';
 import SelectorNichosGrid from '@/components/cementerio/SelectorNichosGrid.vue';
 import SepulturaInfoPanel from '@/components/cementerio/SepulturaInfoPanel.vue';
-import MapaGpsSomahoz from '@/components/cementerio/MapaGpsSomahoz.vue';
+import MapaCementerioSomahoz from '@/components/cementerio/MapaCementerioSomahoz.vue';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 
-// ── Catálogo ─────────────────────────────────────────────────────────────────
 const zonas = ref([]);
 const bloques = ref([]);
 
@@ -122,7 +168,6 @@ async function loadCatalogo() {
   bloques.value = res.data?.bloques ?? [];
 }
 
-// ── Selección en grid ────────────────────────────────────────────────────────
 const selectedId = ref(null);
 const route = useRoute();
 
@@ -131,7 +176,6 @@ function onSelected(sepultura) {
   if (selectedId.value) openDetail(selectedId.value);
 }
 
-// ── Dialog detalle ────────────────────────────────────────────────────────────
 const detailDialog = ref(false);
 const detailSepulturaId = ref(null);
 
@@ -149,67 +193,105 @@ function onNavegate(id) {
   selectedId.value = v;
 }
 
-// ── Difuntos sin asignar ──────────────────────────────────────────────────────
-const sinAsignar = ref([]);
-const loadingSin = ref(false);
+const panelMode = ref('difuntos');
+const difuntosSinAsignar = ref([]);
+const concesionesSinAsignar = ref([]);
+const loadingPanel = ref(false);
 const busqueda = ref('');
 
 let fetchTimer = null;
-function fetchSinAsignar() {
+function fetchPanelItems() {
   clearTimeout(fetchTimer);
   fetchTimer = setTimeout(_doFetch, 280);
 }
 
 async function _doFetch() {
-  loadingSin.value = true;
+  loadingPanel.value = true;
   try {
-    const res = await api.get('/api/cementerio/difuntos/sin-asignar', {
+    const endpoint = panelMode.value === 'difuntos'
+      ? '/api/cementerio/difuntos/sin-asignar'
+      : '/api/cementerio/concesiones/sin-asignar';
+    const res = await api.get(endpoint, {
       params: { q: busqueda.value || undefined },
     });
-    sinAsignar.value = res.data?.items ?? [];
+    const items = res.data?.items ?? [];
+    if (panelMode.value === 'difuntos') {
+      difuntosSinAsignar.value = items;
+    } else {
+      concesionesSinAsignar.value = items;
+    }
   } catch {
-    sinAsignar.value = [];
+    if (panelMode.value === 'difuntos') {
+      difuntosSinAsignar.value = [];
+    } else {
+      concesionesSinAsignar.value = [];
+    }
   } finally {
-    loadingSin.value = false;
+    loadingPanel.value = false;
   }
 }
 
-// ── Drag & drop ───────────────────────────────────────────────────────────────
-const draggingDifunto = ref(null);
+const activeItems = computed(() => {
+  if (panelMode.value === 'difuntos') {
+    return difuntosSinAsignar.value.map((d) => ({
+      id: d.id,
+      nombre: d.nombre_completo,
+      meta: [d.fecha_fallecimiento ? `† ${d.fecha_fallecimiento}` : null, d.parentesco].filter(Boolean).join(' · '),
+      raw: d,
+    }));
+  }
+
+  return concesionesSinAsignar.value.map((c) => ({
+    id: c.id,
+    nombre: c.concesionario || `Concesión #${c.id}`,
+    meta: [c.numero_expediente ? `Exp. ${c.numero_expediente}` : null, c.tipo, c.estado].filter(Boolean).join(' · '),
+    raw: c,
+  }));
+});
+
+function setPanelMode(mode) {
+  panelMode.value = mode;
+  busqueda.value = '';
+  _doFetch();
+}
+
+const draggingEntity = ref(null);
 const asignMsg = ref(null);
 let msgTimer = null;
 
-function onDragStart(difunto) {
-  draggingDifunto.value = difunto;
+function onDragStart(entity) {
+  draggingEntity.value = {
+    ...entity,
+    mode: panelMode.value,
+  };
 }
 
 function onDragEnd() {
-  draggingDifunto.value = null;
+  draggingEntity.value = null;
 }
 
 async function onDropDifunto({ difunto, sepultura }) {
-  draggingDifunto.value = null;
+  const mode = difunto?.mode ?? panelMode.value;
+  draggingEntity.value = null;
   clearTimeout(msgTimer);
 
   try {
-    await api.put(`/api/cementerio/difuntos/${difunto.id}/asignar-sepultura`, {
-      sepultura_id: sepultura.id,
-    });
-
-    // Quitar de la lista sin asignar
-    sinAsignar.value = sinAsignar.value.filter((d) => d.id !== difunto.id);
-
-    // Refrescar grid reponiendo el bloque activo (la sepultura cambia a ocupada)
-    // SelectorNichosGrid lo gestionará en su próximo cambio de bloque o manualmente.
-    // Forzamos un reset del selectedId para que el grid recargue el bloque.
-    const prevSelected = selectedId.value;
-    selectedId.value = null;
-    await loadCatalogo();
-    selectedId.value = prevSelected;
-
-    showMsg(true, `${difunto.nombre_completo} asignado a ${sepultura.codigo}`);
+    if (mode === 'concesiones') {
+      await api.put(`/api/cementerio/concesiones/${difunto.id}/asignar-sepultura`, {
+        sepultura_id: sepultura.id,
+      });
+      concesionesSinAsignar.value = concesionesSinAsignar.value.filter((c) => c.id !== difunto.id);
+      showMsg(true, `Concesión #${difunto.id} asignada a ${sepultura.codigo}`);
+    } else {
+      await api.put(`/api/cementerio/difuntos/${difunto.id}/asignar-sepultura`, {
+        sepultura_id: sepultura.id,
+      });
+      difuntosSinAsignar.value = difuntosSinAsignar.value.filter((d) => d.id !== difunto.id);
+      showMsg(true, `${difunto.nombre} asignado a ${sepultura.codigo}`);
+    }
+    await Promise.all([loadGeo(), loadSepulturas()]);
   } catch (e) {
-    showMsg(false, e?.response?.data?.message ?? 'Error al asignar el difunto.');
+    showMsg(false, e?.response?.data?.message ?? 'Error al asignar.');
   }
 }
 
@@ -219,9 +301,54 @@ function showMsg(ok, text) {
   msgTimer = setTimeout(() => { asignMsg.value = null; }, 4000);
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+const LAT = 43.25445;
+const LON = -4.0492;
+const capas = [
+  { key: 'nicho', label: 'Nichos' },
+  { key: 'fosa', label: 'Fosas' },
+  { key: 'columbario', label: 'Columbarios' },
+  { key: 'panteon', label: 'Panteones' },
+];
+const capasActivas = ref(capas.map((c) => c.key));
+const geoItems = ref([]);
+const allSepulturas = ref([]);
+const sepLoading = ref(false);
+const sepSearch = ref('');
+
+const sepFiltradas = computed(() => {
+  const q = sepSearch.value.trim().toLowerCase();
+  return allSepulturas.value.filter((s) => {
+    const tipo = (s.tipo || '').toLowerCase();
+    const capaOk = capasActivas.value.includes(tipo);
+    const textOk = !q || String(s.codigo || '').toLowerCase().includes(q) || String(s.numero || '').includes(q);
+    return capaOk && textOk;
+  });
+});
+
+async function loadGeo() {
+  const res = await api.get('/api/cementerio/sepulturas/geo', { params: { limit: 5000 } });
+  geoItems.value = res.data?.items ?? [];
+}
+
+async function loadSepulturas() {
+  sepLoading.value = true;
+  try {
+    const res = await api.get('/api/cementerio/admin/sepulturas');
+    allSepulturas.value = res.data?.items ?? [];
+  } finally {
+    sepLoading.value = false;
+  }
+}
+
+function onMapSelect(it) {
+  if (it?.id) {
+    selectedId.value = Number(it.id);
+    openDetail(it.id);
+  }
+}
+
 onMounted(async () => {
-  await loadCatalogo();
+  await Promise.all([loadCatalogo(), loadGeo(), loadSepulturas()]);
   _doFetch();
 });
 
@@ -237,8 +364,6 @@ watch(
 
 <style scoped>
 .mapa-wrap { display: flex; flex-direction: column; gap: 14px; padding: 12px; }
-
-/* Fila superior: grid nichos + panel difuntos */
 .grid-top {
   display: grid;
   grid-template-columns: minmax(380px, 1fr) 320px;
@@ -247,16 +372,6 @@ watch(
 }
 @media (max-width: 1100px) { .grid-top { grid-template-columns: 1fr; } }
 
-/* Fila inferior: mapa GPS */
-.mapa-gps { }
-.mapa-gps__inner { position: relative; }
-.mapa-gps__btn { position: absolute; top: 12px; right: 12px; }
-
-.btn { height: 36px; padding: 0 12px; border-radius: 12px; border: 1px solid rgba(23,35,31,0.14); background: rgba(255,255,255,0.92); cursor: pointer; font-weight: 900; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 10px 24px rgba(23,35,31,0.12); backdrop-filter: blur(6px); }
-.btn:hover { background: white; }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
-
-/* Panel sin asignar */
 .asign-panel {
   background: white;
   border-radius: 14px;
@@ -264,14 +379,26 @@ watch(
   box-shadow: 0 6px 18px rgba(23,35,31,0.06);
   overflow: hidden;
   position: relative;
+  min-height: 300px;
 }
 
 .asign-panel__head {
-  display: flex;
-  flex-direction: column;
   gap: 10px;
   padding: 14px 14px 10px;
   border-bottom: 1px solid rgba(23,35,31,0.08);
+}
+.asign-tabs { display: inline-flex; border: 1px solid rgba(23,35,31,0.18); border-radius: 10px; overflow: hidden; width: fit-content; }
+.asign-tab {
+  border: 0;
+  background: white;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.asign-tab--active {
+  background: rgba(17,134,82,0.12);
+  color: var(--c2-primary,#118652);
 }
 
 .asign-panel__title {
@@ -304,8 +431,6 @@ watch(
 .search-input:focus { border-color: var(--c2-primary,#118652); box-shadow: 0 0 0 3px rgba(17,134,82,0.12); }
 
 .asign-empty { padding: 20px 16px; font-size: 13px; }
-
-/* Lista de difuntos */
 .asign-list {
   display: flex;
   flex-direction: column;
@@ -353,7 +478,6 @@ watch(
 
 .muted { color: rgba(23,35,31,0.60); }
 
-/* Toast */
 .asign-toast {
   position: absolute;
   bottom: 12px;
@@ -373,4 +497,55 @@ watch(
 .asign-toast--ok { background: var(--c2-primary,#118652); color: white; }
 .asign-toast--err { background: var(--c2-danger,#A61B1B); color: white; }
 @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+.mapa-row {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .mapa-row { grid-template-columns: 1fr; }
+}
+
+.mapa-card, .sep-panel {
+  background: white;
+  border-radius: 14px;
+  border: 1px solid rgba(23,35,31,0.10);
+  box-shadow: 0 6px 18px rgba(23,35,31,0.06);
+  overflow: hidden;
+}
+.mapa-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(23,35,31,0.08);
+}
+.mapa-card__title {
+  font-weight: 900;
+}
+.capas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.capas__label { font-size: 11px; font-weight: 800; color: rgba(23,35,31,0.55); text-transform: uppercase; }
+.capa-check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; }
+.capa-check input { accent-color: var(--c2-primary,#118652); }
+.mapa-foot { padding: 8px 14px; border-top: 1px solid rgba(23,35,31,0.08); font-size: 12px; }
+
+.sep-panel__head { padding: 12px; border-bottom: 1px solid rgba(23,35,31,0.08); display: grid; gap: 8px; }
+.sep-panel__title { font-weight: 900; }
+.sep-list { max-height: 420px; overflow-y: auto; padding: 8px; display: grid; gap: 4px; }
+.sep-item {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sep-item:hover, .sep-item--active { background: rgba(17,134,82,0.08); border-color: rgba(17,134,82,0.25); }
+.sep-dot { width: 8px; height: 8px; border-radius: 999px; }
+.sep-dot--libre { background: var(--c2-success,#0F7A4A); }
+.sep-dot--ocupada { background: var(--c2-danger,#A61B1B); }
+.sep-code { font-weight: 700; font-size: 13px; }
 </style>

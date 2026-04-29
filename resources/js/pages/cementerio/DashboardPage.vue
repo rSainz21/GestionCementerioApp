@@ -11,56 +11,81 @@
       </div>
     </header>
 
-    <!-- ── Sección KPIs + gráficas ──────────────────────────────────────── -->
-    <div class="top-section">
-      <!-- Columna izquierda: KPIs + gráfica por bloque -->
-      <div class="left-col">
-        <div class="kpis">
-          <div class="kpi kpi--free">
-            <div class="kpi__label">Libres</div>
-            <div class="kpi__value">{{ stats.libres ?? '—' }}</div>
-          </div>
-          <div class="kpi kpi--busy">
-            <div class="kpi__label">Ocupadas</div>
-            <div class="kpi__value">{{ stats.ocupadas ?? '—' }}</div>
-          </div>
-          <div class="kpi kpi--total">
-            <div class="kpi__label">Total</div>
-            <div class="kpi__value">{{ totalSepulturas }}</div>
-          </div>
-          <div class="kpi kpi--pct">
-            <div class="kpi__label">% ocupación</div>
-            <div class="kpi__value">{{ pctOcupacion }}%</div>
-          </div>
-        </div>
-
-        <section class="card">
-          <div class="card__body">
-            <div class="card__title">Ocupación por bloque</div>
-            <ApexChart
-              v-if="bloqueSeries.length"
-              type="bar"
-              height="260"
-              :options="bloqueOptions"
-              :series="bloqueSeries"
-            />
-            <div v-else class="muted">Cargando datos de bloques…</div>
-          </div>
-        </section>
+    <!-- ── KPIs ──────────────────────────────────────────────────────────── -->
+    <div class="kpis">
+      <div class="kpi kpi--free">
+        <div class="kpi__label">Libres</div>
+        <div class="kpi__value">{{ stats.libres ?? '—' }}</div>
       </div>
+      <div class="kpi kpi--busy">
+        <div class="kpi__label">Ocupadas</div>
+        <div class="kpi__value">{{ stats.ocupadas ?? '—' }}</div>
+      </div>
+      <div class="kpi kpi--total">
+        <div class="kpi__label">Total</div>
+        <div class="kpi__value">{{ totalSepulturas }}</div>
+      </div>
+      <div class="kpi kpi--pct">
+        <div class="kpi__label">% ocupación</div>
+        <div class="kpi__value">{{ pctOcupacion }}%</div>
+      </div>
+    </div>
 
-      <!-- Columna derecha: donut -->
-      <section class="card card--chart">
+    <!-- ── Gráficas de ocupación ──────────────────────────────────────────── -->
+    <div class="charts-grid">
+      <section class="card">
         <div class="card__body">
-          <div class="card__title">Ocupación general</div>
+          <div class="card__title">Ocupación por bloque</div>
           <ApexChart
-            v-if="chartSeries.length"
-            type="donut"
-            height="280"
-            :options="chartOptions"
-            :series="chartSeries"
+            v-if="bloqueSeries.length"
+            type="bar"
+            height="210"
+            :options="bloqueOptions"
+            :series="bloqueSeries"
           />
-          <div v-else class="muted">Cargando…</div>
+          <div v-else class="chart-empty muted">Cargando…</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card__body">
+          <div class="card__title">Ocupación por tipo de unidad</div>
+          <ApexChart
+            v-if="tipoSeries.length"
+            type="bar"
+            height="210"
+            :options="tipoOptions"
+            :series="tipoSeries"
+          />
+          <div v-else class="chart-empty muted">Cargando…</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card__body">
+          <div class="card__title">Ocupación por zona</div>
+          <ApexChart
+            v-if="zonaSeries.length"
+            type="bar"
+            height="210"
+            :options="zonaOptions"
+            :series="zonaSeries"
+          />
+          <div v-else class="chart-empty muted">Cargando…</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card__body">
+          <div class="card__title">Resumen general</div>
+          <ApexChart
+            v-if="donutSeries.length"
+            type="donut"
+            height="210"
+            :options="donutOptions"
+            :series="donutSeries"
+          />
+          <div v-else class="chart-empty muted">Cargando…</div>
         </div>
       </section>
     </div>
@@ -282,21 +307,42 @@ const pctOcupacion = computed(() => {
   return t > 0 ? Math.round((Number(stats.ocupadas ?? 0) / t) * 100) : 0;
 });
 
-// ── Donut chart ─────────────────────────────────────────────────────────────
-const chartSeries = computed(() => {
-  const libres   = Number(stats.libres   ?? 0);
-  const ocupadas = Number(stats.ocupadas ?? 0);
-  if (libres + ocupadas === 0) return [];
-  return [libres, ocupadas];
-});
-
-const chartOptions = computed(() => ({
-  labels: ['Libres', 'Ocupadas'],
-  colors: ['#0F7A4A', '#A61B1B'],
-  legend: { position: 'bottom' },
-  dataLabels: { enabled: true },
-  stroke: { width: 0 },
-}));
+// ── Opciones base compartidas para gráficas de barras apiladas ─────────────
+function makeBarOptions(categories, rotateLabels = false) {
+  return {
+    chart: {
+      stacked: true,
+      toolbar: { show: false },
+      animations: { enabled: true, speed: 250 },
+    },
+    plotOptions: {
+      bar: {
+        horizontal: false,
+        borderRadius: 5,
+        columnWidth: '60%',
+      },
+    },
+    xaxis: {
+      categories,
+      labels: {
+        rotate: rotateLabels ? -45 : 0,
+        rotateAlways: rotateLabels,
+        trim: true,
+        hideOverlappingLabels: true,
+        style: { fontSize: '10px' },
+        maxHeight: rotateLabels ? 72 : 32,
+        offsetY: rotateLabels ? 4 : 0,
+      },
+      tickPlacement: 'between',
+    },
+    yaxis: { labels: { style: { fontSize: '10px' } } },
+    colors: ['#A61B1B', '#0F7A4A'],
+    legend: { position: 'bottom', fontSize: '11px' },
+    dataLabels: { enabled: false },
+    grid: { borderColor: 'rgba(23,35,31,0.08)', padding: { left: 4, right: 4, top: 0, bottom: 0 } },
+    tooltip: { y: { formatter: (v) => `${v}` } },
+  };
+}
 
 // ── Gráfica por bloque ──────────────────────────────────────────────────────
 const bloqueItems = ref([]);
@@ -309,43 +355,57 @@ const bloqueSeries = computed(() => {
   ];
 });
 
-const bloqueOptions = computed(() => ({
-  chart: {
-    stacked: true,
-    toolbar: { show: false },
-    animations: { enabled: true, speed: 250 },
-  },
-  plotOptions: {
-    bar: {
-      horizontal: false,
-      borderRadius: 6,
-      columnWidth: '62%',
-    },
-  },
-  xaxis: {
-    // Mejor usar el código (corto) para que quepan bien las barras.
-    categories: bloqueItems.value.map((b) => (b.codigo || b.nombre || '').toString()),
-    labels: {
-      rotate: -45,
-      rotateAlways: true,
-      trim: true,
-      hideOverlappingLabels: true,
-      style: { fontSize: '10px' },
-      maxHeight: 80,
-      offsetY: 6,
-    },
-    tickPlacement: 'between',
-  },
-  yaxis: {
-    labels: { style: { fontSize: '10px' } },
-  },
+const bloqueOptions = computed(() =>
+  makeBarOptions(
+    bloqueItems.value.map((b) => (b.codigo || b.nombre || '').toString()),
+    bloqueItems.value.length > 5,
+  )
+);
+
+// ── Gráfica por tipo de unidad ───────────────────────────────────────────────
+const tipoItems = ref([]);
+
+const tipoSeries = computed(() => {
+  if (!tipoItems.value.length) return [];
+  return [
+    { name: 'Ocupadas', data: tipoItems.value.map((t) => t.ocupadas) },
+    { name: 'Libres',   data: tipoItems.value.map((t) => t.libres)   },
+  ];
+});
+
+const tipoOptions = computed(() =>
+  makeBarOptions(tipoItems.value.map((t) => t.nombre), false)
+);
+
+// ── Gráfica por zona ─────────────────────────────────────────────────────────
+const zonaItems = ref([]);
+
+const zonaSeries = computed(() => {
+  if (!zonaItems.value.length) return [];
+  return [
+    { name: 'Ocupadas', data: zonaItems.value.map((z) => z.ocupadas) },
+    { name: 'Libres',   data: zonaItems.value.map((z) => z.libres)   },
+  ];
+});
+
+const zonaOptions = computed(() =>
+  makeBarOptions(zonaItems.value.map((z) => z.nombre), false)
+);
+
+// ── Donut resumen general ────────────────────────────────────────────────────
+const donutSeries = computed(() => {
+  const libres   = Number(stats.libres   ?? 0);
+  const ocupadas = Number(stats.ocupadas ?? 0);
+  return libres + ocupadas > 0 ? [ocupadas, libres] : [];
+});
+
+const donutOptions = computed(() => ({
+  labels: ['Ocupadas', 'Libres'],
   colors: ['#A61B1B', '#0F7A4A'],
-  legend: { position: 'bottom' },
-  dataLabels: { enabled: false },
-  grid: { borderColor: 'rgba(23,35,31,0.08)', padding: { left: 6, right: 6, top: 0, bottom: 0 } },
-  tooltip: {
-    y: { formatter: (v) => `${v}` },
-  },
+  legend: { position: 'bottom', fontSize: '11px' },
+  dataLabels: { enabled: true, style: { fontSize: '11px' } },
+  stroke: { width: 0 },
+  plotOptions: { pie: { donut: { size: '60%' } } },
 }));
 
 // ── Buscar concesiones ───────────────────────────────────────────────────────
@@ -480,12 +540,16 @@ const regVisible = ref(false);
 async function loadStats() {
   error.value = null;
   try {
-    const [resStats, resBloques] = await Promise.all([
+    const [resStats, resBloques, resTipos, resZonas] = await Promise.all([
       api.get('/api/cementerio/stats'),
       api.get('/api/cementerio/stats/bloques'),
+      api.get('/api/cementerio/stats/tipos'),
+      api.get('/api/cementerio/stats/zonas'),
     ]);
     Object.assign(stats, resStats.data ?? {});
     bloqueItems.value = resBloques.data?.items ?? [];
+    tipoItems.value   = resTipos.data?.items   ?? [];
+    zonaItems.value   = resZonas.data?.items   ?? [];
   } catch (e) {
     error.value = e?.response?.data?.message ?? 'No se pudo cargar el dashboard.';
   }
@@ -510,24 +574,19 @@ onMounted(async () => {
 .subtitle { margin-top: 4px; color: rgba(23, 35, 31, 0.65); font-size: 13px; }
 .actions { display: flex; gap: 10px; align-items: center; }
 
-/* ── Sección superior (KPIs + bloques | donut) ── */
-.top-section {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 12px;
-  align-items: start;
-}
-
-.left-col {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
+/* ── KPIs ── */
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 10px;
+}
+
+/* ── Gráficas de ocupación ── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-items: start;
 }
 
 .kpi {
@@ -557,10 +616,8 @@ onMounted(async () => {
 }
 .card__body { padding: 16px; }
 .card__title { font-weight: 900; margin-bottom: 10px; color: rgba(23,35,31,0.92); }
-.card--chart { overflow: hidden; }
-
-/* Ajuste fino: que el resumen de bloques quede más compacto bajo KPIs */
-.left-col .card__body { padding: 12px 14px; }
+.charts-grid .card__body { padding: 12px 14px; }
+.chart-empty { padding: 40px 0; text-align: center; }
 
 /* ── Quick tiles ── */
 .quick {
@@ -768,12 +825,15 @@ onMounted(async () => {
 .muted { color: rgba(23, 35, 31, 0.60); font-size: 12px; }
 .error { color: var(--c2-danger, #A61B1B); font-size: 13px; }
 
+@media (max-width: 1300px) {
+  .charts-grid { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 1100px) {
   .mapa-row { grid-template-columns: 1fr; }
-  .top-section { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) {
   .kpis { grid-template-columns: repeat(2, 1fr); }
+  .charts-grid { grid-template-columns: 1fr; }
   .quick { grid-template-columns: repeat(2, 1fr); }
   .result { flex-direction: column; }
 }

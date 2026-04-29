@@ -10,8 +10,6 @@ import LoginPage from '@/pages/LoginPage.vue';
 import { useAuthStore } from '@/stores/auth';
 import DefaultLayout from '@/layouts/DefaultLayout.vue';
 import GestionPage from '@/pages/cementerio/GestionPage.vue';
-import NavegacionEspacialPage from '@/pages/cementerio/NavegacionEspacialPage.vue';
-
 import 'primeicons/primeicons.css';
 import './styles/app.css';
 
@@ -24,8 +22,7 @@ const routes = [
     meta: { requiresAuth: true },
     children: [
       { path: '', component: DashboardPage, meta: { title: 'Cementerio · Inicio' } },
-      { path: 'mapa', component: NavegacionEspacialPage, meta: { title: 'Cementerio · Navegación espacial' } },
-      { path: 'gestion', component: GestionPage, meta: { title: 'Cementerio · Gestión' } },
+{ path: 'gestion', component: GestionPage, meta: { title: 'Cementerio · Gestión' } },
       { path: 'nuevo', component: NuevoCasoWizard, meta: { title: 'Cementerio · Nuevo caso' } },
     ],
   },

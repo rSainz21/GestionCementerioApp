@@ -18,11 +18,7 @@
           <i class="pi pi-home" />
           <span>Inicio</span>
         </router-link>
-        <router-link class="nav__item" to="/cementerio/mapa" active-class="nav__item--active">
-          <i class="pi pi-map" />
-          <span>Mapa</span>
-        </router-link>
-        <router-link class="nav__item" to="/cementerio/gestion" active-class="nav__item--active">
+<router-link class="nav__item" to="/cementerio/gestion" active-class="nav__item--active">
           <i class="pi pi-database" />
           <span>Gestión</span>
         </router-link>
