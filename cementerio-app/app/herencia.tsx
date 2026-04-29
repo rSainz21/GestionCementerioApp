@@ -6,14 +6,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { apiFetch } from '@/lib/laravel-api';
+import { AppButton, AppCard, AppInput } from '@/components/ui';
 
 export default function HerenciaModal() {
   const router = useRouter();
@@ -42,19 +41,14 @@ export default function HerenciaModal() {
         setLoading(false);
         return;
       }
-      const res = await supabase
-        .from('cemn_concesiones')
-        .select('id, estado')
-        .eq('sepultura_id', sepulturaId)
-        .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const r = await apiFetch<{ items?: any[] }>(`/api/cementerio/admin/concesiones?sepultura_id=${sepulturaId}&limit=1`);
       setLoading(false);
-      if (res.error) {
-        Alert.alert('Error', res.error.message);
+      if (!r.ok) {
+        Alert.alert('Error', String(r.error ?? 'No se pudo cargar la concesión.'));
         return;
       }
-      setConcesionId((res.data as any)?.id ?? null);
+      const row = (r.data.items ?? [])[0] ?? null;
+      setConcesionId(row?.id ?? null);
     };
     run();
   }, [sepulturaId]);
@@ -72,31 +66,30 @@ export default function HerenciaModal() {
       let terceroId: number | null = null;
       const tDni = dni.trim();
       if (tDni) {
-        const ex = await supabase.from('cemn_terceros').select('id').eq('dni', tDni).limit(1).maybeSingle();
-        if (ex.error) throw ex.error;
-        terceroId = (ex.data as any)?.id ?? null;
+        const ex = await apiFetch<{ items?: any[] }>(`/api/cementerio/terceros?q=${encodeURIComponent(tDni)}&limit=1`);
+        terceroId = ex.ok ? ((ex.data.items ?? [])[0]?.id ?? null) : null;
       }
 
       if (!terceroId) {
-        const ins = await supabase
-          .from('cemn_terceros')
-          .insert({
+        const ins = await apiFetch<any>('/api/cementerio/terceros', {
+          method: 'POST',
+          body: {
             dni: tDni || null,
             nombre: nombre.trim(),
             apellido1: apellido1.trim() || null,
             apellido2: apellido2.trim() || null,
-          })
-          .select('id')
-          .single();
-        if (ins.error) throw ins.error;
+          },
+        });
+        if (!ins.ok) throw new Error(String(ins.error ?? 'No se pudo crear el heredero'));
         terceroId = (ins.data as any).id as number;
       }
 
       // 2) Vincular como heredero
-      const link = await supabase
-        .from('cemn_concesion_terceros')
-        .insert({ concesion_id: concesionId, tercero_id: terceroId, rol: 'heredero' } as any);
-      if (link.error) throw link.error;
+      const link = await apiFetch(`/api/cementerio/concesiones/${concesionId}/terceros`, {
+        method: 'POST',
+        body: { tercero_id: terceroId, rol: 'heredero' },
+      });
+      if (!link.ok) throw new Error(String(link.error ?? 'No se pudo vincular el heredero'));
 
       Alert.alert('OK', 'Heredero añadido a la concesión.');
       router.back();
@@ -117,7 +110,7 @@ export default function HerenciaModal() {
           <Text style={s.centerT}>Cargando concesión…</Text>
         </View>
       ) : (
-        <View style={s.card}>
+        <AppCard style={s.card} padded>
           <View style={s.row}>
             <FontAwesome name={concesionId ? 'check-circle' : 'exclamation-triangle'} size={18} color={concesionId ? '#16A34A' : '#B45309'} />
             <Text style={s.cardT}>
@@ -126,38 +119,26 @@ export default function HerenciaModal() {
           </View>
 
           {!user && (
-            <View style={s.warnBox}>
-              <Text style={s.warnText}>Sin sesión no se puede guardar en Supabase (RLS exige authenticated).</Text>
-              <TouchableOpacity style={s.warnBtn} onPress={() => router.push('/login')} activeOpacity={0.85}>
-                <Text style={s.warnBtnT}>Iniciar sesión</Text>
-              </TouchableOpacity>
-            </View>
+            <AppCard style={s.warnBox} padded>
+              <Text style={s.warnText}>Sin sesión no se puede guardar.</Text>
+              <AppButton label="Iniciar sesión" variant="primary" onPress={() => router.push('/login')} />
+            </AppCard>
           )}
 
-          <Text style={s.label}>DNI (opcional)</Text>
-          <TextInput style={s.input} value={dni} onChangeText={setDni} placeholder="12345678A" placeholderTextColor="#9CA3AF" autoCapitalize="characters" />
-
-          <Text style={s.label}>Nombre *</Text>
-          <TextInput style={s.input} value={nombre} onChangeText={setNombre} placeholder="Nombre" placeholderTextColor="#9CA3AF" />
-          <Text style={s.label}>Apellido 1</Text>
-          <TextInput style={s.input} value={apellido1} onChangeText={setApellido1} placeholder="Apellido 1" placeholderTextColor="#9CA3AF" />
-          <Text style={s.label}>Apellido 2</Text>
-          <TextInput style={s.input} value={apellido2} onChangeText={setApellido2} placeholder="Apellido 2" placeholderTextColor="#9CA3AF" />
-        </View>
+          <AppInput label="DNI (opcional)" value={dni} onChangeText={setDni} placeholder="12345678A" autoCapitalize="characters" />
+          <AppInput label="Nombre *" value={nombre} onChangeText={setNombre} placeholder="Nombre" />
+          <AppInput label="Apellido 1" value={apellido1} onChangeText={setApellido1} placeholder="Apellido 1" />
+          <AppInput label="Apellido 2" value={apellido2} onChangeText={setApellido2} placeholder="Apellido 2" />
+        </AppCard>
       )}
 
       <View style={s.bottom}>
-        <TouchableOpacity style={[s.btn, s.ghost]} onPress={() => router.back()} activeOpacity={0.85}>
-          <Text style={s.ghostT}>Cancelar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.btn, s.primary, (saving || !concesionId) && { opacity: 0.6 }]}
-          onPress={guardar}
-          disabled={saving || !concesionId}
-          activeOpacity={0.85}
-        >
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryT}>Guardar</Text>}
-        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <AppButton label="Cancelar" variant="ghost" onPress={() => router.back()} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppButton label="Guardar" variant="primary" onPress={guardar} loading={saving} disabled={!concesionId} />
+        </View>
       </View>
     </ScrollView>
   );
@@ -168,20 +149,11 @@ const s = StyleSheet.create({
   h1: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
   center: { marginTop: 20, alignItems: 'center', gap: 10 },
   centerT: { color: '#64748B', fontWeight: '800' },
-  card: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E5E7EB', gap: 10 },
+  card: { marginTop: 14, gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardT: { fontWeight: '900', color: '#0F172A' },
-  label: { marginTop: 10, fontSize: 12, fontWeight: '900', color: '#334155' },
-  input: { marginTop: 8, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, fontSize: 14, fontWeight: '700', color: '#111827', backgroundColor: '#FFF' },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 14, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 26 : 14, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E5E7EB', flexDirection: 'row', gap: 10 },
-  btn: { flex: 1, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  ghost: { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  ghostT: { color: '#0F172A', fontWeight: '900' },
-  primary: { backgroundColor: '#16A34A' },
-  primaryT: { color: '#fff', fontWeight: '900' },
-  warnBox: { marginTop: 8, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 12, padding: 12, gap: 10 },
+  warnBox: { marginTop: 8, backgroundColor: '#FFFBEB' },
   warnText: { fontSize: 13, color: '#92400E', fontWeight: '700' },
-  warnBtn: { alignSelf: 'flex-start', backgroundColor: '#15803D', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  warnBtnT: { color: '#FFF', fontWeight: '900' },
 });
 

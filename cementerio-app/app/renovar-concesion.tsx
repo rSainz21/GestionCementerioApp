@@ -6,14 +6,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { apiFetch } from '@/lib/laravel-api';
+import { AppButton, AppCard, AppInput } from '@/components/ui';
 
 function fechaParaPostgres(raw: string): string | null {
   const t = raw.trim();
@@ -46,21 +45,16 @@ export default function RenovarConcesionModal() {
         setLoading(false);
         return;
       }
-      const res = await supabase
-        .from('cemn_concesiones')
-        .select('id, fecha_vencimiento')
-        .eq('sepultura_id', sepulturaId)
-        .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const r = await apiFetch<{ items?: any[] }>(`/api/cementerio/admin/concesiones?sepultura_id=${sepulturaId}&limit=1`);
       setLoading(false);
-      if (res.error) {
-        Alert.alert('Error', res.error.message);
+      if (!r.ok) {
+        Alert.alert('Error', String(r.error ?? 'No se pudo cargar la concesión.'));
         return;
       }
-      const id = (res.data as any)?.id ?? null;
-      setConcesionId(id);
-      const fv = (res.data as any)?.fecha_vencimiento ?? '';
+      const row = (r.data.items ?? [])[0] ?? null;
+      const cid = row?.id ?? null;
+      setConcesionId(cid);
+      const fv = row?.fecha_vencimiento ?? '';
       if (fv && !fechaVenc) setFechaVenc(String(fv));
     };
     run();
@@ -74,11 +68,11 @@ export default function RenovarConcesionModal() {
       if (!venc) throw new Error('Introduce una fecha de vencimiento (AAAA-MM-DD).');
 
       setSaving(true);
-      const up = await supabase
-        .from('cemn_concesiones')
-        .update({ fecha_vencimiento: venc, estado: 'renovada' } as any)
-        .eq('id', concesionId);
-      if (up.error) throw up.error;
+      const up = await apiFetch(`/api/cementerio/admin/concesiones/${concesionId}`, {
+        method: 'PUT',
+        body: { fecha_vencimiento: venc, estado: 'renovada' },
+      });
+      if (!up.ok) throw new Error(String(up.error ?? 'No se pudo renovar.'));
 
       Alert.alert('OK', 'Concesión renovada.');
       router.back();
@@ -99,14 +93,12 @@ export default function RenovarConcesionModal() {
           <Text style={s.centerT}>Cargando concesión…</Text>
         </View>
       ) : (
-        <View style={s.card}>
+        <AppCard style={s.card} padded>
           {!user && (
-            <View style={s.warnBox}>
-              <Text style={s.warnText}>Sin sesión no se puede guardar en Supabase (RLS exige authenticated).</Text>
-              <TouchableOpacity style={s.warnBtn} onPress={() => router.push('/login')} activeOpacity={0.85}>
-                <Text style={s.warnBtnT}>Iniciar sesión</Text>
-              </TouchableOpacity>
-            </View>
+            <AppCard style={s.warnBox} padded>
+              <Text style={s.warnText}>Sin sesión no se puede guardar.</Text>
+              <AppButton label="Iniciar sesión" variant="primary" onPress={() => router.push('/login')} />
+            </AppCard>
           )}
 
           <View style={s.row}>
@@ -114,29 +106,17 @@ export default function RenovarConcesionModal() {
             <Text style={s.cardT}>{concesionId ? `Concesión detectada (id ${concesionId})` : 'No hay concesión asociada'}</Text>
           </View>
 
-          <Text style={s.label}>Nueva fecha de vencimiento *</Text>
-          <TextInput
-            style={s.input}
-            value={fechaVenc}
-            onChangeText={setFechaVenc}
-            placeholder="2030-12-31"
-            placeholderTextColor="#9CA3AF"
-          />
-        </View>
+          <AppInput label="Nueva fecha de vencimiento *" value={fechaVenc} onChangeText={setFechaVenc} placeholder="2030-12-31" />
+        </AppCard>
       )}
 
       <View style={s.bottom}>
-        <TouchableOpacity style={[s.btn, s.ghost]} onPress={() => router.back()} activeOpacity={0.85}>
-          <Text style={s.ghostT}>Cancelar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.btn, s.primary, (saving || !concesionId) && { opacity: 0.6 }]}
-          onPress={guardar}
-          disabled={saving || !concesionId}
-          activeOpacity={0.85}
-        >
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryT}>Guardar</Text>}
-        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <AppButton label="Cancelar" variant="ghost" onPress={() => router.back()} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppButton label="Guardar" variant="primary" onPress={guardar} loading={saving} disabled={!concesionId} />
+        </View>
       </View>
     </ScrollView>
   );
@@ -147,20 +127,11 @@ const s = StyleSheet.create({
   h1: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
   center: { marginTop: 20, alignItems: 'center', gap: 10 },
   centerT: { color: '#64748B', fontWeight: '800' },
-  card: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E5E7EB', gap: 10 },
+  card: { marginTop: 14, gap: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardT: { fontWeight: '900', color: '#0F172A' },
-  label: { marginTop: 10, fontSize: 12, fontWeight: '900', color: '#334155' },
-  input: { marginTop: 8, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, fontSize: 14, fontWeight: '700', color: '#111827', backgroundColor: '#FFF' },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 14, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 26 : 14, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E5E7EB', flexDirection: 'row', gap: 10 },
-  btn: { flex: 1, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  ghost: { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  ghostT: { color: '#0F172A', fontWeight: '900' },
-  primary: { backgroundColor: '#16A34A' },
-  primaryT: { color: '#fff', fontWeight: '900' },
-  warnBox: { marginTop: 8, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 12, padding: 12, gap: 10 },
+  warnBox: { marginTop: 8, backgroundColor: '#FFFBEB' },
   warnText: { fontSize: 13, color: '#92400E', fontWeight: '700' },
-  warnBtn: { alignSelf: 'flex-start', backgroundColor: '#15803D', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  warnBtnT: { color: '#FFF', fontWeight: '900' },
 });
 

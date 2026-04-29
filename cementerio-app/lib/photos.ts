@@ -1,6 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Alert, Platform } from 'react-native';
-import { apiFetch } from './laravel-api';
+import { apiFetch, resolveMediaUrl } from './laravel-api';
+import { unwrapItem } from './normalize';
 
 export interface Foto {
   id: number;
@@ -15,13 +16,21 @@ type DocumentoFoto = {
   sepultura_id: number;
   tipo: string;
   ruta_archivo?: string | null;
-  url?: string | null; // compat schema viejo
+  url?: string | null;
   descripcion: string | null;
   created_at?: string;
-  creado_en?: string; // compat schema viejo
+  creado_en?: string;
 };
 
-async function requestPermission(): Promise<boolean> {
+function documentoToAbsoluteUrl(doc: { url?: string | null; ruta_archivo?: string | null } | null): string {
+  if (!doc) return '';
+  const rel =
+    (typeof doc.url === 'string' && doc.url.trim() !== '' && doc.url) ||
+    (doc.ruta_archivo ? String(doc.ruta_archivo) : '');
+  return resolveMediaUrl(rel);
+}
+
+async function requestCameraPermission(): Promise<boolean> {
   if (Platform.OS === 'web') return true;
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
   if (status !== 'granted') {
@@ -31,13 +40,23 @@ async function requestPermission(): Promise<boolean> {
   return true;
 }
 
+async function requestLibraryPermission(): Promise<boolean> {
+  if (Platform.OS === 'web') return true;
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert('Permiso necesario', 'Necesitamos acceso a la galería para elegir una foto.');
+    return false;
+  }
+  return true;
+}
+
 export async function tomarFoto(): Promise<string | null> {
-  const ok = await requestPermission();
+  const ok = await requestCameraPermission();
   if (!ok) return null;
 
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ['images'],
-    quality: 0.7,
+    quality: 0.85,
     allowsEditing: false,
   });
 
@@ -46,9 +65,12 @@ export async function tomarFoto(): Promise<string | null> {
 }
 
 export async function elegirDeGaleria(): Promise<string | null> {
+  const ok = await requestLibraryPermission();
+  if (!ok) return null;
+
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    quality: 0.7,
+    quality: 0.85,
     allowsEditing: false,
   });
 
@@ -57,40 +79,33 @@ export async function elegirDeGaleria(): Promise<string | null> {
 }
 
 export async function subirFoto(sepulturaId: number, localUri: string, descripcion?: string): Promise<Foto | null> {
-  try {
-    const filename = `sep_${sepulturaId}_${Date.now()}.jpg`;
-    const path = `sepulturas/${sepulturaId}/${filename}`;
-
-    const response = await fetch(localUri);
-    const blob = await response.blob();
-
-    const { error: uploadError } = await supabase.storage
-      .from('fotos-cementerio')
-      .upload(path, blob, { contentType: 'image/jpeg', upsert: false });
-
-    if (uploadError) {
-      console.warn('Upload error:', uploadError.message);
-      const { data: foto } = await supabase
-        .from('cemn_fotos')
-        .insert({ sepultura_id: sepulturaId, url: localUri, descripcion: descripcion ?? null })
-        .select()
-        .single();
-      return foto as Foto | null;
-    }
-
-    const { data: urlData } = supabase.storage.from('fotos-cementerio').getPublicUrl(path);
-
-    const { data: foto } = await supabase
-      .from('cemn_fotos')
-      .insert({ sepultura_id: sepulturaId, url: urlData.publicUrl, descripcion: descripcion ?? null })
-      .select()
-      .single();
-
-    return foto as Foto | null;
-  } catch (e: any) {
-    Alert.alert('Error al subir foto', e.message);
+  const r = await subirDocumentoFoto(sepulturaId, localUri, descripcion);
+  if (!r.ok) {
+    Alert.alert('Error al subir foto', r.error);
     return null;
   }
+  return {
+    id: r.documentoId ?? 0,
+    sepultura_id: sepulturaId,
+    url: r.url,
+    descripcion: descripcion ?? null,
+    tomada_en: new Date().toISOString(),
+  };
+}
+
+function inferFilePart(localUri: string): { name: string; type: string } {
+  const path = localUri.split('?')[0];
+  const extMatch = path.match(/\.([a-z0-9]+)$/i);
+  const ext = (extMatch?.[1] ?? 'jpg').toLowerCase();
+  const mime =
+    ext === 'png'
+      ? 'image/png'
+      : ext === 'webp'
+        ? 'image/webp'
+        : ext === 'heic' || ext === 'heif'
+          ? 'image/heic'
+          : 'image/jpeg';
+  return { name: `foto.${ext}`, type: mime };
 }
 
 export async function subirDocumentoFoto(
@@ -104,11 +119,16 @@ export async function subirDocumentoFoto(
     if (descripcion) fd.append('descripcion', descripcion);
 
     if (Platform.OS === 'web') {
-      const blob = await fetch(localUri).then((r) => r.blob());
-      fd.append('archivo', blob, 'foto.jpg');
+      const resBlob = await fetch(localUri);
+      const blob = await resBlob.blob();
+      const mime = blob.type && blob.type !== 'application/octet-stream' ? blob.type : 'image/jpeg';
+      const file =
+        typeof File !== 'undefined' ? new File([blob], 'foto.jpg', { type: mime }) : (blob as Blob);
+      fd.append('archivo', file as any);
     } else {
+      const { name, type } = inferFilePart(localUri);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fd.append('archivo', { uri: localUri, name: 'foto.jpg', type: 'image/jpeg' } as any);
+      fd.append('archivo', { uri: localUri, name, type } as any);
     }
 
     const res = await apiFetch<{ item: any }>(`/api/cementerio/sepulturas/${sepulturaId}/documentos`, {
@@ -119,9 +139,13 @@ export async function subirDocumentoFoto(
 
     if (!res.ok) return { ok: false, error: String(res.error ?? 'No se pudo subir el documento') };
 
-    const item = (res.data as any).item;
-    const url = item?.url ? String(item.url) : '';
-    return { ok: true, url, documentoId: item?.id };
+    const doc =
+      unwrapItem<any>(res.data) ??
+      (res.data as any)?.item ??
+      null;
+    const url = documentoToAbsoluteUrl(doc);
+    const idRaw = doc?.id;
+    return { ok: true, url, documentoId: idRaw != null ? Number(idRaw) : undefined };
   } catch (e: any) {
     return { ok: false, error: e?.message ?? String(e) };
   }
@@ -133,11 +157,14 @@ export async function obtenerFotos(sepulturaId: number): Promise<Foto[]> {
 
   const docs = (r.data as any)?.item?.documentos ?? [];
   const fotos = (docs as DocumentoFoto[])
-    .filter((d) => String(d?.tipo ?? '').toLowerCase() === 'fotografia' || String(d?.tipo ?? '').toLowerCase() === 'foto')
+    .filter((d) => {
+      const tipo = String(d?.tipo ?? '').toLowerCase();
+      return tipo === 'fotografia' || tipo === 'foto' || tipo.includes('foto');
+    })
     .map((d) => ({
       id: d.id,
       sepultura_id: sepulturaId,
-      url: String((d as any).url ?? d.ruta_archivo ?? d.url ?? ''),
+      url: documentoToAbsoluteUrl(d),
       descripcion: d.descripcion,
       tomada_en: String((d as any).created_at ?? d.created_at ?? d.creado_en ?? ''),
     }));
@@ -146,6 +173,5 @@ export async function obtenerFotos(sepulturaId: number): Promise<Foto[]> {
 }
 
 export async function eliminarFoto(fotoId: number): Promise<void> {
-  // Todavía no hay endpoint de borrado: no-op (fase 1 pruebas).
   void fotoId;
 }

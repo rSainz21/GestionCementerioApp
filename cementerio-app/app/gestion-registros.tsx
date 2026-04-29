@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,138 +9,222 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { supabase } from '@/lib/supabase';
+import { apiFetch } from '@/lib/laravel-api';
+import { AppCard, AppPill } from '@/components/ui';
 
 type Tab = 'difuntos' | 'terceros' | 'concesiones';
 
+const TAB_LABELS: Record<Tab, string> = {
+  difuntos: 'Difuntos',
+  terceros: 'Terceros',
+  concesiones: 'Concesiones',
+};
+
 export default function GestionScreen() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('difuntos');
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const initialTab = useMemo((): Tab => {
+    const t = String(params.tab ?? '').toLowerCase();
+    if (t === 'terceros' || t === 'titulares') return 'terceros';
+    if (t === 'concesiones' || t === 'expedientes') return 'concesiones';
+    return 'difuntos';
+  }, [params.tab]);
+
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    if (tab === 'difuntos') {
-      const { data: d } = await supabase
-        .from('cemn_difuntos')
-        .select('*, cemn_sepulturas(numero, codigo, cemn_bloques(codigo)), cemn_terceros(dni)')
-        .order('id', { ascending: false })
-        .limit(100);
-      setData(d ?? []);
-    } else if (tab === 'terceros') {
-      const { data: t } = await supabase
-        .from('cemn_terceros')
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(100);
-      setData(t ?? []);
-    } else {
-      const { data: c } = await supabase
-        .from('cemn_concesiones')
-        .select('*, cemn_sepulturas(numero, codigo)')
-        .order('id', { ascending: false })
-        .limit(100);
-      setData(c ?? []);
-    }
+    const q = search.trim();
+    const qParam = q.length >= 2 ? `&q=${encodeURIComponent(q)}` : '';
+    let path = '';
+    if (tab === 'difuntos') path = `/api/cementerio/difuntos?limit=150${qParam}`;
+    else if (tab === 'terceros') path = `/api/cementerio/terceros?limit=150${qParam}`;
+    else path = `/api/cementerio/concesiones?limit=150${qParam}`;
+
+    const r = await apiFetch<{ items: any[] }>(path);
+    setData(r.ok ? ((r.data as any)?.items ?? []) : []);
     setLoading(false);
-  };
+  }, [tab, search]);
 
-  useEffect(() => { fetchData(); }, [tab]);
+  useEffect(() => {
+    const delay = search.trim().length >= 2 ? 280 : 0;
+    const t = setTimeout(() => {
+      void fetchData();
+    }, delay);
+    return () => clearTimeout(t);
+  }, [tab, search, fetchData]);
 
-  const filteredData = search.trim()
-    ? data.filter((item) => {
-        const s = search.toLowerCase();
-        if (tab === 'difuntos') return item.nombre_completo?.toLowerCase().includes(s);
-        if (tab === 'terceros') return (item.nombre + ' ' + (item.apellido1 ?? '') + ' ' + (item.dni ?? '')).toLowerCase().includes(s);
-        return (item.numero_expediente ?? '').toLowerCase().includes(s);
-      })
-    : data;
+  const filteredData = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    if (!s) return data;
+    return data.filter((item) => {
+      if (tab === 'difuntos') {
+        return (
+          String(item.nombre_completo ?? '').toLowerCase().includes(s) ||
+          String(item.dni ?? '').toLowerCase().includes(s) ||
+          String(item.sepultura_codigo ?? '').toLowerCase().includes(s) ||
+          String(item.label ?? '').toLowerCase().includes(s)
+        );
+      }
+      if (tab === 'terceros') {
+        return (
+          String(item.nombre ?? '').toLowerCase().includes(s) ||
+          String(item.apellido1 ?? '').toLowerCase().includes(s) ||
+          String(item.apellido2 ?? '').toLowerCase().includes(s) ||
+          String(item.dni ?? '').toLowerCase().includes(s) ||
+          String(item.label ?? '').toLowerCase().includes(s)
+        );
+      }
+      return (
+        String(item.numero_expediente ?? '').toLowerCase().includes(s) ||
+        String(item.estado ?? '').toLowerCase().includes(s) ||
+        String(item.concesionario ?? '').toLowerCase().includes(s) ||
+        String(item.sepultura_codigo ?? '').toLowerCase().includes(s) ||
+        String(item.label ?? '').toLowerCase().includes(s)
+      );
+    });
+  }, [data, search, tab]);
 
-  const eliminar = (id: number, tabla: string, nombre: string) => {
-    Alert.alert('Eliminar', `¿Seguro que quieres eliminar "${nombre}"?`, [
+  const eliminarConcesion = (id: number, label: string) => {
+    Alert.alert('Eliminar concesión', `¿Eliminar "${label}"? Esta acción no se puede deshacer.`, [
       { text: 'Cancelar', style: 'cancel' },
       {
-        text: 'Eliminar', style: 'destructive',
+        text: 'Eliminar',
+        style: 'destructive',
         onPress: async () => {
-          await supabase.from(tabla).delete().eq('id', id);
+          const r = await apiFetch(`/api/cementerio/admin/concesiones/${id}`, { method: 'DELETE' });
+          if (!r.ok) {
+            Alert.alert('Error', typeof r.error === 'string' ? r.error : 'No se pudo eliminar.');
+            return;
+          }
           fetchData();
         },
       },
     ]);
   };
 
-  const renderDifunto = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={() => item.cemn_sepulturas && router.push(`/sepultura/${item.sepultura_id}`)}
-    >
-      <View style={styles.rowLeft}>
-        <FontAwesome name="user" size={16} color="#15803D" />
-        <View>
-          <Text style={styles.rowTitle}>{item.nombre_completo}</Text>
-          <Text style={styles.rowSub}>
-            {item.cemn_sepulturas ? `${item.cemn_sepulturas.cemn_bloques?.codigo ?? ''} · N.º ${item.cemn_sepulturas.numero}` : 'Sin asignar'}
-            {item.fecha_fallecimiento ? ` · ${item.fecha_fallecimiento}` : ''}
-          </Text>
-        </View>
-      </View>
-      <TouchableOpacity onPress={() => eliminar(item.id, 'cemn_difuntos', item.nombre_completo)}>
-        <FontAwesome name="trash-o" size={16} color="#EF4444" />
+  const renderDifunto = ({ item }: { item: any }) => {
+    const sid = Number(item.sepultura_id);
+    const canOpen = Number.isFinite(sid) && sid > 0;
+    const bloque = item.bloque_codigo ?? item.bloque_nombre ?? '—';
+    const num = item.sepultura_numero ?? '—';
+    return (
+      <TouchableOpacity
+        style={styles.rowWrap}
+        onPress={() => canOpen && router.push(`/sepultura/${sid}`)}
+        activeOpacity={canOpen ? 0.85 : 1}
+        disabled={!canOpen}
+      >
+        <AppCard padded style={styles.rowCard}>
+          <View style={styles.rowInner}>
+            <View style={styles.iconCircle}>
+              <FontAwesome name="user" size={16} color="#15803D" />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.rowTitle} numberOfLines={1}>
+                {item.nombre_completo ?? '—'}
+              </Text>
+              <Text style={styles.rowSub} numberOfLines={2}>
+                {canOpen ? `${bloque} · N.º ${num}` : 'Sin sepultura asignada'}
+                {item.fecha_fallecimiento ? ` · ${item.fecha_fallecimiento}` : ''}
+              </Text>
+            </View>
+            {canOpen ? <FontAwesome name="chevron-right" size={14} color="rgba(15,23,42,0.35)" /> : null}
+          </View>
+        </AppCard>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const renderTercero = ({ item }: { item: any }) => (
-    <View style={styles.row}>
-      <View style={styles.rowLeft}>
-        <FontAwesome name="id-card" size={16} color="#15803D" />
-        <View>
-          <Text style={styles.rowTitle}>{item.nombre} {item.apellido1 ?? ''} {item.apellido2 ?? ''}</Text>
-          <Text style={styles.rowSub}>{item.dni ?? 'Sin DNI'}</Text>
+    <AppCard padded style={styles.rowCard}>
+      <View style={styles.rowInner}>
+        <View style={styles.iconCircle}>
+          <FontAwesome name="id-card" size={16} color="#15803D" />
         </View>
-      </View>
-      <TouchableOpacity onPress={() => eliminar(item.id, 'cemn_terceros', item.nombre)}>
-        <FontAwesome name="trash-o" size={16} color="#EF4444" />
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderConcesion = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={() => router.push(`/sepultura/${item.sepultura_id}`)}
-    >
-      <View style={styles.rowLeft}>
-        <FontAwesome name="file-text-o" size={16} color="#15803D" />
-        <View>
-          <Text style={styles.rowTitle}>{item.numero_expediente ?? 'Sin expediente'}</Text>
-          <Text style={styles.rowSub}>
-            {item.tipo} · {item.estado} · N.º {item.cemn_sepulturas?.numero ?? '?'}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {[item.nombre, item.apellido1, item.apellido2].filter(Boolean).join(' ') || '—'}
+          </Text>
+          <Text style={styles.rowSub} numberOfLines={1}>
+            {item.dni ?? 'Sin DNI'}
+            {item.telefono ? ` · ${item.telefono}` : ''}
           </Text>
         </View>
       </View>
-      <View style={[styles.badge, { backgroundColor: item.estado === 'vigente' ? '#DCFCE7' : '#FEF3C7' }]}>
-        <Text style={[styles.badgeText, { color: item.estado === 'vigente' ? '#16A34A' : '#D97706' }]}>{item.estado}</Text>
-      </View>
-    </TouchableOpacity>
+    </AppCard>
   );
+
+  const renderConcesion = ({ item }: { item: any }) => {
+    const sid = Number(item.sepultura_id);
+    const canOpen = Number.isFinite(sid) && sid > 0;
+    return (
+      <TouchableOpacity
+        style={styles.rowWrap}
+        onPress={() => canOpen && router.push(`/sepultura/${sid}`)}
+        activeOpacity={canOpen ? 0.85 : 1}
+        disabled={!canOpen}
+      >
+        <AppCard padded style={styles.rowCard}>
+          <View style={styles.rowInner}>
+            <View style={styles.iconCircle}>
+              <FontAwesome name="file-text-o" size={16} color="#15803D" />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.rowTitle} numberOfLines={1}>
+                {item.numero_expediente ?? 'Sin expediente'}
+              </Text>
+              <Text style={styles.rowSub} numberOfLines={2}>
+                {[item.tipo, item.estado].filter(Boolean).join(' · ')}
+                {item.sepultura_codigo ? ` · ${item.sepultura_codigo}` : ''}
+                {item.concesionario ? ` · ${item.concesionario}` : ''}
+              </Text>
+            </View>
+            <View style={styles.rowActions}>
+              <View style={[styles.badge, { backgroundColor: item.estado === 'vigente' ? '#DCFCE7' : '#FEF3C7' }]}>
+                <Text style={[styles.badgeText, { color: item.estado === 'vigente' ? '#16A34A' : '#D97706' }]}>
+                  {String(item.estado ?? '—')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => eliminarConcesion(item.id, String(item.numero_expediente ?? item.id))}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.85}
+              >
+                <FontAwesome name="trash-o" size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </AppCard>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.85}>
+          <FontAwesome name="chevron-left" size={16} color="#0F172A" />
+        </TouchableOpacity>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.screenTitle}>Registros</Text>
+          <Text style={styles.screenSub}>Listado rápido · toca una fila con sepultura para abrir la ficha</Text>
+        </View>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/buscar')} activeOpacity={0.85}>
+          <FontAwesome name="search" size={16} color="#0F172A" />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.tabs}>
         {(['difuntos', 'terceros', 'concesiones'] as Tab[]).map((t) => (
-          <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => { setTab(t); setSearch(''); }}>
-            <FontAwesome
-              name={t === 'difuntos' ? 'users' : t === 'terceros' ? 'id-card' : 'file-text'}
-              size={14}
-              color={tab === t ? '#FFF' : '#6B7280'}
-            />
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{t}</Text>
-          </TouchableOpacity>
+          <View key={t} style={{ flex: 1 }}>
+            <AppPill label={TAB_LABELS[t]} active={tab === t} onPress={() => { setTab(t); setSearch(''); }} />
+          </View>
         ))}
       </View>
 
@@ -148,23 +232,37 @@ export default function GestionScreen() {
         <FontAwesome name="search" size={14} color="#9CA3AF" />
         <TextInput
           style={styles.searchInput}
-          placeholder={`Buscar ${tab}...`}
+          placeholder={tab === 'difuntos' ? 'Nombre o DNI (2+ letras para filtrar en servidor)…' : 'Buscar…'}
           value={search}
           onChangeText={setSearch}
           placeholderTextColor="#9CA3AF"
+          autoCapitalize="none"
+          autoCorrect={false}
         />
         <Text style={styles.countBadge}>{filteredData.length}</Text>
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#16A34A" /></View>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <Text style={styles.loadingT}>Cargando…</Text>
+        </View>
       ) : (
         <FlatList
           data={filteredData}
           keyExtractor={(item) => String(item.id)}
           renderItem={tab === 'difuntos' ? renderDifunto : tab === 'terceros' ? renderTercero : renderConcesion}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={styles.empty}>No hay {tab} registrados</Text>}
+          ListEmptyComponent={
+            <AppCard padded>
+              <Text style={styles.emptyTitle}>Sin datos</Text>
+              <Text style={styles.emptyText}>
+                {search.trim().length > 0 && search.trim().length < 2
+                  ? 'Escribe al menos 2 caracteres para buscar en el servidor, o deja vacío para ver el listado reciente.'
+                  : `No hay ${TAB_LABELS[tab].toLowerCase()} que mostrar.`}
+              </Text>
+            </AppCard>
+          }
         />
       )}
     </View>
@@ -173,21 +271,80 @@ export default function GestionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  tabs: { flexDirection: 'row', padding: 12, gap: 8, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: '#F3F4F6' },
-  tabActive: { backgroundColor: '#15803D' },
-  tabText: { fontSize: 12, fontWeight: '600', color: '#6B7280', textTransform: 'capitalize' },
-  tabTextActive: { color: '#FFF' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, backgroundColor: '#FFF', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#E5E7EB' },
-  searchInput: { flex: 1, fontSize: 14, color: '#1F2937' },
-  countBadge: { fontSize: 12, color: '#9CA3AF', fontWeight: '600', backgroundColor: '#F3F4F6', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-  list: { padding: 16, gap: 6 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 10, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  rowTitle: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
-  rowSub: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  badgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
-  empty: { textAlign: 'center', color: '#9CA3AF', fontSize: 14, marginTop: 40, textTransform: 'capitalize' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
+  loadingT: { fontSize: 13, fontWeight: '800', color: 'rgba(15,23,42,0.55)' },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: '#F8FAFC',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  screenTitle: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
+  screenSub: { marginTop: 2, fontSize: 11, fontWeight: '700', color: 'rgba(15,23,42,0.55)' },
+  tabs: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+  },
+  searchInput: { flex: 1, fontSize: 14, fontWeight: '700', color: '#0F172A' },
+  countBadge: {
+    fontSize: 12,
+    color: 'rgba(15,23,42,0.55)',
+    fontWeight: '900',
+    backgroundColor: 'rgba(15,23,42,0.06)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  list: { paddingHorizontal: 12, paddingBottom: 24, gap: 10 },
+  rowWrap: {},
+  rowCard: { marginBottom: 0 },
+  rowInner: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: 'rgba(21,128,61,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowTitle: { fontSize: 15, fontWeight: '900', color: '#0F172A' },
+  rowSub: { fontSize: 12, fontWeight: '700', color: 'rgba(15,23,42,0.55)', marginTop: 4, lineHeight: 16 },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  badgeText: { fontSize: 11, fontWeight: '800', textTransform: 'capitalize' },
+  emptyTitle: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
+  emptyText: { marginTop: 8, fontSize: 13, fontWeight: '700', color: 'rgba(15,23,42,0.55)', lineHeight: 18 },
 });

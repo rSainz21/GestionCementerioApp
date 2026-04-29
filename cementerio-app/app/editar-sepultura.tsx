@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,17 +11,24 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { supabase } from '@/lib/supabase';
 import type { EstadoSepultura, TipoSepultura } from '@/lib/types';
 import { ESTADO_COLORS } from '@/constants/Colors';
 import { normalizarEstadoEditable } from '@/lib/estado-sepultura';
+import { apiFetch } from '@/lib/laravel-api';
+import { unwrapItem } from '@/lib/normalize';
 
 const ESTADOS: EstadoSepultura[] = ['libre', 'ocupada'];
 const TIPOS: TipoSepultura[] = ['nicho', 'sepultura', 'columbario', 'panteon'];
 
 export default function EditarSepulturaScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, sepultura_id } = useLocalSearchParams<{ id?: string; sepultura_id?: string }>();
   const router = useRouter();
+
+  const sepulturaId = useMemo(() => {
+    const raw = (sepultura_id ?? id ?? '').toString().trim();
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : NaN;
+  }, [id, sepultura_id]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,26 +38,55 @@ export default function EditarSepulturaScreen() {
   const [ubicacion, setUbicacion] = useState('');
 
   useEffect(() => {
-    supabase.from('cemn_sepulturas').select('*').eq('id', Number(id)).single().then(({ data }) => {
+    const run = async () => {
+      if (!Number.isFinite(sepulturaId) || sepulturaId <= 0) {
+        Alert.alert('Error', 'sepultura_id no válido.');
+        setLoading(false);
+        return;
+      }
+      const res = await apiFetch<any>(`/api/cementerio/sepulturas/${sepulturaId}`);
+      if (!res.ok) {
+        Alert.alert('Error', String(res.error ?? 'No se pudo cargar la sepultura.'));
+        setLoading(false);
+        return;
+      }
+      const data: any = unwrapItem<any>(res.data);
       if (data) {
         setEstado(normalizarEstadoEditable(String(data.estado)));
-        setTipo(data.tipo as TipoSepultura);
+        setTipo((data.tipo as TipoSepultura) ?? 'nicho');
         setNotas(data.notas ?? '');
         setUbicacion(data.ubicacion_texto ?? '');
       }
       setLoading(false);
-    });
-  }, [id]);
+    };
+    run();
+  }, [sepulturaId]);
 
   const guardar = async () => {
+    if (!Number.isFinite(sepulturaId) || sepulturaId <= 0) {
+      Alert.alert('Error', 'sepultura_id no válido.');
+      return;
+    }
     setSaving(true);
-    const { error } = await supabase.from('cemn_sepulturas').update({
-      estado, tipo, notas: notas.trim() || null, ubicacion_texto: ubicacion.trim() || null,
-    }).eq('id', Number(id));
-    setSaving(false);
-    if (error) { Alert.alert('Error', error.message); return; }
-    Alert.alert('Guardado', 'Sepultura actualizada');
-    router.back();
+    try {
+      const res = await apiFetch<any>(`/api/cementerio/sepulturas/${sepulturaId}`, {
+        method: 'PUT',
+        body: {
+          estado,
+          tipo,
+          notas: notas.trim() || null,
+          ubicacion_texto: ubicacion.trim() || null,
+        },
+      });
+      if (!res.ok) {
+        Alert.alert('Error', String(res.error ?? 'No se pudo guardar.'));
+        return;
+      }
+      Alert.alert('Guardado', 'Nicho actualizado');
+      router.back();
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#16A34A" /></View>;

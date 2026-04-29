@@ -15,7 +15,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { apiFetch } from '@/lib/laravel-api';
+import { AppButton, AppCard, AppInput, AppPill } from '@/components/ui';
 
 const TIPOS = ['temporal', 'perpetua'] as const;
 
@@ -61,14 +62,15 @@ export default function VentaConcesionModal() {
       const t = dni.trim();
       if (!t || t.length < 6) return;
       setChecking(true);
-      const res = await supabase.from('cemn_terceros').select('id, nombre, apellido1, apellido2').eq('dni', t).limit(1).maybeSingle();
+      const res = await apiFetch<{ items?: any[] }>(`/api/cementerio/terceros?q=${encodeURIComponent(t)}&limit=1`);
       setChecking(false);
-      if (!res.error && res.data) {
-        setExistingTerceroId((res.data as any).id as number);
+      const row = res.ok ? (res.data.items ?? [])[0] : null;
+      if (row) {
+        setExistingTerceroId(row.id as number);
         // autocompletar (sin machacar si ya escribió)
-        if (!nombre.trim()) setNombre((res.data as any).nombre ?? '');
-        if (!apellido1.trim()) setApellido1((res.data as any).apellido1 ?? '');
-        if (!apellido2.trim()) setApellido2((res.data as any).apellido2 ?? '');
+        if (!nombre.trim()) setNombre(row.nombre ?? '');
+        if (!apellido1.trim()) setApellido1(row.apellido1 ?? '');
+        if (!apellido2.trim()) setApellido2(row.apellido2 ?? '');
       }
     };
     run();
@@ -85,15 +87,9 @@ export default function VentaConcesionModal() {
       }
       setSearching(true);
       try {
-        const res = await supabase
-          .from('cemn_terceros')
-          .select('id, dni, nombre, apellido1, apellido2')
-          .or(
-            `dni.ilike.%${q}%,nombre.ilike.%${q}%,apellido1.ilike.%${q}%,apellido2.ilike.%${q}%`
-          )
-          .limit(15);
-        if (res.error) throw res.error;
-        setSearchRows(res.data ?? []);
+        const res = await apiFetch<{ items?: any[] }>(`/api/cementerio/terceros?q=${encodeURIComponent(q)}&limit=15`);
+        if (!res.ok) throw new Error(String(res.error ?? 'No se pudo buscar'));
+        setSearchRows(res.data.items ?? []);
       } catch (e: any) {
         Alert.alert('Error', e?.message ?? String(e));
         setSearchRows([]);
@@ -101,7 +97,12 @@ export default function VentaConcesionModal() {
         setSearching(false);
       }
     }, 250);
-    return () => debounceRef.current && clearTimeout(debounceRef.current);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
   }, [searchQ]);
 
   const guardar = async () => {
@@ -117,43 +118,38 @@ export default function VentaConcesionModal() {
 
       let terceroId = existingTerceroId;
       if (!terceroId) {
-        const insT = await supabase
-          .from('cemn_terceros')
-          .insert({
+        const insT = await apiFetch<any>('/api/cementerio/terceros', {
+          method: 'POST',
+          body: {
             dni: dni.trim() || null,
             nombre: nombre.trim(),
             apellido1: apellido1.trim() || null,
             apellido2: apellido2.trim() || null,
-          })
-          .select('id')
-          .single();
-        if (insT.error) throw insT.error;
+          },
+        });
+        if (!insT.ok) throw new Error(String(insT.error ?? 'No se pudo crear el titular'));
         terceroId = (insT.data as any).id as number;
       }
 
-      const insC = await supabase
-        .from('cemn_concesiones')
-        .insert({
+      const insC = await apiFetch<any>('/api/cementerio/admin/concesiones', {
+        method: 'POST',
+        body: {
           sepultura_id: sepulturaId,
           numero_expediente: expediente.trim() || null,
           tipo,
           estado: 'vigente',
           fecha_vencimiento: venc,
-        } as any)
-        .select('id')
-        .single();
-      if (insC.error) throw insC.error;
-      const concesionId = (insC.data as any).id as number;
+        },
+      });
+      if (!insC.ok) throw new Error(String(insC.error ?? 'No se pudo crear la concesión'));
+      const created = (insC.data as any)?.item ?? (insC.data as any);
+      const concesionId = (created as any).id as number;
 
       // Vincular titular a concesión (si existe la tabla)
-      const link = await supabase
-        .from('cemn_concesion_terceros')
-        .insert({ concesion_id: concesionId, tercero_id: terceroId, rol: 'concesionario' } as any);
-      if (link.error) {
-        const msg = (link.error.message ?? '').toLowerCase();
-        const isMissing = msg.includes('relation') && msg.includes('does not exist');
-        if (!isMissing) throw link.error;
-      }
+      await apiFetch(`/api/cementerio/concesiones/${concesionId}/terceros`, {
+        method: 'POST',
+        body: { tercero_id: terceroId, rol: 'concesionario' },
+      }).catch(() => null);
 
       Alert.alert('OK', 'Titular y concesión registrados.');
       router.back();
@@ -169,15 +165,13 @@ export default function VentaConcesionModal() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
         <Text style={s.h1}>{titulo}</Text>
         {!user && (
-          <View style={s.warnBox}>
-            <Text style={s.warnText}>Sin sesión no se puede guardar en Supabase (RLS exige authenticated).</Text>
-            <TouchableOpacity style={s.warnBtn} onPress={() => router.push('/login')} activeOpacity={0.85}>
-              <Text style={s.warnBtnT}>Iniciar sesión</Text>
-            </TouchableOpacity>
-          </View>
+          <AppCard style={s.warnBox} padded>
+            <Text style={s.warnText}>Sin sesión no se puede guardar.</Text>
+            <AppButton label="Iniciar sesión" variant="primary" onPress={() => router.push('/login')} />
+          </AppCard>
         )}
 
-        <View style={s.card}>
+        <AppCard style={s.card} padded>
           <Text style={s.section}>Titular</Text>
 
           <Text style={s.label}>Buscar titular existente</Text>
@@ -229,49 +223,36 @@ export default function VentaConcesionModal() {
             />
           ) : null}
 
-          <Text style={s.label}>DNI (opcional)</Text>
-          <TextInput style={s.input} value={dni} onChangeText={setDni} placeholder="12345678A" placeholderTextColor="#9CA3AF" autoCapitalize="characters" />
+          <AppInput label="DNI (opcional)" value={dni} onChangeText={setDni} placeholder="12345678A" autoCapitalize="characters" />
           {checking ? <Text style={s.hint}>Buscando titular…</Text> : existingTerceroId ? <Text style={s.hintOk}>Titular existente detectado (se reutiliza).</Text> : null}
 
-          <Text style={s.label}>Nombre *</Text>
-          <TextInput style={s.input} value={nombre} onChangeText={setNombre} placeholder="Nombre" placeholderTextColor="#9CA3AF" />
-          <Text style={s.label}>Apellido 1</Text>
-          <TextInput style={s.input} value={apellido1} onChangeText={setApellido1} placeholder="Apellido 1" placeholderTextColor="#9CA3AF" />
-          <Text style={s.label}>Apellido 2</Text>
-          <TextInput style={s.input} value={apellido2} onChangeText={setApellido2} placeholder="Apellido 2" placeholderTextColor="#9CA3AF" />
-        </View>
+          <AppInput label="Nombre *" value={nombre} onChangeText={setNombre} placeholder="Nombre" />
+          <AppInput label="Apellido 1" value={apellido1} onChangeText={setApellido1} placeholder="Apellido 1" />
+          <AppInput label="Apellido 2" value={apellido2} onChangeText={setApellido2} placeholder="Apellido 2" />
+        </AppCard>
 
-        <View style={s.card}>
+        <AppCard style={s.card} padded>
           <Text style={s.section}>Concesión</Text>
-          <Text style={s.label}>N.º expediente (opcional)</Text>
-          <TextInput style={s.input} value={expediente} onChangeText={setExpediente} placeholder="EXP-2026-0001" placeholderTextColor="#9CA3AF" autoCapitalize="characters" />
+          <AppInput label="N.º expediente (opcional)" value={expediente} onChangeText={setExpediente} placeholder="EXP-2026-0001" autoCapitalize="characters" />
 
           <Text style={s.label}>Tipo</Text>
           <View style={s.row}>
             {TIPOS.map((t) => (
-              <TouchableOpacity key={t} style={[s.pill, tipo === t && s.pillActive]} onPress={() => setTipo(t)} activeOpacity={0.85}>
-                <Text style={[s.pillT, tipo === t && s.pillTActive]}>{t}</Text>
-              </TouchableOpacity>
+              <AppPill key={t} label={t} active={tipo === t} onPress={() => setTipo(t)} style={{ flex: 1 }} />
             ))}
           </View>
 
-          <Text style={s.label}>Vencimiento (opcional, AAAA-MM-DD)</Text>
-          <TextInput style={s.input} value={fechaVenc} onChangeText={setFechaVenc} placeholder="2030-12-31" placeholderTextColor="#9CA3AF" />
-        </View>
+          <AppInput label="Vencimiento (opcional, AAAA-MM-DD)" value={fechaVenc} onChangeText={setFechaVenc} placeholder="2030-12-31" />
+        </AppCard>
       </ScrollView>
 
       <View style={s.bottom}>
-        <TouchableOpacity style={[s.btn, s.ghost]} onPress={() => router.back()} activeOpacity={0.85}>
-          <Text style={s.ghostT}>Cancelar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.btn, s.primary, saving && { opacity: 0.6 }]} onPress={guardar} disabled={saving} activeOpacity={0.85}>
-          {saving ? <ActivityIndicator color="#fff" /> : (
-            <>
-              <FontAwesome name="check" size={16} color="#fff" />
-              <Text style={s.primaryT}>Guardar</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <AppButton label="Cancelar" variant="ghost" onPress={() => router.back()} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppButton label="Guardar" variant="primary" onPress={guardar} loading={saving} />
+        </View>
       </View>
     </KeyboardAvoidingView>
   );

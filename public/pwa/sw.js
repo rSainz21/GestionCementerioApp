@@ -1,6 +1,6 @@
 // Service Worker - Somahoz PWA
-// Versión: incrementa para forzar actualización
-const CACHE = 'somahoz-v2';
+// Versiï¿½n: incrementa para forzar actualizaciï¿½n
+const CACHE = 'somahoz-v3';
 const SHELL = ['/movil', '/pwa/manifest.json'];
 
 self.addEventListener('install', e => {

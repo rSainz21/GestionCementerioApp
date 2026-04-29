@@ -83,8 +83,6 @@ export default function AsignarDifuntoScreen() {
     }
 
     setSaving(true);
-
-    setSaving(false);
     const res = await apiFetch<{ ok: true; difunto_id: number; movimiento_id: number }>(
       '/api/cementerio/workflows/inhumacion',
       {
@@ -100,6 +98,7 @@ export default function AsignarDifuntoScreen() {
         },
       }
     );
+    setSaving(false);
     if (!res.ok) {
       Alert.alert('Error', typeof res.error === 'string' ? res.error : 'No se pudo asignar el difunto.');
       return;
@@ -115,7 +114,7 @@ export default function AsignarDifuntoScreen() {
         {!user && (
           <View style={s.warnBox}>
             <Text style={s.warnText}>
-              Sin sesión no se puede guardar en Supabase (mismas reglas que al crear zonas/bloques). Pulsa “Ir al login” abajo o desde Más.
+              Sin sesión no se puede guardar. Pulsa “Iniciar sesión” abajo o desde Más.
             </Text>
             <TouchableOpacity style={s.warnBtn} onPress={() => router.push('/login')} activeOpacity={0.8}>
               <Text style={s.warnBtnT}>Iniciar sesión</Text>

@@ -4,7 +4,7 @@ import { apiFetch, setToken } from './laravel-api';
 interface AuthState {
   user: any | null;
   loading: boolean;
-  signIn: (usernameOrEmail: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (usernameOrEmail: string, password: string, opts?: { persist?: boolean }) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -23,16 +23,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const signIn = async (usernameOrEmail: string, password: string) => {
-    const r = await apiFetch<{ token: string; user: any }>('/api/login', {
+  const signIn = async (usernameOrEmail: string, password: string, opts?: { persist?: boolean }) => {
+    // Compat: algunos backends validan "username", otros "email".
+    // Intentamos primero username y si falla repetimos con email.
+    const first = await apiFetch<{ token: string; user: any }>('/api/login', {
       method: 'POST',
       body: { username: usernameOrEmail, password },
     });
-    if (!r.ok) {
-      return { error: new Error(typeof r.error === 'string' ? r.error : 'No se pudo iniciar sesión') };
+    if (first.ok) {
+      await setToken(first.data.token, { persist: opts?.persist });
+      setUser(first.data.user);
+      return { error: null };
     }
-    await setToken(r.data.token);
-    setUser(r.data.user);
+
+    const msg = typeof first.error === 'string' ? first.error : String(first.error ?? '');
+    const shouldTryEmail = /email/i.test(msg) || /correo/i.test(msg);
+    if (!shouldTryEmail) {
+      return { error: new Error(msg || 'No se pudo iniciar sesión') };
+    }
+
+    const second = await apiFetch<{ token: string; user: any }>('/api/login', {
+      method: 'POST',
+      body: { email: usernameOrEmail, password },
+    });
+    if (!second.ok) {
+      const msg2 = typeof second.error === 'string' ? second.error : String(second.error ?? '');
+      return { error: new Error(msg2 || msg || 'No se pudo iniciar sesión') };
+    }
+    await setToken(second.data.token, { persist: opts?.persist });
+    setUser(second.data.user);
     return { error: null };
   };
 

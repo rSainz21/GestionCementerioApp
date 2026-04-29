@@ -12,22 +12,24 @@ class TercerosSearchController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = trim((string) $request->query('q', ''));
+        $limit = min(max((int) $request->query('limit', 100), 1), 500);
 
-        if (mb_strlen($q) < 2) {
-            return response()->json(['items' => []]);
-        }
+        $query = CemnTercero::query();
 
-        $items = CemnTercero::query()
-            ->where(function ($qq) use ($q) {
+        if (mb_strlen($q) >= 2) {
+            $query->where(function ($qq) use ($q) {
                 $qq->where('dni', 'like', "%{$q}%")
                     ->orWhere('nombre', 'like', "%{$q}%")
                     ->orWhere('apellido1', 'like', "%{$q}%")
                     ->orWhere('apellido2', 'like', "%{$q}%");
-            })
+            });
+        }
+
+        $items = $query
             ->orderBy('apellido1')
             ->orderBy('apellido2')
             ->orderBy('nombre')
-            ->limit(15)
+            ->limit(mb_strlen($q) >= 2 ? min($limit, 100) : $limit)
             ->get([
                 'id',
                 'dni',

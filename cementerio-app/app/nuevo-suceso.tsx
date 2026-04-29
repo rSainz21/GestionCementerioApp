@@ -13,10 +13,11 @@ import {
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
 import type { Bloque, Sepultura } from '@/lib/types';
 import { etiquetaEstadoVisible, normalizarEstadoEditable } from '@/lib/estado-sepultura';
 import { NichoGrid } from '@/components/NichoGrid';
+import { apiFetch } from '@/lib/laravel-api';
+import { unwrapItem } from '@/lib/normalize';
 
 type SucesoAction =
   | 'registrar_inhumacion_nuevo_difunto'
@@ -98,12 +99,11 @@ export default function NuevoSucesoModal() {
   }, [action]);
 
   const fetchSepulturaById = useCallback(async (id: number) => {
-    const res = await supabase
-      .from('cemn_sepulturas')
-      .select('*, cemn_bloques(codigo), cemn_zonas(nombre)')
-      .eq('id', id)
-      .single();
-    if (!res.error && res.data) setSelected(res.data as SepFull);
+    const res = await apiFetch<any>(`/api/cementerio/sepulturas/${id}`);
+    if (res.ok) {
+      const it = unwrapItem<SepFull>(res.data);
+      if (it) setSelected(it);
+    }
   }, []);
 
   useEffect(() => {
@@ -163,15 +163,14 @@ export default function NuevoSucesoModal() {
     }
     setLoadingBuscar(true);
     try {
-      const base = supabase
-        .from('cemn_sepulturas')
-        .select('*, cemn_bloques(codigo), cemn_zonas(nombre)')
-        .limit(20);
-      const res = isNumeric(t)
-        ? await base.or(`numero.eq.${Number(t)},id.eq.${Number(t)}`)
-        : await base.or(`codigo.ilike.%${t}%,ubicacion_texto.ilike.%${t}%`);
-      if (res.error) throw res.error;
-      setRows((res.data ?? []) as SepFull[]);
+      const res = await apiFetch<{ items: any[] }>(`/api/cementerio/sepulturas/search?q=${encodeURIComponent(t)}`);
+      if (!res.ok) throw new Error(String(res.error ?? 'Error de búsqueda'));
+      const mapped = (res.data.items ?? []).map((it: any) => ({
+        ...it,
+        cemn_bloques: it.bloque_codigo ? { codigo: it.bloque_codigo } : it.cemn_bloques ?? null,
+        cemn_zonas: it.zona_nombre ? { nombre: it.zona_nombre } : it.cemn_zonas ?? null,
+      }));
+      setRows(mapped as SepFull[]);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? String(e));
       setRows([]);
@@ -183,18 +182,32 @@ export default function NuevoSucesoModal() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => buscar(q), 250);
-    return () => debounceRef.current && clearTimeout(debounceRef.current);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
   }, [q, buscar]);
 
   // Bloques
   useEffect(() => {
     const run = async () => {
-      const [zonasRes, bloquesRes] = await Promise.all([
-        supabase.from('cemn_zonas').select('id, nombre').order('id'),
-        supabase.from('cemn_bloques').select('*').order('id'),
-      ]);
-      const zonasMap = new Map<number, string>((zonasRes.data ?? []).map((z: any) => [z.id as number, z.nombre as string]));
-      const mapped = (bloquesRes.data ?? []).map((b: any) => ({ ...b, zona_nombre: zonasMap.get(b.zona_id) ?? '' }));
+      const bloquesRes = await apiFetch<{ items?: any[] }>('/api/cementerio/bloques');
+      let mapped: any[] = [];
+      if (bloquesRes.ok) {
+        mapped = (bloquesRes.data.items ?? []) as any[];
+      } else {
+        const catRes = await apiFetch<any>('/api/cementerio/catalogo');
+        const zonas = catRes.ok ? ((catRes.data as any)?.zonas ?? []) : [];
+        const zById = new Map<number, any>(zonas.map((z: any) => [Number(z.id), z]));
+        mapped = catRes.ok
+          ? (((catRes.data as any)?.bloques ?? []) as any[]).map((b: any) => ({
+              ...b,
+              zona_nombre: zById.get(Number(b.zona_id))?.nombre,
+            }))
+          : [];
+      }
       setBloques(mapped);
       if (mapped.length > 0) setBloqueActivo((prev) => prev ?? mapped[0].id);
     };
@@ -205,19 +218,14 @@ export default function NuevoSucesoModal() {
     const run = async () => {
       if (!bloqueActivo) return;
       setLoadingBloque(true);
-      const res = await supabase
-        .from('cemn_sepulturas')
-        .select('*')
-        .eq('bloque_id', bloqueActivo)
-        .order('columna')
-        .order('fila');
+      const res = await apiFetch<{ items: Sepultura[] }>(`/api/cementerio/bloques/${bloqueActivo}/sepulturas`);
       setLoadingBloque(false);
-      if (res.error) {
-        Alert.alert('Error', res.error.message);
+      if (!res.ok) {
+        Alert.alert('Error', String(res.error ?? 'No se pudieron cargar sepulturas'));
         setSepulturasBloque([]);
         return;
       }
-      setSepulturasBloque((res.data ?? []) as Sepultura[]);
+      setSepulturasBloque((res.data.items ?? []) as Sepultura[]);
     };
     run();
   }, [bloqueActivo]);
@@ -381,12 +389,13 @@ export default function NuevoSucesoModal() {
                   filas={bloques.find((b) => b.id === bloqueActivo)?.filas ?? 4}
                   columnas={bloques.find((b) => b.id === bloqueActivo)?.columnas ?? 1}
                   onNichoPress={async (sep) => {
-                    const res = await supabase
-                      .from('cemn_sepulturas')
-                      .select('*, cemn_bloques(codigo), cemn_zonas(nombre)')
-                      .eq('id', sep.id)
-                      .single();
-                    if (!res.error && res.data) setSelected(res.data as SepFull);
+                    const res = await apiFetch<any>(`/api/cementerio/sepulturas/${sep.id}`);
+                    if (!res.ok) {
+                      Alert.alert('Error', String(res.error ?? 'No se pudo cargar la sepultura'));
+                      return;
+                    }
+                    const it = unwrapItem<SepFull>(res.data);
+                    if (it) setSelected(it);
                   }}
                 />
               )}

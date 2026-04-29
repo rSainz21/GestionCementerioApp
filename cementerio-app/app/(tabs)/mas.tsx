@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
@@ -45,29 +45,31 @@ export default function MasScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.statsCard}>
-        <Text style={styles.statsTitle}>Resumen del cementerio</Text>
-        <View style={styles.statsGrid}>
-          <Stat value={stats.total} label="Total nichos" color="#22C55E" />
-          <Stat value={stats.ocupados} label="Ocupados" color="#EF4444" />
-          <Stat value={stats.libres} label="Libres" color="#22C55E" />
-          <Stat value={stats.bloques} label="Bloques" color="#4ADE80" />
-        </View>
-      </View>
+      <Text style={styles.sectionLabel}>Acciones</Text>
 
-      <Text style={styles.sectionLabel}>Gestión</Text>
+      <MenuItem icon="search" label="Buscar" sub="Difuntos, nichos, bloques" onPress={() => router.push('/buscar')} />
+      <MenuItem icon="th-large" label="Campo (Nichos)" sub="Vista por bloque" onPress={() => router.push('/(tabs)/campo')} />
+      <MenuItem icon="map-o" label="Mapa" sub="Vista del recinto" onPress={() => router.push('/(tabs)/mapa')} />
+
+      <Text style={styles.sectionLabel}>Administración</Text>
 
       <MenuItem
-        icon="th-large"
-        label="Gestionar bloques"
-        sub="(Fase 2) Alta/edición avanzada desde móvil"
-        onPress={() => Alert.alert('En preparación', 'Esta pantalla se activa en la Fase 2. Para las primeras pruebas usa Campo / Buscar / Mapa.')}
+        icon="cubes"
+        label="Bloques"
+        sub="Alta y edición"
+        onPress={() => router.push('/admin-bloques')}
       />
       <MenuItem
         icon="users"
-        label="Difuntos y concesiones"
-        sub="(Fase 2) Gestión avanzada desde móvil"
-        onPress={() => Alert.alert('En preparación', 'Esta pantalla se activa en la Fase 2.')}
+        label="Registros"
+        sub="Concesiones, titulares y difuntos"
+        onPress={() => router.push('/gestion-registros')}
+      />
+      <MenuItem
+        icon="folder-open-o"
+        label="Gestión avanzada"
+        sub="Pantalla técnica (opcional)"
+        onPress={() => router.push('/(tabs)/gestion')}
       />
 
       <Text style={styles.sectionLabel}>Cuenta</Text>

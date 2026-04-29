@@ -1,642 +1,957 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
-import type { Bloque } from '@/lib/types';
-import { NichoGrid } from '@/components/NichoGrid';
-import { BLOQUES_OFICIALES } from '@/lib/bloques-oficiales';
-import { OsmWebMap } from '@/components/OsmWebMap';
-import * as Location from 'expo-location';
+import { useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '@/lib/laravel-api';
-
-// Ortofoto PNOA (IGN/CNIG) descargada vía WMS (recorte del recinto)
-const BASE_MAP_IMAGE = require('@/assets/images/mapa-somahoz-pnoa.jpg');
+import { BLOQUES_OFICIALES, type ZonaLabel, formatRango } from '@/lib/bloques-oficiales';
+import { unwrapItem } from '@/lib/normalize';
+import { CementerioMapaOSM } from '@/components/CementerioMapaOSM';
+import { PlanoGeneralMapa, type PlanoGeneralMapaHandle } from '@/components/PlanoGeneralMapa';
+import { normalizarEstadoEditable } from '@/lib/estado-sepultura';
+import { AppButton, AppCard, AppPill, AppSkeleton, Radius, Semantic, Space } from '@/components/ui';
+import { POLIGONOS_BLOQUES_SOMAHOZ } from '@/lib/mapa-somahoz';
+import { buildPlanoBlocksSomahoz } from '@/lib/plano-somahoz';
+import { SOMAHOZ_HOTSPOTS, type SomahozHotspotId } from '@/lib/mapa-somahoz-hotspots';
+import { loadDibujos } from '@/lib/mapa-dibujo-store';
+import { SOMAHOZ_YELLOW_MARKERS } from '@/lib/somahoz-yellow-markers';
 
 export default function MapaScreen() {
+  const params = useLocalSearchParams<{ focus_sepultura_id?: string; focus_lat?: string; focus_lon?: string; focus_acc?: string }>();
   const router = useRouter();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const planoRef = useRef<PlanoGeneralMapaHandle | null>(null);
   const [loading, setLoading] = useState(true);
-  const [bloquesByCodigo, setBloquesByCodigo] = useState<Map<string, Bloque>>(new Map());
-  const [bloquesById, setBloquesById] = useState<Map<number, Bloque>>(new Map());
-  const [selectedCodigo, setSelectedCodigo] = useState<string | null>(null);
-  // Solo OSM (fijo) por simplicidad operativa; en web usamos embed, en nativo MapView.
-  const [mode] = useState<'osm'>('osm');
-  const [osmPreset] = useState<'cerca'>('cerca');
-
-  // Evitar que `react-native-maps` rompa en web (codegenNativeComponent).
-  // Lo cargamos dinámicamente solo en nativo.
-  const rnMaps = useMemo(() => {
-    if (Platform.OS === 'web') return null;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      return require('react-native-maps');
-    } catch {
-      return null;
-    }
-  }, []);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const MapView: any = rnMaps?.default ?? rnMaps?.MapView ?? null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const UrlTile: any = rnMaps?.UrlTile ?? null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const Marker: any = rnMaps?.Marker ?? null;
-
-  // Centro aproximado del cementerio (Somahoz). Ajustable si guardas GPS real.
-  const CEMENTERIO_CENTER = useMemo(
-    // Centrado exacto según vista OSM: https://www.openstreetmap.org/#map=19/43.248748/-4.057871
-    () => ({ latitude: 43.248748, longitude: -4.057871 }),
-    []
-  );
-
-  // En nativo: limitar navegación a un “marco” alrededor del cementerio.
-  // (Evita que el usuario se pierda lejos, pero permite zoom/pan local.)
-  const OSM_LIMIT = useMemo(() => ({ dLat: 0.0012, dLon: 0.0016 }), []);
-  const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
-  const clampRegion = useCallback(
-    (r: any) => {
-      const minLat = CEMENTERIO_CENTER.latitude - OSM_LIMIT.dLat;
-      const maxLat = CEMENTERIO_CENTER.latitude + OSM_LIMIT.dLat;
-      const minLon = CEMENTERIO_CENTER.longitude - OSM_LIMIT.dLon;
-      const maxLon = CEMENTERIO_CENTER.longitude + OSM_LIMIT.dLon;
-      return {
-        ...r,
-        latitude: clamp(r.latitude, minLat, maxLat),
-        longitude: clamp(r.longitude, minLon, maxLon),
-      };
-    },
-    [CEMENTERIO_CENTER.latitude, CEMENTERIO_CENTER.longitude, OSM_LIMIT.dLat, OSM_LIMIT.dLon]
-  );
-
-  const osmMapRef = useRef<any>(null);
-  const [osmRegion] = useState<any>(() =>
-    clampRegion({
-      latitude: CEMENTERIO_CENTER.latitude,
-      longitude: CEMENTERIO_CENTER.longitude,
-      latitudeDelta: 0.0028,
-      longitudeDelta: 0.0028,
-    })
-  );
-
-  const [geoSepulturas, setGeoSepulturas] = useState<{ id: number; numero: number | null; lat: number; lon: number; estado?: string | null; bloque_id?: number | null; tipo?: string | null }[]>([]);
-  const [loadingGeo, setLoadingGeo] = useState(false);
   const [q, setQ] = useState('');
-  const [result, setResult] = useState<{ id: number; numero: number | null; codigo: string | null; estado: string | null } | null>(null);
-  const [assigning, setAssigning] = useState(false);
-  const [lastAcc, setLastAcc] = useState<number | null>(null);
-  const [manualLat, setManualLat] = useState('');
-  const [manualLon, setManualLon] = useState('');
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerBloqueId, setPickerBloqueId] = useState<number | null>(null);
-  const [pickerSepulturas, setPickerSepulturas] = useState<any[]>([]);
-  const [loadingPicker, setLoadingPicker] = useState(false);
-  const [pickerError, setPickerError] = useState<string | null>(null);
-  const [osmTileError, setOsmTileError] = useState<string | null>(null);
-  const [fEstado, setFEstado] = useState<'todas' | 'libre' | 'ocupada'>('todas');
-  const [fTipo, setFTipo] = useState<'todos' | 'nicho' | 'columbario'>('todos');
+  const [searching, setSearching] = useState(false);
+  const [selectedCodigo, setSelectedCodigo] = useState<string | null>(null);
+  const [bloqueCodes, setBloqueCodes] = useState<Set<string>>(new Set());
+  const [bloquesRaw, setBloquesRaw] = useState<any[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [viewMode, setViewMode] = useState<'satelite' | 'plano'>('plano');
+  const [zona, setZona] = useState<'ALL' | ZonaLabel>('ALL');
+  const [highlightSepId, setHighlightSepId] = useState<number | null>(null);
+  const [activeHotspot, setActiveHotspot] = useState<SomahozHotspotId | null>(null);
+  const [ampliacionesOpen, setAmpliacionesOpen] = useState(false);
+  const [gpsHere, setGpsHere] = useState<{ lat: number; lon: number; acc: number | null } | null>(null);
+  const [gpsDetected, setGpsDetected] = useState<string | null>(null);
+  const [customBloques, setCustomBloques] = useState<Array<{ codigo: string; coordinates: Array<{ latitude: number; longitude: number }> }> | null>(null);
+  const [yellowNonce, setYellowNonce] = useState(0);
 
-  const totalNichos = useMemo(() => BLOQUES_OFICIALES.reduce((acc, b) => acc + b.filas * b.columnas, 0), []);
+  // Al volver del editor de números, fuerza recarga desde storage
+  useFocusEffect(
+    useCallback(() => {
+      setYellowNonce(Date.now());
+      return () => {};
+    }, [])
+  );
 
-  const bloquesList = useMemo(() => {
-    const arr = Array.from(bloquesByCodigo.values());
-    arr.sort((a: any, b: any) => String(a.codigo ?? '').localeCompare(String(b.codigo ?? '')));
-    return arr;
-  }, [bloquesByCodigo]);
+  // Ajuste “encuadre”: si el contenedor es muy alto respecto al ancho (móvil),
+  // con `meet` queda mucho margen blanco arriba/abajo. Mejor un alto casi cuadrado.
+  const mapH = useMemo(() => {
+    const w = Number(width || 0);
+    if (!Number.isFinite(w) || w <= 0) return 520;
+    return Math.min(520, Math.max(320, Math.round(w * 0.92)));
+  }, [width]);
 
-  const demoGeo = useMemo(() => {
-    // Demo visual (si todavía no hay GPS en BD). IDs negativos para no navegar.
-    const baseLat = CEMENTERIO_CENTER.latitude;
-    const baseLon = CEMENTERIO_CENTER.longitude;
-    const pts = [
-      { dLat: 0.00010, dLon: 0.00005, estado: 'ocupada' },
-      { dLat: 0.00008, dLon: -0.00004, estado: 'libre' },
-      { dLat: 0.00004, dLon: 0.00010, estado: 'ocupada' },
-      { dLat: -0.00006, dLon: 0.00002, estado: 'libre' },
-      { dLat: -0.00009, dLon: -0.00007, estado: 'ocupada' },
-      { dLat: 0.00002, dLon: -0.00012, estado: 'libre' },
-    ];
-    return pts.map((p, idx) => ({
-      id: -(idx + 1),
-      numero: 1000 + idx,
-      lat: baseLat + p.dLat,
-      lon: baseLon + p.dLon,
-      estado: p.estado,
-      bloque_id: null,
-      tipo: 'nicho',
-    }));
-  }, [CEMENTERIO_CENTER.latitude, CEMENTERIO_CENTER.longitude]);
+  const abrirBloquePorCodigo = useCallback(
+    async (codigo: string) => {
+      const b = (bloquesRaw ?? []).find((x) => String((x as any)?.codigo) === String(codigo));
+      const id = Number((b as any)?.id);
+      if (!Number.isFinite(id) || id <= 0) {
+        Alert.alert('Bloque', `No se encontró el bloque ${codigo} en la base de datos.`);
+        return;
+      }
+      router.push(`/bloque/${id}`);
+    },
+    [bloquesRaw, router]
+  );
+
+  const gpsPointInPoly = useCallback((lat: number, lon: number, poly: Array<{ latitude: number; longitude: number }>) => {
+    // Ray casting sobre plano lon/lat
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i].longitude;
+      const yi = poly[i].latitude;
+      const xj = poly[j].longitude;
+      const yj = poly[j].latitude;
+      const intersect = yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi + 1e-7) + xi;
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }, []);
+
+  const gpsNearestBlock = useCallback(
+    (lat: number, lon: number) => {
+      // Distancia aproximada (en metros) punto->segmento en proyección equirectangular local
+      const lat0 = lat;
+      const mPerDegLat = 111_320;
+      const mPerDegLon = 111_320 * Math.cos((lat0 * Math.PI) / 180);
+
+      const toXY = (p: { latitude: number; longitude: number }) => ({
+        x: (p.longitude - lon) * mPerDegLon,
+        y: (p.latitude - lat) * mPerDegLat,
+      });
+
+      const distPointToSeg = (p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) => {
+        const abx = b.x - a.x;
+        const aby = b.y - a.y;
+        const apx = p.x - a.x;
+        const apy = p.y - a.y;
+        const ab2 = abx * abx + aby * aby;
+        const t = ab2 > 0 ? Math.max(0, Math.min(1, (apx * abx + apy * aby) / ab2)) : 0;
+        const cx = a.x + t * abx;
+        const cy = a.y + t * aby;
+        const dx = p.x - cx;
+        const dy = p.y - cy;
+        return Math.hypot(dx, dy);
+      };
+
+      let best: { codigo: string; meters: number } | null = null;
+      const P = { x: 0, y: 0 }; // punto está en origen (toXY es relativo)
+
+      for (const poly of POLIGONOS_BLOQUES_SOMAHOZ) {
+        const ll = poly.puntos.map(vbToLatLon);
+        if (ll.length < 2) continue;
+        let dmin = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < ll.length; i++) {
+          const a = toXY(ll[i]);
+          const b = toXY(ll[(i + 1) % ll.length]);
+          dmin = Math.min(dmin, distPointToSeg(P, a, b));
+        }
+        if (!Number.isFinite(dmin)) continue;
+        if (!best || dmin < best.meters) best = { codigo: String(poly.codigo), meters: dmin };
+      }
+      return best;
+    },
+    [vbToLatLon]
+  );
+
+  // Coordenadas OSM (mismo bbox que `CementerioMapaOSM.native`)
+  const vbToLatLon = useCallback((p: { x: number; y: number }) => {
+    const south = 43.2483426;
+    const north = 43.2491123;
+    const west = -4.0582794;
+    const east = -4.0575471;
+    const longitude = west + (p.x / 1000) * (east - west);
+    const latitude = north - (p.y / 1000) * (north - south);
+    return { latitude, longitude };
+  }, []);
+
+  const onPressHotspot = useCallback(
+    (id: SomahozHotspotId) => {
+      setActiveHotspot(id);
+      const run = async () => {
+        if (id === 'TANATORIO') {
+          Alert.alert('Tanatorio', 'Tanatorio (Fuera de recinto)');
+          return;
+        }
+        if (id === 'A_B6') return abrirBloquePorCodigo('B6');
+        if (id === 'B_B7') return abrirBloquePorCodigo('B7');
+        if (id === 'C_B8') return abrirBloquePorCodigo('B8');
+        if (id === 'D_AMPLIACIONES') {
+          setAmpliacionesOpen(true);
+          return;
+        }
+        if (id === 'E_COLUMBARIOS') {
+          Alert.alert('Columbarios', 'Pendiente: vista especial de columbarios.');
+        }
+      };
+      setTimeout(() => {
+        run();
+      }, 180);
+    },
+    [abrirBloquePorCodigo]
+  );
+
+  const blocksAll = useMemo(() => {
+    const all = BLOQUES_OFICIALES;
+    if (!bloqueCodes || bloqueCodes.size === 0) return all;
+    const filtered = all.filter((b) => bloqueCodes.has(String(b.codigo)));
+    return filtered.length > 0 ? filtered : all;
+  }, [bloqueCodes]);
+  const blocks = useMemo(() => {
+    if (zona === 'ALL') return blocksAll;
+    return blocksAll.filter((b) => b.zonaLabel === zona);
+  }, [blocksAll, zona]);
+
+  const selectedBloque = useMemo(() => {
+    if (!selectedCodigo) return null;
+    const byCode = bloquesRaw.find((b) => String(b?.codigo) === String(selectedCodigo));
+    return byCode ?? null;
+  }, [bloquesRaw, selectedCodigo]);
+
+  const selectedBloqueOficial = useMemo(() => {
+    if (!selectedCodigo) return null;
+    return (blocksAll ?? []).find((b) => String(b.codigo) === String(selectedCodigo)) ?? null;
+  }, [blocksAll, selectedCodigo]);
+
+  const selectedBloqueId = useMemo(() => {
+    const id = Number((selectedBloque as any)?.id);
+    return Number.isFinite(id) && id > 0 ? id : null;
+  }, [selectedBloque]);
+
+  const schematicBlocks = useMemo(() => {
+    return buildPlanoBlocksSomahoz({
+      bloquesOficiales: blocks as any,
+      bloquesRaw,
+      poligonos: POLIGONOS_BLOQUES_SOMAHOZ,
+      crop: { x: 255, y: 205, w: 500, h: 500 },
+      margin: 70,
+      pad: 14,
+    });
+  }, [bloquesRaw, blocks]);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [createZonaCodigo, setCreateZonaCodigo] = useState<string>('Z');
+  const [createNumero, setCreateNumero] = useState<string>('1');
+  const [createFila, setCreateFila] = useState<string>('1');
+  const [createCol, setCreateCol] = useState<string>('1');
+  const [createCodigo, setCreateCodigo] = useState<string>('');
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await apiFetch<{ items: any[] }>('/api/cementerio/bloques');
-    if (!res.ok) {
-      console.error('[mapa/bloques] ', res.error);
-      Alert.alert('Error', String(res.error ?? 'No se pudieron cargar bloques'));
-      setBloquesByCodigo(new Map());
+    const r = await apiFetch<{ items?: any[] }>('/api/cementerio/bloques');
+    if (r.ok) {
+      const items = (r.data.items ?? []) as any[];
+      setBloquesRaw(items);
+      const s = new Set<string>(items.map((b) => String(b.codigo)));
+      setBloqueCodes(s);
       setLoading(false);
       return;
     }
-    const map = new Map<string, Bloque>();
-    const mapId = new Map<number, Bloque>();
-    for (const b of (res.data.items ?? []) as any[]) {
-      if (b?.codigo) map.set(String(b.codigo), b as Bloque);
-      if (b?.id) mapId.set(Number(b.id), b as Bloque);
+    const cat = await apiFetch<any>('/api/cementerio/catalogo');
+    if (cat.ok) {
+      const items = ((cat.data as any)?.bloques ?? []) as any[];
+      setBloquesRaw(items);
+      const s = new Set<string>(items.map((b: any) => String(b.codigo)));
+      setBloqueCodes(s);
+      setLoading(false);
+      return;
     }
-    setBloquesByCodigo(map);
-    setBloquesById(mapId);
+    setBloquesRaw([]);
+    setBloqueCodes(new Set());
     setLoading(false);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  // Buscar nicho rápido por número/código/id (para asignar GPS sin abrir ficha)
-  useFocusEffect(
-    useCallback(() => {
-      const run = async () => {
-        const t = q.trim();
-        if (t.length < 2) {
-          setResult(null);
-          return;
-        }
-        try {
-          const res = await apiFetch<{ items: any[] }>(`/api/cementerio/sepulturas/search?q=${encodeURIComponent(t)}`);
-          if (!res.ok) throw new Error();
-          const row = (res.data.items ?? [])[0] as any;
-          setResult(row ? { id: row.id, numero: row.numero ?? null, codigo: row.codigo ?? null, estado: row.estado ?? null } : null);
-        } catch {
-          setResult(null);
-        }
-      };
-      const to = setTimeout(run, 250);
-      return () => clearTimeout(to);
-    }, [q])
-  );
+  // Cargar dibujos del usuario (bloques pintados)
+  useEffect(() => {
+    loadDibujos().then((items) => {
+      const blocks = (items ?? []).filter((f: any) => f.type === 'bloque' && Array.isArray(f.coordinates) && f.coordinates.length >= 3);
+      if (blocks.length === 0) {
+        setCustomBloques(null);
+        return;
+      }
+      setCustomBloques(blocks.map((b: any) => ({ codigo: String(b.codigo), coordinates: b.coordinates })));
+    });
+  }, []);
 
-  const capturarYAsignar = useCallback(async () => {
-    if (!result) {
-      Alert.alert('Selecciona un nicho', 'Busca un número o código para asignar GPS.');
+  // Si venimos desde la ficha de un nicho: enfocar bloque y resaltar
+  useEffect(() => {
+    const sid = Number(params.focus_sepultura_id);
+    if (!Number.isFinite(sid) || sid <= 0) return;
+    setHighlightSepId(sid);
+    // Preferimos satélite para que el operario “vea” dónde está
+    setViewMode('satelite');
+    apiFetch<any>(`/api/cementerio/sepulturas/${sid}`)
+      .then((r) => {
+        if (!r.ok) return;
+        const item = unwrapItem<any>(r.data) ?? (r.data as any)?.item ?? (r.data as any);
+        const code = item?.bloque?.codigo ?? item?.cemn_bloques?.codigo ?? item?.bloque_codigo ?? null;
+        if (code) setSelectedCodigo(String(code));
+      })
+      .catch(() => null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.focus_sepultura_id]);
+
+  // Si venimos con GPS: centrar y detectar bloque más probable
+  useEffect(() => {
+    const lat = Number(params.focus_lat);
+    const lon = Number(params.focus_lon);
+    const acc = params.focus_acc != null ? Number(params.focus_acc) : null;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    setGpsHere({ lat, lon, acc: Number.isFinite(acc as any) ? (acc as number) : null });
+    setViewMode('satelite');
+
+    // Detectar bloque por punto dentro de polígono
+    for (const p of POLIGONOS_BLOQUES_SOMAHOZ) {
+      const polyLL = p.puntos.map(vbToLatLon);
+      if (gpsPointInPoly(lat, lon, polyLL)) {
+        setGpsDetected(String(p.codigo));
+        // Si no hay bloque seleccionado, seleccionamos el detectado
+        setSelectedCodigo((prev) => prev ?? String(p.codigo));
+        return;
+      }
+    }
+    // Si no cae dentro de ningún bloque: sugerir el más cercano
+    const nearest = gpsNearestBlock(lat, lon);
+    if (nearest) {
+      setGpsDetected(`${nearest.codigo}~${Math.round(nearest.meters)}`);
+      setSelectedCodigo((prev) => prev ?? String(nearest.codigo));
+    } else {
+      setGpsDetected(null);
+    }
+  }, [gpsNearestBlock, gpsPointInPoly, params.focus_acc, params.focus_lat, params.focus_lon, vbToLatLon]);
+
+  const onPressBlock = (codigo: string) => {
+    // UX como captura: seleccionar bloque y mostrar barra inferior.
+    setSelectedCodigo(codigo);
+  };
+
+  const onPressZona = (z: 'ALL' | ZonaLabel) => {
+    setZona(z);
+    // si el bloque seleccionado queda fuera del filtro, lo deseleccionamos
+    if (z !== 'ALL' && selectedBloqueOficial && selectedBloqueOficial.zonaLabel !== z) {
+      setSelectedCodigo(null);
+    }
+  };
+
+  // Preparar modal de creación al abrir o cambiar bloque seleccionado
+  useEffect(() => {
+    if (!createOpen) return;
+    setCreateErr(null);
+
+    const b = selectedBloque;
+    const numDefault = '1';
+    setCreateNumero(numDefault);
+    setCreateFila('1');
+    setCreateCol('1');
+
+    const tryLoadZonaCode = async () => {
+      try {
+        const cat = await apiFetch<any>('/api/cementerio/catalogo');
+        if (!cat.ok) return;
+        const zs = ((cat.data as any)?.zonas ?? []) as any[];
+        const z = b?.zona_id ? zs.find((x) => Number(x?.id) === Number(b.zona_id)) : null;
+        const zc = (z?.codigo ?? z?.siglas ?? z?.nombre ?? 'Z').toString().trim();
+        if (zc) setCreateZonaCodigo(zc);
+      } catch {}
+    };
+    tryLoadZonaCode();
+
+    const baseCode = b?.codigo ? String(b.codigo).trim() : selectedCodigo ? String(selectedCodigo).trim() : 'B?';
+    setCreateCodigo(`${createZonaCodigo}-${baseCode}-N${numDefault}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createOpen, selectedBloque]);
+
+  // Recalcular código sugerido cuando cambien zona/bloque/numero
+  useEffect(() => {
+    if (!createOpen) return;
+    const b = selectedBloque;
+    const baseCode = b?.codigo ? String(b.codigo).trim() : selectedCodigo ? String(selectedCodigo).trim() : 'B?';
+    const n = String(createNumero || '1').trim();
+    setCreateCodigo(`${(createZonaCodigo || 'Z').trim()}-${baseCode}-N${n || '1'}`);
+  }, [createNumero, createOpen, createZonaCodigo, selectedBloque, selectedCodigo]);
+
+  const saveNicho = useCallback(async () => {
+    const b = selectedBloque;
+    if (!b?.id) {
+      setCreateErr('No se pudo resolver el bloque seleccionado (sin id).');
       return;
     }
-    try {
-      setAssigning(true);
-      if (Platform.OS === 'web') {
-        const lat = Number(manualLat);
-        const lon = Number(manualLon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          Alert.alert('Coordenadas', 'En web usa lat/lon manual (números).');
-          return;
-        }
-        const up = await apiFetch(`/api/cementerio/sepulturas/${result.id}`, { method: 'PUT', body: { lat, lon } });
-        if (!up.ok) throw new Error(String(up.error ?? 'No se pudo guardar.'));
-        Alert.alert('GPS asignado', `Nicho ${result.numero ?? result.id} guardado.`);
-        return;
-      }
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permiso GPS', 'Necesitamos permiso de ubicación para capturar coordenadas.');
-        return;
-      }
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.BestForNavigation,
-        mayShowUserSettingsDialog: true,
-      });
-      const acc = pos.coords.accuracy ?? null;
-      setLastAcc(acc);
-      if (acc === null) throw new Error('No se pudo leer la precisión del GPS.');
-      if (acc > 5) {
-        Alert.alert('Precisión insuficiente', `Precisión actual: ${Math.round(acc)} m.\nAcércate y vuelve a intentarlo (objetivo < 5 m).`);
-        return;
-      }
-      const payload = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-      const up = await apiFetch(`/api/cementerio/sepulturas/${result.id}`, { method: 'PUT', body: payload });
-      if (!up.ok) throw new Error(String(up.error ?? 'No se pudo guardar.'));
-      Alert.alert('GPS asignado', `Nicho ${result.numero ?? result.id} guardado con precisión ${Math.round(acc)} m.`);
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? String(e));
-    } finally {
-      setAssigning(false);
+
+    const numero = Number(String(createNumero).trim());
+    const fila = Number(String(createFila).trim());
+    const columna = Number(String(createCol).trim());
+    if (!Number.isFinite(numero) || numero <= 0) {
+      setCreateErr('Número inválido.');
+      return;
     }
-  }, [result]);
+    if (!Number.isFinite(fila) || fila <= 0) {
+      setCreateErr('Fila inválida.');
+      return;
+    }
+    if (!Number.isFinite(columna) || columna <= 0) {
+      setCreateErr('Columna inválida.');
+      return;
+    }
 
-  const abrirPicker = useCallback(async () => {
-    if (bloquesList.length === 0) return;
-    setPickerOpen(true);
-    setPickerBloqueId((prev) => prev ?? bloquesList[0].id);
-  }, [bloquesList, pickerBloqueId]);
-
-  const cerrarPicker = useCallback(() => setPickerOpen(false), []);
-
-  useEffect(() => {
-    const run = async () => {
-      if (!pickerOpen) return;
-      if (!pickerBloqueId) return;
-      setLoadingPicker(true);
-      setPickerError(null);
-      try {
-          const res = await apiFetch<{ items: any[] }>(`/api/cementerio/bloques/${pickerBloqueId}/sepulturas`);
-          if (!res.ok) throw new Error();
-          setPickerSepulturas(res.data.items ?? []);
-      } catch {
-        setPickerSepulturas([]);
-        setPickerError('No se pudieron cargar nichos (revisa sesión/RLS o conexión).');
-      } finally {
-        setLoadingPicker(false);
-      }
+    setCreateSaving(true);
+    setCreateErr(null);
+    const payload: any = {
+      zona_id: Number(b.zona_id),
+      bloque_id: Number(b.id),
+      tipo: 'nicho',
+      numero,
+      fila,
+      columna,
+      codigo: String(createCodigo || '').trim() || null,
+      estado: 'libre',
     };
-    run();
-  }, [pickerOpen, pickerBloqueId]);
 
-  // Cargar nichos con GPS (para pintarlos sobre OSM en nativo)
-  useFocusEffect(
-    useCallback(() => {
-      const run = async () => {
-        if (mode !== 'osm') return;
-        // En web también cargamos para poder dibujar en MapLibre.
-        if (Platform.OS !== 'web' && (!MapView || !Marker)) return;
-        setLoadingGeo(true);
-        try {
-          const res = await apiFetch<{ items: any[] }>(`/api/cementerio/sepulturas/geo?limit=2000`);
-          if (!res.ok) throw new Error();
-          const rows = (res.data.items ?? []) as any[];
-          const mapped = rows
-            .map((r) => ({
-              id: Number(r.id),
-              numero: r.numero == null ? null : Number(r.numero),
-              lat: Number(r.lat),
-              lon: Number(r.lon),
-              estado: r.estado ?? null,
-              bloque_id: r.bloque_id ?? null,
-              tipo: r.tipo ?? null,
-            }))
-            .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lon));
-          setGeoSepulturas(mapped.length > 0 ? mapped : demoGeo);
-        } catch (e: any) {
-          console.warn('[mapa/osm] geo load failed', e?.message ?? e);
-          setGeoSepulturas(demoGeo);
-        } finally {
-          setLoadingGeo(false);
-        }
-      };
-      run();
-    }, [MapView, Marker, mode, demoGeo])
+    const res = await apiFetch<any>('/api/cementerio/admin/sepulturas', { method: 'POST', body: payload });
+    setCreateSaving(false);
+    if (!res.ok) {
+      setCreateErr(typeof res.error === 'string' ? res.error : JSON.stringify(res.error));
+      return;
+    }
+
+    const created = unwrapItem<any>(res.data) ?? (res.data as any)?.item ?? (res.data as any)?.data ?? res.data;
+    const id = Number(created?.id);
+    setCreateOpen(false);
+    if (Number.isFinite(id) && id > 0) {
+      router.push(`/sepultura/${id}`);
+    } else {
+      Alert.alert('Creado', 'Nicho creado, pero no se pudo abrir automáticamente (respuesta sin id).');
+    }
+  }, [createCodigo, createCol, createFila, createNumero, router, selectedBloque]);
+
+  const doSearch = useCallback(
+    async (text: string) => {
+      const t = text.trim();
+      if (t.length < 2) return;
+      setSearching(true);
+      const r = await apiFetch<{ items?: any[] }>(`/api/cementerio/sepulturas/search?q=${encodeURIComponent(t)}`);
+      setSearching(false);
+      if (!r.ok) {
+        Alert.alert('Error', String(r.error ?? 'No se pudo buscar'));
+        return;
+      }
+      const row = (r.data.items ?? [])[0];
+      if (!row?.id) {
+        Alert.alert('Sin resultados', 'No se encontró ningún nicho con esa búsqueda.');
+        return;
+      }
+      router.push(`/sepultura/${row.id}`);
+    },
+    [router]
   );
 
-  const webMarkers = useMemo(() => {
-    // En web también dibujamos (MapLibre). Color por estado.
-    return geoSepulturas.map((r) => ({
-      id: r.id,
-      lat: r.lat,
-      lon: r.lon,
-      label: r.id < 0 ? `DEMO N.º ${r.numero ?? ''}` : (r.numero != null ? `N.º ${r.numero}` : `ID ${r.id}`),
-      color: (String(r.estado ?? '').toLowerCase() === 'libre') ? '#22C55E' : '#EF4444',
-    }));
-  }, [geoSepulturas]);
+  const [sepulturasBloque, setSepulturasBloque] = useState<any[]>([]);
+  const [sepulturasLoading, setSepulturasLoading] = useState(false);
+  useEffect(() => {
+    const run = async () => {
+      if (!selectedBloqueId) {
+        setSepulturasBloque([]);
+        return;
+      }
+      setSepulturasLoading(true);
+      const res = await apiFetch<{ items: any[] }>(`/api/cementerio/bloques/${selectedBloqueId}/sepulturas`);
+      setSepulturasLoading(false);
+      if (!res.ok) {
+        setSepulturasBloque([]);
+        return;
+      }
+      setSepulturasBloque(((res.data as any)?.items ?? []) as any[]);
+    };
+    run();
+  }, [selectedBloqueId]);
 
-  const filteredGeo = useMemo(() => {
-    return geoSepulturas.filter((r) => {
-      const est = String(r.estado ?? '').toLowerCase();
-      const tipo = String(r.tipo ?? '').toLowerCase();
-      if (fEstado !== 'todas' && est !== fEstado) return false;
-      if (fTipo !== 'todos' && tipo !== fTipo) return false;
-      return true;
-    });
-  }, [geoSepulturas, fEstado, fTipo]);
+  const statsSelected = useMemo(() => {
+    let libre = 0;
+    let ocupada = 0;
+    for (const s of sepulturasBloque) {
+      const e = normalizarEstadoEditable((s as any)?.estado);
+      if (e === 'libre') libre++;
+      else if (e === 'ocupada') ocupada++;
+    }
+    return { libre, ocupada, total: sepulturasBloque.length };
+  }, [sepulturasBloque]);
 
-  const filteredWebMarkers = useMemo(() => {
-    return filteredGeo.map((r) => ({
-      id: r.id,
-      lat: r.lat,
-      lon: r.lon,
-      label: r.id < 0 ? `DEMO N.º ${r.numero ?? ''}` : (r.numero != null ? `N.º ${r.numero}` : `ID ${r.id}`),
-      color: (String(r.estado ?? '').toLowerCase() === 'libre') ? '#22C55E' : '#EF4444',
-    }));
-  }, [filteredGeo]);
-
-  const statsGeo = useMemo(() => {
-    const total = geoSepulturas.length;
-    const libre = geoSepulturas.filter((r) => String(r.estado ?? '').toLowerCase() === 'libre').length;
-    const ocupada = geoSepulturas.filter((r) => String(r.estado ?? '').toLowerCase() === 'ocupada').length;
-    const col = geoSepulturas.filter((r) => String(r.tipo ?? '').toLowerCase() === 'columbario').length;
-    return { total, libre, ocupada, col };
-  }, [geoSepulturas]);
-
-  if (loading) {
-    return (
-      <View style={s.center}>
-        <ActivityIndicator size="large" color="#16A34A" />
-        <Text style={s.loadingText}>Cargando mapa…</Text>
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const t = q.trim();
+      if (t.length >= 3) doSearch(t);
+    }, 650);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, [q, doSearch]);
 
   return (
-    <View style={s.container}>
-      <View style={s.top}>
-        <View style={s.topRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.title}>Mapa</Text>
-            <Text style={s.sub}>Somahoz (Corrales de Buelna) · 10 bloques · {totalNichos} nichos</Text>
-          </View>
-        </View>
-
-        <View style={s.presetRow} />
-      </View>
-
-      <View style={s.mapWrap}>
-        <View style={{ width: '100%', maxWidth: Math.min(width - 32, 920), alignSelf: 'center', height: Math.min(760, Math.max(420, Math.round(height * 0.55))) }}>
-          {Platform.OS === 'web' ? (
-            <OsmWebMap
-              height={Math.min(760, Math.max(420, Math.round(height * 0.55)))}
-              center={CEMENTERIO_CENTER}
-              label="Cementerio de Somahoz"
-              preset={osmPreset}
-              markers={filteredWebMarkers}
-              onPressMarker={(sepulturaId) => {
-                // Orden operativo: ir al bloque (vista nichos). Si no hay bloque, abrir ficha.
-                if (sepulturaId <= 0) {
-                  // DEMO: enviar a un bloque conocido para que se vea la “vista nichos”.
-                  const demoCodigo = BLOQUES_OFICIALES[0]?.codigo ?? 'B8';
-                  router.push(`/bloque/${encodeURIComponent(demoCodigo)}`);
-                  return;
-                }
-                const row = geoSepulturas.find((x) => x.id === sepulturaId);
-                const bloqueId = row?.bloque_id ?? null;
-                const b = bloqueId != null ? bloquesById.get(Number(bloqueId)) : null;
-                const codigo = (b as any)?.codigo ? String((b as any).codigo) : null;
-                if (codigo) router.push(`/bloque/${encodeURIComponent(codigo)}`);
-                else router.push(`/sepultura/${sepulturaId}`);
-              }}
-            />
-          ) : MapView && UrlTile ? (
-            <View style={{ flex: 1 }}>
-              {osmTileError ? (
-                <View style={s.osmMissing}>
-                  <Text style={s.osmMissingT}>Mapa no disponible</Text>
-                  <Text style={s.osmMissingSub}>{osmTileError}</Text>
-                  <TouchableOpacity style={s.retryBtn} onPress={() => setOsmTileError(null)} activeOpacity={0.85}>
-                    <Text style={s.retryBtnT}>Reintentar</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <MapView
-                  ref={osmMapRef}
-                  style={{ flex: 1, borderRadius: 14 }}
-                  region={{
-                    ...osmRegion,
-                    latitudeDelta: osmPreset === 'cerca' ? 0.0016 : osmPreset === 'amplio' ? 0.0042 : 0.0028,
-                    longitudeDelta: osmPreset === 'cerca' ? 0.0016 : osmPreset === 'amplio' ? 0.0042 : 0.0028,
-                  }}
-                  minZoomLevel={16}
-                  maxZoomLevel={20}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
-                  rotateEnabled={false}
-                  pitchEnabled={false}
-                  toolbarEnabled={false}
-                >
-                  <UrlTile
-                    urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    maximumZ={19}
-                    flipY={false}
-                    // Algunos dispositivos muestran "Retry" si fallan tiles. Capturamos el fallo y mostramos UI propia.
-                    onError={(e: any) => setOsmTileError(e?.nativeEvent?.error ?? 'Fallo cargando tiles OSM. Comprueba conexión.')}
-                  />
-                  {Marker ? (
-                    <Marker
-                      coordinate={CEMENTERIO_CENTER}
-                      title="Cementerio de Somahoz"
-                      description="Centro"
-                    />
-                  ) : null}
-                  {Marker && filteredGeo.map((r) => (
-                    <Marker
-                      key={r.id}
-                      coordinate={{ latitude: r.lat, longitude: r.lon }}
-                      title={r.numero != null ? `N.º ${r.numero}` : `ID ${r.id}`}
-                      description={r.estado ? String(r.estado) : undefined}
-                      onPress={() => router.push(`/sepultura/${r.id}`)}
-                    />
-                  ))}
-                </MapView>
-              )}
-            </View>
-          ) : (
-            <View style={s.osmMissing}>
-              <Text style={s.osmMissingT}>OSM no disponible en este dispositivo.</Text>
-              <Text style={s.osmMissingSub}>Recompila la app para nativo.</Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      <View style={s.filters}>
-        <View style={s.filtersRow}>
-          <Text style={s.filtersLabel}>Estado</Text>
-          {(['todas', 'libre', 'ocupada'] as const).map((k) => (
-            <TouchableOpacity key={k} style={[s.fChip, fEstado === k && s.fChipActive]} onPress={() => setFEstado(k)} activeOpacity={0.85}>
-              <Text style={[s.fChipT, fEstado === k && s.fChipTActive]}>{k}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={s.filtersRow}>
-          <Text style={s.filtersLabel}>Tipo</Text>
-          {(['todos', 'nicho', 'columbario'] as const).map((k) => (
-            <TouchableOpacity key={k} style={[s.fChip, fTipo === k && s.fChipActive]} onPress={() => setFTipo(k)} activeOpacity={0.85}>
-              <Text style={[s.fChipT, fTipo === k && s.fChipTActive]}>{k}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={s.filtersHint}>
-          GPS en mapa: {statsGeo.total} · libres {statsGeo.libre} · ocupadas {statsGeo.ocupada} · columbarios {statsGeo.col}
-          {loadingGeo ? ' · cargando…' : ''}
-        </Text>
-      </View>
-
-      {/* Panel operario: asignación rápida de GPS */}
-      <View style={s.opsBar}>
-        <View style={s.opsHeader}>
-          <Text style={s.opsTitle}>Asignar GPS rápido</Text>
-          <Text style={s.opsSub}>Busca o elige en “NICHOS” y guarda coordenadas</Text>
-        </View>
-        <View style={s.opsRow}>
+    <View style={s.screen}>
+      <View style={s.topBar}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.85}>
+          <FontAwesome name="chevron-left" size={18} color="#0F172A" />
+        </TouchableOpacity>
+        <View style={s.searchWrap}>
+          <FontAwesome name="search" size={14} color="rgba(15,23,42,0.55)" />
           <TextInput
-            style={s.opsInput}
             value={q}
             onChangeText={setQ}
-            placeholder="N.º o código…"
-            placeholderTextColor="#94A3B8"
+            placeholder="Buscar nicho, titular o expediente"
+            placeholderTextColor="rgba(15,23,42,0.45)"
+            style={s.search}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <TouchableOpacity style={s.opsMiniBtn} onPress={abrirPicker} activeOpacity={0.85}>
-            <Text style={s.opsMiniBtnT}>NICHOS</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.opsBtn, assigning && { opacity: 0.6 }]} onPress={capturarYAsignar} disabled={assigning} activeOpacity={0.85}>
-            {assigning ? <ActivityIndicator color="#fff" /> : <Text style={s.opsBtnT}>{Platform.OS === 'web' ? 'GUARDAR' : 'CAPTURAR'}</Text>}
-          </TouchableOpacity>
+          {searching ? <ActivityIndicator color="#2F6B4E" /> : null}
         </View>
-
-        {Platform.OS === 'web' ? (
-          <View style={s.opsRow}>
-            <TextInput
-              style={s.opsInput}
-              value={manualLat}
-              onChangeText={setManualLat}
-              placeholder="lat (ej: 43.248748)"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TextInput
-              style={s.opsInput}
-              value={manualLon}
-              onChangeText={setManualLon}
-              placeholder="lon (ej: -4.057871)"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-        ) : null}
-
-        <Text style={s.opsHint}>
-          {result
-            ? `Objetivo: N.º ${result.numero ?? '—'} · ${result.codigo ?? `ID ${result.id}`} · ${result.estado ?? ''}`
-            : 'Escribe 2+ caracteres para encontrar el nicho.'}
-          {lastAcc != null ? ` · Últ. precisión: ${Math.round(lastAcc)} m` : ''}
-          {Platform.OS === 'web' ? ' · En web es manual (sin GPS).' : ''}
-        </Text>
-
+        <TouchableOpacity style={s.editBtn} onPress={() => router.push('/mapa-editor')} activeOpacity={0.85}>
+          <FontAwesome name="pencil" size={18} color="#0F172A" />
+          <Text style={s.editBtnT}>Editar</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Modal picker (evita problemas de scroll en web) */}
-      <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={cerrarPicker}>
-        <View style={s.modalBg}>
-          <View style={s.modalCard}>
-            <View style={s.pickerHeader}>
-              <Text style={s.pickerHeaderT}>Elegir nicho</Text>
-              <TouchableOpacity style={s.pickerClose} onPress={cerrarPicker} activeOpacity={0.85}>
-                <Text style={s.pickerCloseT}>Cerrar</Text>
+      <View style={[s.mapStage, viewMode === 'satelite' && { paddingHorizontal: 0 }]}>
+        {loading ? (
+          <View style={s.center}>
+            <View style={{ width: '100%', padding: 14 }}>
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: Radius.lg, borderWidth: 1, borderColor: 'rgba(15,23,42,0.10)', padding: Space.md }}>
+                <AppSkeleton h={12} w={140} r={8} />
+                <View style={{ height: 10 }} />
+                <AppSkeleton h={14} w={220} r={10} />
+                <View style={{ height: 16 }} />
+                <AppSkeleton h={420} w="100%" r={18} />
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={[s.pwaMapWrap, { height: mapH }, viewMode === 'satelite' && { borderRadius: 0, borderWidth: 0 }]}>
+            {viewMode === 'plano' ? (
+              <PlanoGeneralMapa
+                ref={planoRef as any}
+                height={mapH}
+                selectedCodigo={selectedCodigo}
+                onPressBlock={onPressBlock}
+                blocks={schematicBlocks as any}
+                selectedSepulturas={sepulturasBloque as any}
+                selectedGrid={
+                  (selectedBloque as any)?.filas && (selectedBloque as any)?.columnas
+                    ? { filas: Number((selectedBloque as any).filas), columnas: Number((selectedBloque as any).columnas) }
+                    : null
+                }
+                highlightSepulturaId={highlightSepId}
+                // Misma disposición “real”, pero sin satélite: UX más limpio.
+                viewBox={{ x: 0, y: 0, w: 1000, h: 1000 }}
+                decorations={false}
+              />
+            ) : (
+              <CementerioMapaOSM
+                height={mapH}
+                hotspots={SOMAHOZ_HOTSPOTS}
+                activeHotspotId={activeHotspot}
+                onPressHotspot={onPressHotspot}
+                onPressYellowMarker={(n) => {
+                  const m = SOMAHOZ_YELLOW_MARKERS.find((x) => x.id === n);
+                  if (!m) return;
+                  if (m.action === 'bloque' && m.codigoBloque) abrirBloquePorCodigo(m.codigoBloque);
+                  else if (m.action === 'columbarios') Alert.alert('Columbarios', 'Pendiente: vista especial de columbarios.');
+                  else Alert.alert('Tanatorio', 'Tanatorio (Fuera de recinto)');
+                }}
+                blocks={blocks as any}
+                selectedCodigo={selectedCodigo}
+                onPressBlock={onPressBlock}
+                customBloques={customBloques}
+                allGrids={bloquesRaw.map((b) => ({
+                  codigo: String((b as any)?.codigo ?? ''),
+                  filas: Number((b as any)?.filas ?? 0),
+                  columnas: Number((b as any)?.columnas ?? 0),
+                }))}
+                selectedSepulturas={sepulturasBloque as any}
+                selectedGrid={
+                  (selectedBloque as any)?.filas && (selectedBloque as any)?.columnas
+                    ? { filas: Number((selectedBloque as any).filas), columnas: Number((selectedBloque as any).columnas) }
+                    : null
+                }
+                highlightSepulturaId={highlightSepId}
+                yellowReloadNonce={yellowNonce}
+                userLocation={gpsHere ? { latitude: gpsHere.lat, longitude: gpsHere.lon } : null}
+                userAccuracyM={gpsHere?.acc ?? null}
+              />
+            )}
+
+            <View style={s.modePill}>
+              <AppPill label="foto" active={viewMode === 'satelite'} onPress={() => setViewMode('satelite')} />
+              <AppPill label="plano" active={viewMode === 'plano'} onPress={() => setViewMode('plano')} />
+            </View>
+          </View>
+        )}
+
+        <View style={s.floatRight}>
+          <FloatBtn
+            icon="search-plus"
+            onPress={() => planoRef.current?.zoomIn()}
+          />
+          <FloatBtn
+            icon="crosshairs"
+            onPress={() => planoRef.current?.reset()}
+          />
+          {gpsHere ? (
+            <View style={s.gpsBadge}>
+              <Text style={s.gpsBadgeOver}>GPS</Text>
+              <Text style={s.gpsBadgeT} numberOfLines={1}>
+                {gpsDetected
+                  ? gpsDetected.includes('~')
+                    ? `Bloque más cercano: ${gpsDetected.split('~')[0]} (${gpsDetected.split('~')[1]} m)`
+                    : `Bloque detectado: ${gpsDetected}`
+                  : 'Fuera de bloques'}
+              </Text>
+              {selectedCodigo ? (
+                <Text style={s.gpsBadgeSub} numberOfLines={1}>
+                  Nicho en: {selectedCodigo}{' '}
+                  {gpsDetected && !gpsDetected.includes('~') && String(gpsDetected) === String(selectedCodigo) ? '✓' : ''}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+          <FloatBtn icon="clone" onPress={() => Alert.alert('Capas', 'Pendiente: selector de capas')} />
+          <FloatBtn icon="pencil" onPress={() => router.push('/mapa-editor')} />
+        </View>
+      </View>
+
+      {/* Barra inferior */}
+      {selectedCodigo ? (
+        <View style={s.bottomBar}>
+          <View style={s.bottomIcon}>
+            <FontAwesome name="th-large" size={16} color="rgba(15,23,42,0.75)" />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.bottomTitle} numberOfLines={1}>
+              Bloque {selectedCodigo} · {(selectedBloque as any)?.zona_nombre ?? (selectedBloque as any)?.zona?.nombre ?? '—'}
+            </Text>
+            <Text style={s.bottomSub} numberOfLines={1}>
+              {sepulturasLoading ? 'Cargando…' : `${statsSelected.total} nichos · ${statsSelected.ocupada} ocupadas · ${statsSelected.libre} libres`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={s.openBtn}
+            onPress={() => selectedCodigo && abrirBloquePorCodigo(selectedCodigo)}
+            activeOpacity={0.9}
+          >
+            <Text style={s.openBtnT}>Abrir</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {/* Submenú ampliaciones (hotspot D) */}
+      <Modal visible={ampliacionesOpen} transparent animationType="fade" onRequestClose={() => setAmpliacionesOpen(false)}>
+        <View style={s.overlayBackdrop}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setAmpliacionesOpen(false)} />
+          <View style={s.overlaySheet}>
+            <Text style={s.overlayOver}>ZONA NUEVA</Text>
+            <Text style={s.overlayTitle}>Ampliaciones</Text>
+            <View style={{ height: 10 }} />
+            {[
+              { codigo: 'B2001', label: 'B2001 · Muro Norte' },
+              { codigo: 'B2007', label: 'B2007 · Exento' },
+              { codigo: 'BD', label: 'BD · Ampliación D' },
+              { codigo: 'B2017', label: 'B2017' },
+              { codigo: 'B2020', label: 'B2020' },
+            ].map((it) => (
+              <TouchableOpacity
+                key={it.codigo}
+                style={s.overlayRow}
+                onPress={async () => {
+                  setAmpliacionesOpen(false);
+                  setSelectedCodigo(it.codigo);
+                  await abrirBloquePorCodigo(it.codigo);
+                }}
+                activeOpacity={0.9}
+              >
+                <Text style={s.overlayRowT}>{it.label}</Text>
+                <FontAwesome name="chevron-right" size={16} color="rgba(15,23,42,0.35)" />
               </TouchableOpacity>
-            </View>
-            <Text style={s.modalHint}>Tap = seleccionar para asignar GPS · Doble tap = abrir ficha</Text>
-            {pickerError ? <Text style={s.modalErr}>{pickerError}</Text> : null}
-
-            <View style={s.pickerPills}>
-              {bloquesList.slice(0, 18).map((b: any) => (
-                <TouchableOpacity
-                  key={b.id}
-                  style={[s.pickerPill, pickerBloqueId === b.id && s.pickerPillActive]}
-                  onPress={() => setPickerBloqueId(b.id)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[s.pickerPillT, pickerBloqueId === b.id && s.pickerPillTActive]}>{String(b.codigo ?? b.id)}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {loadingPicker ? (
-              <View style={s.pickerLoading}>
-                <ActivityIndicator color="#16A34A" />
-                <Text style={s.pickerLoadingT}>Cargando nichos…</Text>
-              </View>
-            ) : pickerBloqueId ? (
-              <View style={{ height: 320 }}>
-                <NichoGrid
-                  sepulturas={pickerSepulturas as any}
-                  filas={(bloquesById.get(pickerBloqueId) as any)?.filas ?? 4}
-                  columnas={(bloquesById.get(pickerBloqueId) as any)?.columnas ?? 1}
-                  onNichoPress={(sep: any) => {
-                    setResult({ id: sep.id, numero: sep.numero ?? null, codigo: sep.codigo ?? null, estado: sep.estado ?? null });
-                    setQ(String(sep.numero ?? sep.id));
-                    setPickerOpen(false);
-                  }}
-                  onNichoDoublePress={(sep: any) => router.push(`/sepultura/${sep.id}`)}
-                />
-              </View>
-            ) : null}
+            ))}
+            <View style={{ height: 10 }} />
+            <AppButton label="Cerrar" variant="ghost" onPress={() => setAmpliacionesOpen(false)} />
           </View>
         </View>
       </Modal>
 
-      {/* Espacio para que la barra inferior no tape el final */}
-      <View style={{ height: 120 }} />
+      {/* Panel inferior de sucesos (como captura) */}
+      <View style={s.sheet}>
+        <View style={s.sheetHead}>
+          <Text style={s.sheetTitle}>SUCESOS EN MAPA</Text>
+          <TouchableOpacity style={s.markBtn} onPress={() => router.push('/nuevo-suceso')} activeOpacity={0.85}>
+            <FontAwesome name="plus" size={16} color="#FFF" />
+            <Text style={s.markBtnT}>Marcar aquí</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={s.zoneRow}>
+          <Text style={s.zoneRowTitle}>ZONA</Text>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            <AppPill label="Todas" active={zona === 'ALL'} onPress={() => onPressZona('ALL')} />
+            <AppPill label="Zona vieja" active={zona === 'ZONA VIEJA'} onPress={() => onPressZona('ZONA VIEJA')} />
+            <AppPill label="Zona nueva" active={zona === 'ZONA NUEVA'} onPress={() => onPressZona('ZONA NUEVA')} />
+          </View>
+          <Text style={s.zoneRowHint} numberOfLines={2}>
+            {selectedBloqueOficial
+              ? `Rango ${formatRango(selectedBloqueOficial.rango)} · ${selectedBloqueOficial.nombre}`
+              : zona === 'ALL'
+                ? 'Pulsa un bloque para ver su rango.'
+                : zona === 'ZONA VIEJA'
+                  ? `Rango ${formatRango([1, 224])} · Muro Sur`
+                  : `Rango ${formatRango([225, 520])} · Ampliaciones`}
+          </Text>
+        </View>
+
+        <View style={s.sheetRow}>
+          <View style={s.dot} />
+          <Text style={s.sheetRowT}>Anomalías abiertas</Text>
+          <Text style={s.sheetRowBadge}>—</Text>
+        </View>
+        {/* Leyenda: estados */}
+        <View style={s.legend}>
+          <LegendItem color="#22C55E" label="Libre" />
+          <LegendItem color="#EF4444" label="Ocupada" />
+          <LegendItem color="#F59E0B" label="Reservada" />
+          <LegendItem color="#64748B" label="Clausurada" />
+        </View>
+      </View>
+
+      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
+        <View style={s.modalBackdrop}>
+          <View style={s.modalSheet}>
+            <View style={s.modalHandle} />
+            <View style={s.modalHead}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.modalTitle}>Crear nicho</Text>
+                <Text style={s.modalSub}>
+                  {selectedCodigo ? `Bloque ${selectedCodigo}` : 'Selecciona un bloque'}
+                </Text>
+              </View>
+              <TouchableOpacity style={s.modalClose} onPress={() => setCreateOpen(false)} activeOpacity={0.85}>
+                <FontAwesome name="times" size={18} color="rgba(15,23,42,0.65)" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={s.label}>NÚMERO</Text>
+            <TextInput value={createNumero} onChangeText={setCreateNumero} keyboardType="numeric" style={s.input} placeholder="Ej: 225" placeholderTextColor="rgba(15,23,42,0.35)" />
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>FILA</Text>
+                <TextInput value={createFila} onChangeText={setCreateFila} keyboardType="numeric" style={s.input} placeholder="1" placeholderTextColor="rgba(15,23,42,0.35)" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>COLUMNA</Text>
+                <TextInput value={createCol} onChangeText={setCreateCol} keyboardType="numeric" style={s.input} placeholder="1" placeholderTextColor="rgba(15,23,42,0.35)" />
+              </View>
+            </View>
+
+            <Text style={s.label}>CÓDIGO</Text>
+            <TextInput value={createCodigo} onChangeText={setCreateCodigo} style={s.input} placeholder="Z-BA-N225" placeholderTextColor="rgba(15,23,42,0.35)" autoCapitalize="characters" />
+
+            {createErr ? (
+              <View style={s.errBox}>
+                <Text style={s.errText}>{createErr}</Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              style={[s.saveBtn, createSaving && { opacity: 0.6 }]}
+              onPress={saveNicho}
+              disabled={createSaving}
+              activeOpacity={0.9}
+            >
+              {createSaving ? <ActivityIndicator color="#FFF" /> : <Text style={s.saveBtnT}>Crear nicho</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={s.legendItem}>
+      <View style={[s.legendDot, { backgroundColor: color }]} />
+      <Text style={s.legendText}>{label}</Text>
+    </View>
+  );
+}
+
+function FloatBtn({ icon, onPress }: { icon: any; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={s.fbtn} onPress={onPress} activeOpacity={0.85}>
+      <FontAwesome name={icon} size={16} color="#0F172A" />
+    </TouchableOpacity>
+  );
+}
+
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  loadingText: { marginTop: 12, fontSize: 16, color: '#6B7280' },
-  top: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { fontSize: 22, fontWeight: '900', color: '#15803D' },
-  sub: { marginTop: 4, fontSize: 13, color: '#6B7280', fontWeight: '600' },
-  presetRow: { marginTop: 10, flexDirection: 'row', gap: 8 },
-  presetBtn: { flex: 1, height: 34, borderRadius: 12, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
-  presetBtnActive: { backgroundColor: '#15803D', borderColor: '#15803D' },
-  presetBtnT: { fontWeight: '900', fontSize: 12, color: '#0F172A' },
-  presetBtnTActive: { color: '#FFF' },
-  mapWrap: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4, alignItems: 'center' },
-  osmMissing: { flex: 1, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 8 },
-  osmMissingT: { fontWeight: '900', color: '#0F172A' },
-  osmMissingSub: { fontWeight: '700', color: '#64748B', textAlign: 'center', lineHeight: 18 },
-  // Barra operativa (sticky) para GPS rápido
-  opsBar: {
+  screen: { flex: 1, backgroundColor: Semantic.screenBg },
+  topBar: {
+    paddingTop: 14,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Semantic.screenBg,
+  },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
+  searchWrap: {
+    flex: 1,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFF',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  search: { flex: 1, fontSize: 14, fontWeight: '800', color: '#0F172A' },
+  editBtn: {
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Semantic.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  editBtnT: { fontWeight: '900', color: '#0F172A' },
+  mapStage: { flex: 1, paddingBottom: 10, justifyContent: 'center' },
+  pwaMapWrap: {
+    width: '100%',
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: Semantic.surface,
+    borderWidth: 1,
+    borderColor: Semantic.border,
+    position: 'relative',
+  },
+  pwaMapBg: {
+    position: 'absolute',
+    inset: 0,
+    opacity: 0.9,
+    backgroundColor: '#263325',
+  },
+  center: { alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
+  centerT: { color: 'rgba(15,23,42,0.65)', fontWeight: '900' },
+  floatRight: { position: 'absolute', right: 18, top: 74, gap: 10 },
+  fbtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
+  },
+  gpsBadge: {
+    marginTop: 6,
+    width: 170,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: Semantic.surface,
+    borderWidth: 1,
+    borderColor: Semantic.border,
+  },
+  gpsBadgeOver: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4, color: Semantic.textSecondary },
+  gpsBadgeT: { marginTop: 4, fontSize: 13, fontWeight: '900', color: Semantic.text },
+  gpsBadgeSub: { marginTop: 2, fontSize: 12, fontWeight: '800', color: Semantic.textSecondary },
+
+  modePill: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 6,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+  },
+
+  bottomBar: {
     position: 'absolute',
     left: 12,
     right: 12,
-    bottom: 12,
-    backgroundColor: '#FFFFFF',
+    bottom: 150,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bottomIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15,23,42,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomTitle: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
+  bottomSub: { marginTop: 4, fontSize: 12, fontWeight: '800', color: 'rgba(15,23,42,0.55)' },
+  openBtn: { height: 38, paddingHorizontal: 16, borderRadius: 14, backgroundColor: '#2F3F35', alignItems: 'center', justifyContent: 'center' },
+  openBtnT: { color: '#FFFFFF', fontWeight: '900' },
+
+  overlayBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  overlaySheet: {
+    backgroundColor: Semantic.surface,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 26 : 16,
+    borderTopWidth: 1,
+    borderColor: Semantic.border,
+  },
+  overlayOver: { fontSize: 11, fontWeight: '900', letterSpacing: 1.6, color: Semantic.textSecondary },
+  overlayTitle: { marginTop: 6, fontSize: 20, fontWeight: '900', color: Semantic.text },
+  overlayRow: {
+    marginTop: 10,
+    backgroundColor: Semantic.surface2,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: 12,
-    gap: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    borderColor: Semantic.border,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  opsHeader: { gap: 2 },
-  opsTitle: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
-  opsSub: { fontSize: 12, fontWeight: '800', color: '#64748B' },
-  opsRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  opsInput: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', paddingHorizontal: 14, fontWeight: '900', color: '#0F172A' },
-  opsMiniBtn: { height: 48, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: '#0F172A', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  opsMiniBtnT: { fontWeight: '900', color: '#0F172A', fontSize: 12, letterSpacing: 0.8 },
-  opsBtn: { height: 48, paddingHorizontal: 16, borderRadius: 14, backgroundColor: '#15803D', alignItems: 'center', justifyContent: 'center' },
-  opsBtnT: { color: '#FFF', fontWeight: '900', letterSpacing: 1.1 },
-  opsHint: { color: '#475569', fontWeight: '800', lineHeight: 18 },
-  filters: { marginHorizontal: 16, marginTop: 10, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 12, gap: 10 },
-  filtersRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  filtersLabel: { fontWeight: '900', color: '#0F172A', fontSize: 12, marginRight: 4 },
-  fChip: { height: 32, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
-  fChipActive: { backgroundColor: '#0F172A', borderColor: '#0F172A' },
-  fChipT: { fontWeight: '900', color: '#0F172A', fontSize: 12 },
-  fChipTActive: { color: '#FFF' },
-  filtersHint: { color: '#64748B', fontWeight: '700', lineHeight: 18 },
-  pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  pickerHeaderT: { flex: 1, fontWeight: '900', color: '#0F172A', fontSize: 12 },
-  pickerClose: { paddingHorizontal: 10, height: 30, borderRadius: 10, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center' },
-  pickerCloseT: { color: '#FFF', fontWeight: '900', fontSize: 12 },
-  pickerPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pickerPill: { height: 34, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
-  pickerPillActive: { backgroundColor: '#15803D', borderColor: '#15803D' },
-  pickerPillT: { fontWeight: '900', color: '#0F172A', fontSize: 12 },
-  pickerPillTActive: { color: '#FFF' },
-  pickerLoading: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  pickerLoadingT: { color: '#64748B', fontWeight: '800' },
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', padding: 16, justifyContent: 'center' },
-  modalCard: { backgroundColor: '#FFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', padding: 12, gap: 10, maxHeight: '90%' as any },
-  modalHint: { color: '#64748B', fontWeight: '700', fontSize: 12, lineHeight: 16 },
-  modalErr: { color: '#B45309', fontWeight: '900', fontSize: 12, lineHeight: 16 },
-  retryBtn: { marginTop: 10, height: 44, paddingHorizontal: 14, borderRadius: 12, backgroundColor: '#15803D', alignItems: 'center', justifyContent: 'center' },
-  retryBtnT: { color: '#FFF', fontWeight: '900', letterSpacing: 0.6 },
+  overlayRowT: { fontSize: 14, fontWeight: '900', color: Semantic.text },
+
+  sheet: { backgroundColor: Semantic.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 14, borderTopWidth: 1, borderTopColor: Semantic.border },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sheetTitle: { fontWeight: '900', color: Semantic.text, letterSpacing: 1.2, fontSize: 12 },
+  markBtn: { height: 40, borderRadius: 14, backgroundColor: Semantic.primary, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  markBtnT: { color: '#FFF', fontWeight: '900' },
+  sheetRow: { marginTop: 12, backgroundColor: Semantic.surface, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: Semantic.border, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444' },
+  sheetRowT: { flex: 1, fontWeight: '900', color: Semantic.text },
+  sheetRowBadge: { fontWeight: '900', color: Semantic.subText },
+  zoneRow: { marginTop: 12, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: Semantic.border, backgroundColor: Semantic.surface },
+  zoneRowTitle: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2, color: Semantic.subText },
+  zoneRowHint: { marginTop: 10, fontSize: 12, fontWeight: '800', color: Semantic.subText, lineHeight: 16 },
+  legend: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 3 },
+  legendText: { fontSize: 11, fontWeight: '800', color: 'rgba(15,23,42,0.55)' },
+
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#FBF7EE', borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 24 : 16 },
+  modalHandle: { width: 44, height: 5, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.18)', alignSelf: 'center', marginBottom: 10 },
+  modalHead: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
+  modalTitle: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
+  modalSub: { marginTop: 4, fontSize: 12, fontWeight: '700', color: 'rgba(15,23,42,0.55)' },
+  modalClose: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(15,23,42,0.10)' },
+
+  label: { marginTop: 12, fontSize: 12, fontWeight: '900', letterSpacing: 1.4, color: 'rgba(15,23,42,0.45)' },
+  input: { marginTop: 10, height: 44, borderRadius: 14, paddingHorizontal: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(15,23,42,0.10)', fontWeight: '900', color: '#0F172A' },
+  errBox: { marginTop: 12, padding: 10, borderRadius: 12, backgroundColor: 'rgba(185,28,28,0.08)', borderWidth: 1, borderColor: 'rgba(185,28,28,0.25)' },
+  errText: { fontSize: 12, fontWeight: '800', color: '#0F172A' },
+  saveBtn: { marginTop: 14, height: 52, borderRadius: 16, backgroundColor: '#2F6B4E', alignItems: 'center', justifyContent: 'center' },
+  saveBtnT: { color: '#FFF', fontWeight: '900', fontSize: 16 },
 });
 

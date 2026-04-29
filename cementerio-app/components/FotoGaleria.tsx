@@ -62,9 +62,15 @@ export function FotoGaleria({ sepulturaId, refreshToken, pendingUris, showAdd = 
 
   const upload = async (uri: string) => {
     setUploading(true);
-    const foto = await subirFoto(sepulturaId, uri);
-    if (foto) setFotos((prev) => [foto, ...prev]);
-    setUploading(false);
+    try {
+      const foto = await subirFoto(sepulturaId, uri);
+      if (foto) {
+        const list = await obtenerFotos(sepulturaId);
+        setFotos(list);
+      }
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDelete = (foto: Foto) => {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import React from 'react';
 
 type Props = {
@@ -15,15 +15,21 @@ type Props = {
     color?: string;
   }[];
   onPressMarker?: (id: number) => void;
+  /**
+   * Por defecto el mapa se monta en modo “fijo” (sin pan/zoom) para no romper el scroll.
+   * Activa `true` si quieres permitir interacción desde el inicio.
+   */
+  interactive?: boolean;
 };
 
-export function OsmWebMap({ height, center, label, preset = 'medio', markers = [], onPressMarker }: Props) {
+export function OsmWebMap({ height, center, label, preset = 'medio', markers = [], onPressMarker, interactive = false }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const osmMarkersRef = useRef<any[]>([]);
   const wheelCleanupRef = useRef<(() => void) | null>(null);
   const statusRef = useRef<'loading' | 'ready' | 'error'>('loading');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [isInteractive, setIsInteractive] = useState<boolean>(interactive);
 
   const setStatusSafe = (s: 'loading' | 'ready' | 'error') => {
     statusRef.current = s;
@@ -51,6 +57,13 @@ export function OsmWebMap({ height, center, label, preset = 'medio', markers = [
     const note = label ? encodeURIComponent(label) : 'Cementerio';
     return `https://www.openstreetmap.org/export/embed.html?bbox=${maxBounds.left}%2C${maxBounds.bottom}%2C${maxBounds.right}%2C${maxBounds.top}&layer=mapnik&marker=${marker}&note=${note}`;
   }, [center.latitude, center.longitude, label, maxBounds.bottom, maxBounds.left, maxBounds.right, maxBounds.top]);
+
+  const openInOsm = useMemo(() => {
+    const z = zoom;
+    const lat = center.latitude;
+    const lon = center.longitude;
+    return `https://www.openstreetmap.org/#map=${z}/${lat}/${lon}`;
+  }, [center.latitude, center.longitude, zoom]);
 
   // 1) Cargar MapLibre (CDN) y crear el mapa UNA vez
   useEffect(() => {
@@ -136,15 +149,9 @@ export function OsmWebMap({ height, center, label, preset = 'medio', markers = [
           ],
         });
 
-        // Modo “fijo” para operario: no capturar scroll ni gestos, pero permitir click en marcadores.
+        // Controles (zoom + brújula). Pequeño y no intrusivo.
         try {
-          map.scrollZoom?.disable?.();
-          map.dragPan?.disable?.();
-          map.dragRotate?.disable?.();
-          map.doubleClickZoom?.disable?.();
-          map.boxZoom?.disable?.();
-          map.keyboard?.disable?.();
-          map.touchZoomRotate?.disable?.();
+          map.addControl(new maplibregl.NavigationControl({ showCompass: false, visualizePitch: false }), 'top-right');
         } catch {}
 
         // Asegurar que el navegador puede hacer scroll vertical aunque el cursor esté encima del mapa.
@@ -196,6 +203,29 @@ export function OsmWebMap({ height, center, label, preset = 'medio', markers = [
     } catch {}
   }, [center.latitude, center.longitude, maxBounds.bottom, maxBounds.left, maxBounds.right, maxBounds.top, zoom]);
 
+  // 2.5) Habilitar/inhabilitar interacción sin romper el scroll de página
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    try {
+      if (isInteractive) {
+        map.scrollZoom?.enable?.();
+        map.dragPan?.enable?.();
+        map.doubleClickZoom?.enable?.();
+        map.boxZoom?.enable?.();
+        map.keyboard?.enable?.();
+        map.touchZoomRotate?.enable?.();
+      } else {
+        map.scrollZoom?.disable?.();
+        map.dragPan?.disable?.();
+        map.doubleClickZoom?.disable?.();
+        map.boxZoom?.disable?.();
+        map.keyboard?.disable?.();
+        map.touchZoomRotate?.disable?.();
+      }
+    } catch {}
+  }, [isInteractive]);
+
   useEffect(() => {
     const map = mapRef.current;
     const maplibregl = (window as any).maplibregl;
@@ -237,13 +267,53 @@ export function OsmWebMap({ height, center, label, preset = 'medio', markers = [
       el.style.background = it.color ?? '#3B82F6';
       el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.35)';
       el.style.cursor = 'pointer';
-      el.onclick = () => onPressMarker?.(it.id);
+      el.onfocus = () => {
+        try {
+          (el.style as any).outline = '3px solid rgba(34,197,94,0.55)';
+          (el.style as any).outlineOffset = '2px';
+        } catch {}
+      };
+      el.onblur = () => {
+        try {
+          (el.style as any).outline = 'none';
+        } catch {}
+      };
 
-      const mk = new maplibregl.Marker({ element: el })
-        .setLngLat([it.lon, it.lat])
-        .addTo(map);
+      const popup = new maplibregl.Popup({ offset: 16 }).setText(it.label);
+      const mk = new maplibregl.Marker({ element: el }).setLngLat([it.lon, it.lat]).setPopup(popup).addTo(map);
       osmMarkersRef.current.push(mk);
+
+      el.onclick = () => {
+        try {
+          map.flyTo?.({ center: [it.lon, it.lat], zoom: Math.max(zoom, 19), essential: true });
+          mk.togglePopup?.();
+        } catch {}
+        onPressMarker?.(it.id);
+      };
     }
+
+    // Auto-encuadre: si hay marcadores, encuadrarlos (sin salirse de límites)
+    try {
+      if (markers.length > 0 && map.fitBounds) {
+        let minLon = center.longitude;
+        let maxLon = center.longitude;
+        let minLat = center.latitude;
+        let maxLat = center.latitude;
+        for (const it of markers) {
+          minLon = Math.min(minLon, it.lon);
+          maxLon = Math.max(maxLon, it.lon);
+          minLat = Math.min(minLat, it.lat);
+          maxLat = Math.max(maxLat, it.lat);
+        }
+        map.fitBounds(
+          [
+            [minLon, minLat],
+            [maxLon, maxLat],
+          ],
+          { padding: 42, duration: 0, maxZoom: 20 }
+        );
+      }
+    } catch {}
   }, [center.latitude, center.longitude, label, markers, onPressMarker]);
 
   return (
@@ -265,9 +335,32 @@ export function OsmWebMap({ height, center, label, preset = 'medio', markers = [
 
       {status !== 'ready' ? (
         <View style={s.overlay}>
-          <Text style={s.overlayT}>
-            {status === 'loading' ? 'Cargando mapa…' : 'Modo básico (sin puntos).'}
-          </Text>
+          <Text style={s.overlayT}>{status === 'loading' ? 'Cargando mapa…' : 'Modo básico (sin puntos).'}</Text>
+          {status === 'error' ? (
+            <TouchableOpacity
+              style={s.overlayBtn}
+              onPress={() => {
+                try {
+                  window.open(openInOsm, '_blank', 'noopener,noreferrer');
+                } catch {}
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={s.overlayBtnT}>Abrir en OpenStreetMap</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
+
+      {status === 'ready' ? (
+        <View style={s.controls}>
+          <TouchableOpacity
+            style={[s.ctrlBtn, isInteractive && s.ctrlBtnActive]}
+            onPress={() => setIsInteractive((v) => !v)}
+            activeOpacity={0.85}
+          >
+            <Text style={[s.ctrlBtnT, isInteractive && s.ctrlBtnTActive]}>{isInteractive ? 'Bloquear' : 'Explorar'}</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
     </View>
@@ -276,7 +369,14 @@ export function OsmWebMap({ height, center, label, preset = 'medio', markers = [
 
 const s = StyleSheet.create({
   frame: { width: '100%', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFF' },
-  overlay: { position: 'absolute', left: 10, right: 10, bottom: 10, padding: 10, borderRadius: 12, backgroundColor: 'rgba(15,23,42,0.65)' },
+  overlay: { position: 'absolute', left: 10, right: 10, bottom: 10, padding: 10, borderRadius: 12, backgroundColor: 'rgba(15,23,42,0.65)', gap: 10 },
   overlayT: { color: '#FFF', fontWeight: '900', textAlign: 'center' },
+  overlayBtn: { alignSelf: 'center', paddingHorizontal: 12, height: 34, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', justifyContent: 'center' },
+  overlayBtnT: { color: '#FFF', fontWeight: '900', fontSize: 12 },
+  controls: { position: 'absolute', left: 10, top: 10, flexDirection: 'row', gap: 8 },
+  ctrlBtn: { paddingHorizontal: 12, height: 34, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: 'rgba(15,23,42,0.10)', justifyContent: 'center' },
+  ctrlBtnActive: { backgroundColor: '#0F172A', borderColor: 'rgba(255,255,255,0.18)' },
+  ctrlBtnT: { fontWeight: '900', fontSize: 12, color: '#0F172A' },
+  ctrlBtnTActive: { color: '#FFF' },
 });
 

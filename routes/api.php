@@ -25,6 +25,8 @@ use App\Http\Controllers\Cementerio\SepulturaDifuntosController;
 use App\Http\Controllers\Cementerio\WorkflowInhumacionController;
 use App\Http\Controllers\Cementerio\WorkflowExhumacionController;
 use App\Http\Controllers\Cementerio\SepulturasGeoController;
+use App\Http\Controllers\Cementerio\ConcesionTercerosController;
+use App\Http\Controllers\Cementerio\NfcTagsController;
 
 /**
  * Proxy opcional: tu PC sirve la PWA, pero los datos vienen del servidor del compañero.
@@ -58,10 +60,18 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('permission:cementerio.ver');
         Route::get('/concesiones', [ConcesionesSearchController::class, 'index'])
             ->middleware('permission:cementerio.ver');
+        Route::post('/concesiones/{id}/terceros', [ConcesionTercerosController::class, 'store'])
+            ->middleware('permission:cementerio.editar');
         Route::get('/difuntos', [DifuntosSearchController::class, 'index'])
             ->middleware('permission:cementerio.ver');
         Route::get('/catalogo', [CementerioCatalogoController::class, 'catalogo'])
             ->middleware('permission:cementerio.ver');
+        Route::get('/nfc-tags/{tagId}', [NfcTagsController::class, 'show'])
+            ->middleware('permission:cementerio.ver');
+        Route::post('/nfc-tags', [NfcTagsController::class, 'upsert'])
+            ->middleware('permission:cementerio.editar');
+        Route::delete('/nfc-tags/{tagId}', [NfcTagsController::class, 'destroy'])
+            ->middleware('permission:cementerio.editar');
         Route::get('/bloques/{bloque}/sepulturas', [BloqueSepulturasController::class, 'index'])
             ->middleware('permission:cementerio.ver');
         Route::get('/sepulturas/{id}', [SepulturaDetalleController::class, 'show'])
@@ -104,6 +114,8 @@ Route::middleware('auth:sanctum')->group(function () {
                 ->middleware('permission:cementerio.ver');
             Route::post('/bloques', [BloquesAdminController::class, 'store'])
                 ->middleware('permission:cementerio.editar');
+            Route::post('/bloques/{id}/generar-sepulturas', [BloquesAdminController::class, 'generarSepulturas'])
+                ->middleware('permission:cementerio.editar');
             Route::put('/bloques/{id}', [BloquesAdminController::class, 'update'])
                 ->middleware('permission:cementerio.editar');
             Route::delete('/bloques/{id}', [BloquesAdminController::class, 'destroy'])
@@ -120,6 +132,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::get('/concesiones', [ConcesionesAdminController::class, 'index'])
                 ->middleware('permission:cementerio.ver');
+            Route::post('/concesiones', [ConcesionesAdminController::class, 'store'])
+                ->middleware('permission:cementerio.editar');
+            Route::put('/concesiones/{id}', [ConcesionesAdminController::class, 'update'])
+                ->middleware('permission:cementerio.editar');
+            Route::delete('/concesiones/{id}', [ConcesionesAdminController::class, 'destroy'])
+                ->middleware('permission:cementerio.admin');
         });
     });
 });

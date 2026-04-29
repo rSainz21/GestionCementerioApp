@@ -12,26 +12,31 @@ class ConcesionesSearchController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = trim((string) $request->query('q', ''));
+        $limit = min(max((int) $request->query('limit', 100), 1), 500);
 
-        if (mb_strlen($q) < 2) {
-            return response()->json(['items' => []]);
-        }
-
-        $items = CemnConcesion::query()
-            ->whereHas('terceros', function ($qq) use ($q) {
-                $qq->where('dni', 'like', "%{$q}%")
-                    ->orWhere('nombre', 'like', "%{$q}%")
-                    ->orWhere('apellido1', 'like', "%{$q}%")
-                    ->orWhere('apellido2', 'like', "%{$q}%");
-            })
+        $query = CemnConcesion::query()
             ->with([
-                'sepultura:id,codigo,zona_id,bloque_id,fila,columna,estado',
+                'sepultura:id,codigo,numero,zona_id,bloque_id,fila,columna,estado',
                 'sepultura.zona:id,nombre',
                 'sepultura.bloque:id,nombre,codigo',
                 'terceros:id,nombre,apellido1,apellido2,dni',
             ])
-            ->orderByDesc('id')
-            ->limit(15)
+            ->orderByDesc('id');
+
+        if (mb_strlen($q) >= 2) {
+            $query->where(function ($w) use ($q) {
+                $w->where('numero_expediente', 'like', "%{$q}%")
+                    ->orWhereHas('terceros', function ($qq) use ($q) {
+                        $qq->where('dni', 'like', "%{$q}%")
+                            ->orWhere('nombre', 'like', "%{$q}%")
+                            ->orWhere('apellido1', 'like', "%{$q}%")
+                            ->orWhere('apellido2', 'like', "%{$q}%");
+                    });
+            });
+        }
+
+        $items = $query
+            ->limit(mb_strlen($q) >= 2 ? min($limit, 100) : $limit)
             ->get()
             ->map(function (CemnConcesion $c) {
                 $concesionario = $c->terceros->firstWhere('pivot.rol', 'concesionario')
@@ -43,7 +48,7 @@ class ConcesionesSearchController extends Controller
 
                 $ubicacion = trim(implode(' · ', array_filter([
                     $c->sepultura?->codigo ? ('Unidad '.$c->sepultura->codigo) : null,
-                    $c->sepultura?->bloque?->nombre ? ('Bloque '.$c->sepultura->bloque->nombre) : null,
+                    $c->sepultura?->bloque?->codigo ? ('Bloque '.$c->sepultura->bloque->codigo) : null,
                     $c->sepultura?->zona?->nombre ? ('Zona '.$c->sepultura->zona->nombre) : null,
                 ])));
 
@@ -51,6 +56,8 @@ class ConcesionesSearchController extends Controller
                     'id' => $c->id,
                     'sepultura_id' => $c->sepultura_id,
                     'sepultura_codigo' => $c->sepultura?->codigo,
+                    'sepultura_numero' => $c->sepultura?->numero,
+                    'bloque_codigo' => $c->sepultura?->bloque?->codigo,
                     'zona_nombre' => $c->sepultura?->zona?->nombre,
                     'bloque_nombre' => $c->sepultura?->bloque?->nombre,
                     'numero_expediente' => $c->numero_expediente,

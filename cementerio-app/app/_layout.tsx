@@ -79,6 +79,9 @@ function RootLayoutNav() {
       <Stack screenOptions={{ headerBackTitle: 'Atrás' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="mapa-editor" options={{ title: 'Editar números', presentation: 'modal' }} />
+        <Stack.Screen name="numeros-editor" options={{ title: 'Editar números', presentation: 'modal' }} />
+        <Stack.Screen name="osm-editor" options={{ title: 'OpenStreetMap', presentation: 'modal' }} />
         <Stack.Screen name="bloque/[id]" options={{ title: 'Bloque' }} />
         <Stack.Screen name="sepultura/[id]" options={{ title: 'Ficha de nicho' }} />
         <Stack.Screen name="asignar-difunto" options={{ title: 'Asignar difunto', presentation: 'modal' }} />
@@ -90,6 +93,8 @@ function RootLayoutNav() {
         <Stack.Screen name="renovar-concesion" options={{ title: 'Renovar concesión', presentation: 'modal' }} />
         <Stack.Screen name="editar-sepultura" options={{ title: 'Editar nicho', presentation: 'modal' }} />
         <Stack.Screen name="nueva-concesion" options={{ title: 'Nueva concesión', presentation: 'modal' }} />
+        <Stack.Screen name="buscar" options={{ title: 'Buscar', presentation: 'modal' }} />
+        <Stack.Screen name="gestion-registros" options={{ title: 'Registros' }} />
         {/* Pantallas de gestión avanzada se activan en Fase 2 (evitar depender de backends antiguos). */}
       </Stack>
     </ThemeProvider>

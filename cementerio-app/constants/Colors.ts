@@ -1,6 +1,8 @@
 export const ESTADO_COLORS = {
   libre: '#22C55E',
   ocupada: '#EF4444',
+  reservada: '#F59E0B',
+  clausurada: '#64748B',
 } as const;
 
 /** Botones y acentos principales (verde) */

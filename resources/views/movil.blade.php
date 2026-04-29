@@ -273,7 +273,7 @@ const icSettings= ["M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z","M19.4 15a1.65 1.65 0 0
 function Spinner({size=24}) {
   return <div className="spinner" style={{width:size,height:size}}/>;
 }
-function LoadView({msg='CargandoÔÇª'}) {
+function LoadView({msg='Cargando…'}) {
   return <div style={{height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16,color:'var(--ink-3)'}}>
     <Spinner size={32}/><div style={{fontSize:13}}>{msg}</div>
   </div>;
@@ -296,7 +296,7 @@ function StickyHeader({title, subtitle, onBack, right}) {
   </div>;
 }
 function KV({k,v,mono}) {
-  return <div className="kv"><div className="kv-k">{k}</div><div className={`kv-v${mono?' mono':''}`}>{v||'ÔÇö'}</div></div>;
+  return <div className="kv"><div className="kv-k">{k}</div><div className={`kv-v${mono?' mono':''}`}>{v||'—'}</div></div>;
 }
 
 // ÔöÇÔöÇÔöÇ LOGIN ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
@@ -307,7 +307,7 @@ function LoginScreen({onLogin}) {
   const [err, setErr] = useState(null);
 
   const go = async () => {
-    if (!user || !pass) { setErr('Introduce usuario y contrase├▒a'); return; }
+    if (!user || !pass) { setErr('Introduce usuario y contraseña'); return; }
     setLoading(true); setErr(null);
     try {
       // Prueba primero con 'username', luego con 'email' por si acaso
@@ -319,7 +319,7 @@ function LoginScreen({onLogin}) {
         } else throw e;
       }
       const tok = data.token || data.access_token || data.data?.token;
-      if (!tok) throw new Error('No se recibi├│ token');
+      if (!tok) throw new Error('No se recibió token');
       setTok(tok);
       onLogin(data.user || data.data?.user || { name: user });
     } catch(e) { setErr(e.message); } finally { setLoading(false); }
@@ -330,13 +330,13 @@ function LoginScreen({onLogin}) {
       <div style={{position:'absolute',top:20,left:16,right:16,display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
         <div>
           <div className="mono" style={{fontSize:10,letterSpacing:'0.14em',color:'var(--ink-3)',textTransform:'uppercase'}}>Ayto. Los Corrales de Buelna</div>
-          <div style={{fontSize:11,color:'var(--ink-3)',marginTop:4}}>Conecta2 ┬À m├│dulo cementerio</div>
+          <div style={{fontSize:11,color:'var(--ink-3)',marginTop:4}}>Conecta2 — Módulo cementerio</div>
         </div>
         <div style={{width:10,height:10,borderRadius:'50%',background:'var(--accent)',marginTop:5}}/>
       </div>
       <div style={{position:'absolute',bottom:24,left:16,right:16}}>
         <div style={{fontSize:30,fontWeight:800,letterSpacing:'-0.04em',lineHeight:1.05}}>Cementerio<br/>de Somahoz</div>
-        <div style={{fontSize:13,color:'var(--ink-2)',marginTop:8}}>Gesti├│n de campo y expedientes</div>
+        <div style={{fontSize:13,color:'var(--ink-2)',marginTop:8}}>Gestión de campo y expedientes</div>
       </div>
     </div>
 
@@ -347,8 +347,8 @@ function LoginScreen({onLogin}) {
         <div className="input-wrap"><Ico d={icUser} s={18}/><input value={user} onChange={e=>setUser(e.target.value)} placeholder="admin" autoComplete="username"/></div>
       </div>
       <div>
-        <div className="field-label">Contrase├▒a</div>
-        <div className="input-wrap"><Ico d={icLock} s={18}/><input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="ÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇó" autoComplete="current-password" onKeyDown={e=>e.key==='Enter'&&go()}/></div>
+        <div className="field-label">Contraseña</div>
+        <div className="input-wrap"><Ico d={icLock} s={18}/><input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" autoComplete="current-password" onKeyDown={e=>e.key==='Enter'&&go()}/></div>
       </div>
       <div style={{flex:1}}/>
       <button className="btn btn-primary btn-block" onClick={go} disabled={loading} style={{height:52}}>
@@ -373,7 +373,7 @@ function HomeScreen({onNav, user, onLogout}) {
   const nombre = user?.name || 'Operario';
   const ini = nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const h = new Date().getHours();
-  const sal = h<13?'Buenos d├¡as':h<20?'Buenas tardes':'Buenas noches';
+  const sal = h<13?'Buenos días':h<20?'Buenas tardes':'Buenas noches';
 
   return <div className="screen-inner">
     <div style={{padding:'16px 16px 8px'}}>
@@ -391,7 +391,7 @@ function HomeScreen({onNav, user, onLogout}) {
         <Ico d={icPin} s={18} stroke="var(--accent)"/>
         <div style={{flex:1}}>
           <div style={{fontSize:13,fontWeight:600}}>Cementerio Municipal de Somahoz</div>
-          <div className="mono" style={{fontSize:10,color:'var(--ink-3)'}}>43.2664┬░ N ┬À 4.0751┬░ W</div>
+          <div className="mono" style={{fontSize:10,color:'var(--ink-3)'}}>43.2664° N — 4.0751° W</div>
         </div>
         <div className="chip" style={{color:'var(--accent)',background:'var(--accent-soft)',borderColor:'transparent'}}><span className="chip-dot"/>activo</div>
       </div>
@@ -402,14 +402,14 @@ function HomeScreen({onNav, user, onLogout}) {
         <div className="sec-title">Estado del recinto</div>
         <button className="btn btn-ghost btn-sm" onClick={load} style={{padding:'4px 8px',fontSize:11,gap:5}}><Ico d={icRefresh} s={13}/>Actualizar</button>
       </div>
-      {loading ? <LoadView msg="Cargando estad├¡sticasÔÇª"/> :
+      {loading ? <LoadView msg="Cargando estadísticas…"/> :
        err ? <ErrBanner msg={err} onRetry={load}/> :
        stats && <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
         <div className="stat">
           <div className="stat-label">Ocupadas</div>
           <div className="row gap-6" style={{alignItems:'baseline'}}>
-            <div className="stat-num">{stats.ocupadas??stats.sepulturas_ocupadas??'ÔÇö'}</div>
-            <div style={{fontSize:12,color:'var(--ink-3)'}} className="mono">/ {stats.sepulturas_total??'ÔÇö'}</div>
+            <div className="stat-num">{stats.ocupadas??stats.sepulturas_ocupadas??'—'}</div>
+            <div style={{fontSize:12,color:'var(--ink-3)'}} className="mono">/ {stats.sepulturas_total??'—'}</div>
           </div>
           {stats.sepulturas_total && <div style={{height:3,background:'var(--surface-3)',borderRadius:2,marginTop:8,overflow:'hidden'}}>
             <div style={{height:'100%',width:`${Math.round(((stats.ocupadas??stats.sepulturas_ocupadas??0)/stats.sepulturas_total)*100)}%`,background:'var(--ink-2)'}}/>
@@ -417,17 +417,17 @@ function HomeScreen({onNav, user, onLogout}) {
         </div>
         <div className="stat">
           <div className="stat-label">Libres</div>
-          <div className="stat-num" style={{color:'var(--accent)'}}>{stats.libres??stats.sepulturas_libres??'ÔÇö'}</div>
+          <div className="stat-num" style={{color:'var(--accent)'}}>{stats.libres??stats.sepulturas_libres??'—'}</div>
           <div style={{fontSize:11,color:'var(--ink-3)',marginTop:4}}>{stats.reservadas??0} reservadas</div>
         </div>
         <div className="stat" style={{background:'var(--warn-soft)',borderColor:'transparent'}}>
           <div className="stat-label" style={{color:'var(--warn)'}}>Por caducar</div>
-          <div className="stat-num" style={{color:'var(--warn)'}}>{stats.proximas_caducar??stats.concesiones_proximas_caducar??'ÔÇö'}</div>
+          <div className="stat-num" style={{color:'var(--warn)'}}>{stats.proximas_caducar??stats.concesiones_proximas_caducar??'—'}</div>
           <div style={{fontSize:11,color:'var(--warn)',marginTop:4}}>próximos 12 meses</div>
         </div>
         <div className="stat" style={{background:'var(--danger-soft)',borderColor:'transparent'}}>
           <div className="stat-label" style={{color:'var(--danger)'}}>Caducadas</div>
-          <div className="stat-num" style={{color:'var(--danger)'}}>{stats.concesiones_caducadas??'ÔÇö'}</div>
+          <div className="stat-num" style={{color:'var(--danger)'}}>{stats.concesiones_caducadas??'—'}</div>
           <div style={{fontSize:11,color:'var(--danger)',marginTop:4}}>concesiones</div>
         </div>
       </div>}
@@ -485,7 +485,7 @@ function NichosScreen({onBack, onOpenFicha, dataRev}) {
     })();
   },[bloqId]);
 
-  if(loadCat) return <LoadView msg="Cargando cat├ílogoÔÇª"/>;
+  if(loadCat) return <LoadView msg="Cargando catálogo…"/>;
 
   const bloque = cat?.bloques?.find(b=>b.id===bloqId);
   const zona   = cat?.zonas?.find(z=>z.id===bloque?.zona_id);
@@ -530,7 +530,7 @@ function NichosScreen({onBack, onOpenFicha, dataRev}) {
         <div className="row" style={{justifyContent:'space-between',marginBottom:10}}>
           <div>
             <div style={{fontSize:15,fontWeight:700}}>{bloque.nombre}</div>
-            <div className="mono" style={{fontSize:11,color:'var(--ink-3)',marginTop:2}}>{zona?.codigo}┬À{bloque.codigo} ┬À {bloque.filas}├ù{bloque.columnas}</div>
+            <div className="mono" style={{fontSize:11,color:'var(--ink-3)',marginTop:2}}>{zona?.codigo}—{bloque.codigo} — {bloque.filas}×{bloque.columnas}</div>
           </div>
           <div className="chip">{bloque.tipo||'nichos'}</div>
         </div>
@@ -548,10 +548,10 @@ function NichosScreen({onBack, onOpenFicha, dataRev}) {
       </div>
     </div>}
 
-    {loadSep ? <div style={{padding:24}}><LoadView msg="Cargando sepulturasÔÇª"/></div> : (
+    {loadSep ? <div style={{padding:24}}><LoadView msg="Cargando sepulturas…"/></div> : (
       bloque && seps.length > 0 && <>
         <div style={{padding:'16px 16px 0'}}>
-          <div className="sec-title" style={{marginBottom:10}}>Disposici├│n f├¡sica ┬À vista frontal</div>
+          <div className="sec-title" style={{marginBottom:10}}>Disposición física — vista frontal</div>
           <div style={{background:'var(--surface)',border:'1px solid var(--line)',borderRadius:14,padding:'10px 10px 10px 28px',overflowX:'auto'}}>
             <div style={{display:'flex',gap:3,marginBottom:3}}>
               {Array.from({length:bloque.columnas}).map((_,i)=>(
@@ -573,7 +573,7 @@ function NichosScreen({onBack, onOpenFicha, dataRev}) {
         </div>
 
         <div style={{padding:'16px 16px 0'}}>
-          <div className="sec-title" style={{marginBottom:10}}>Lista {filter!=='todos'?`┬À ${filter}`:''} ({shown.length})</div>
+          <div className="sec-title" style={{marginBottom:10}}>Lista {filter!=='todos'?`— ${filter}`:''} ({shown.length})</div>
           <div className="card">
             {shown.slice(0,20).map((s,i)=>(
               <React.Fragment key={s.id}>
@@ -587,14 +587,14 @@ function NichosScreen({onBack, onOpenFicha, dataRev}) {
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:14,fontWeight:600}}>{s.codigo}</div>
-                    <div className="mono" style={{fontSize:11,color:'var(--ink-3)'}}>F{s.fila} ┬À C{s.columna}</div>
+                    <div className="mono" style={{fontSize:11,color:'var(--ink-3)'}}>F{s.fila} — C{s.columna}</div>
                   </div>
                   <div className="chip" style={{fontSize:10,textTransform:'capitalize'}}>{s.estado}</div>
                   <Ico d={icRight} s={16} stroke="var(--ink-3)"/>
                 </div>
               </React.Fragment>
             ))}
-            {shown.length>20&&<div style={{padding:14,textAlign:'center',fontSize:13,color:'var(--ink-3)'}}>+{shown.length-20} m├ísÔÇª</div>}
+            {shown.length>20&&<div style={{padding:14,textAlign:'center',fontSize:13,color:'var(--ink-3)'}}>+{shown.length-20} más…</div>}
           </div>
         </div>
       </>
@@ -617,30 +617,94 @@ function FichaScreen({id, onBack}) {
     (async()=>{
       setLoading(true); setErr(null);
       try {
-        // Endpoint ÔÇ£estableÔÇØ de detalle (incluye titular, concesi├│n, documentos, sucesos, etc.)
+        // Endpoint “estable” de detalle (incluye titular, concesión, documentos, sucesos, etc.)
         let d = await GET(`/cementerio/sepulturas/${id}`).catch(()=>null);
-        // Compat: si en alg├║n entorno antiguo solo existe el admin endpoint
+        // Compat: si en algún entorno antiguo solo existe el admin endpoint
         if(!d) d = await GET(`/cementerio/admin/sepulturas/${id}`).catch(()=>null);
+        // Normaliza respuesta tipo { item: {...} }
+        if(d && d.item && typeof d.item === 'object') d = d.item;
         if(!d) {
           // fallback: buscar en listado del bloque
           const bloqId = String(id).split('-')[0];
           const r = await GET(`/cementerio/bloques/${bloqId}/sepulturas`).catch(()=>([]));
           d = arr(r).find(s=>String(s.id)===String(id)) || {id};
         }
+
+        // En el backend del compañero algunos detalles no vienen completos
+        // (concesión/difuntos) aunque existan. Enriquecemos consultando el buscador de concesiones.
+        const needsEnrich = !!d?.codigo
+          && !(d?.concesion_activa || d?.concesion || d?.concesion_vigente)
+          && arr(d?.difuntos).length === 0
+          && !d?.difunto_titular;
+        if (needsEnrich) {
+          const code = String(d.codigo || '').trim();
+          const m = code.match(/N(\d+)\s*$/i);
+          const nNum = m ? m[1] : null; // "132" en "ZV-B8-N132"
+          const candidates = [
+            code,
+            nNum ? `N${nNum}` : null,
+            nNum,
+            String(d.id || ''),
+          ].filter(Boolean);
+
+          let it = null;
+          for (const q of candidates) {
+            const rr = await GET(`/cementerio/concesiones?q=${encodeURIComponent(q)}`).catch(()=>null);
+            const items = arr(rr?.items || rr);
+            it = items.find(x => String(x?.sepultura_id ?? '') === String(d.id ?? '')) || items[0] || null;
+            if (it) break;
+          }
+
+          if (it) {
+            d = {
+              ...d,
+              concesion_vigente: {
+                id: it.id,
+                sepultura_id: it.sepultura_id,
+                numero_expediente: it.numero_expediente,
+                tipo: it.tipo,
+                fecha_concesion: it.fecha_concesion,
+                fecha_vencimiento: it.fecha_vencimiento,
+                duracion_anos: it.duracion_anos,
+                estado: it.estado,
+                importe: it.importe,
+                moneda: it.moneda || 'euros',
+                terceros: it.concesionario ? [{
+                  nombre_completo: it.concesionario,
+                  dni: it.concesionario_dni,
+                  pivot: { rol: 'concesionario', activo: 1 },
+                }] : [],
+              },
+              difuntos: arr(it.difuntos),
+            };
+          }
+        }
+
         setData(d);
       } catch(e){ setErr(e.message); } finally{ setLoading(false); }
     })();
   },[id, rev]);
 
-  if(loading) return <LoadView msg="Cargando fichaÔÇª"/>;
+  if(loading) return <LoadView msg="Cargando ficha…"/>;
   if(err) return <><StickyHeader title="Ficha" onBack={onBack}/><ErrBanner msg={err} onRetry={()=>setRev(r=>r+1)}/></>;
   if(!data) return null;
 
   const s = data;
-  const conc = s.concesion_activa || s.concesion;
-  const difs = arr(s.difuntos);
+  // Normalización entre backends (local vs servidor compañero)
+  const conc = s.concesion_activa || s.concesion || s.concesion_vigente;
+  const difs = (() => {
+    const out = arr(s.difuntos);
+    if(out.length===0 && s.difunto_titular) return [s.difunto_titular];
+    return out;
+  })();
   const sucs = arr(s.sucesos);
-  const titular = conc?.titular;
+  const titular = (() => {
+    if(!conc) return null;
+    if(conc.titular) return conc.titular;
+    const ts = arr(conc.terceros);
+    const t = ts.find(x=>x?.pivot?.rol==='concesionario' && (x?.pivot?.activo===true || x?.pivot?.activo===1)) || ts[0];
+    return t || null;
+  })();
 
   return <div className="screen-inner">
     <StickyHeader
@@ -664,7 +728,7 @@ function FichaScreen({id, onBack}) {
           <div style={{fontSize:18,fontWeight:800,letterSpacing:'-0.02em',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
             {titular ? (titular.nombre_completo || `${titular.apellido1||''} ${titular.apellido2||''}, ${titular.nombre||''}`.trim()) : 'Sin titular'}
           </div>
-          <div className="mono" style={{fontSize:11,color:'var(--ink-3)',marginTop:3}}>{s.codigo} ┬À F{s.fila} C{s.columna}</div>
+          <div className="mono" style={{fontSize:11,color:'var(--ink-3)',marginTop:3}}>{s.codigo} — F{s.fila} C{s.columna}</div>
           {conc?.numero_expediente && <div style={{fontSize:12,color:'var(--ink-2)',marginTop:2}}>{conc.numero_expediente}</div>}
         </div>
         <div className="chip" style={{
@@ -672,13 +736,13 @@ function FichaScreen({id, onBack}) {
           color:s.estado==='libre'?'var(--accent)':s.estado==='reservada'?'var(--warn)':'var(--ink-2)',
           background:s.estado==='libre'?'var(--accent-soft)':s.estado==='reservada'?'var(--warn-soft)':'var(--surface-2)',
           borderColor:'transparent'
-        }}><span className="chip-dot"/>{s.estado||'ÔÇö'}</div>
+        }}><span className="chip-dot"/>{s.estado||'—'}</div>
       </div>
     </div>
 
     <div style={{padding:'14px 16px 0'}}>
       <div className="tabs">
-        {[['datos','Datos'],['concesion','Concesi├│n'],['restos','Restos'],['sucesos','Sucesos']].map(([k,l])=>(
+        {[['datos','Datos'],['concesion','Concesión'],['restos','Restos'],['sucesos','Sucesos']].map(([k,l])=>(
           <div key={k} className={`tab ${tab===k?'active':''}`} onClick={()=>setTab(k)}>{l}</div>
         ))}
       </div>
@@ -686,7 +750,7 @@ function FichaScreen({id, onBack}) {
 
     <div style={{padding:'14px 16px 0'}}>
       {tab==='datos' && <div className="card" style={{padding:0}}>
-        <KV k="C├│digo" v={s.codigo} mono/>
+        <KV k="Código" v={s.codigo} mono/>
         <hr className="hline"/><KV k="Tipo" v={s.tipo}/>
         <hr className="hline"/><KV k="Fila" v={s.fila} mono/>
         <hr className="hline"/><KV k="Columna" v={s.columna} mono/>
@@ -696,11 +760,11 @@ function FichaScreen({id, onBack}) {
       </div>}
 
       {tab==='concesion' && (!conc
-        ? <div className="card" style={{padding:24,textAlign:'center',color:'var(--ink-3)',fontSize:13}}>Sin concesi├│n asociada.</div>
+        ? <div className="card" style={{padding:24,textAlign:'center',color:'var(--ink-3)',fontSize:13}}>Sin concesión asociada.</div>
         : <div className="card" style={{padding:0}}>
           <KV k="Expediente" v={conc.numero_expediente} mono/>
           <hr className="hline"/><KV k="Tipo" v={conc.tipo}/>
-          <hr className="hline"/><KV k="Fecha concesi├│n" v={conc.fecha_concesion} mono/>
+          <hr className="hline"/><KV k="Fecha concesión" v={conc.fecha_concesion} mono/>
           <hr className="hline"/><KV k="Vencimiento" v={conc.fecha_vencimiento||'Perpetua'} mono/>
           <hr className="hline"/><KV k="Importe" v={conc.importe?`${conc.importe} Ôé¼`:null} mono/>
           <hr className="hline"/><KV k="Estado" v={conc.estado}/>
@@ -714,7 +778,7 @@ function FichaScreen({id, onBack}) {
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:14,fontWeight:700}}>{titular.nombre_completo||`${titular.apellido1||''} ${titular.apellido2||''}, ${titular.nombre||''}`.trim()}</div>
-                  <div className="mono" style={{fontSize:11,color:'var(--ink-3)'}}>{titular.dni||''}{titular.telefono?` ┬À ${titular.telefono}`:''}</div>
+                  <div className="mono" style={{fontSize:11,color:'var(--ink-3)'}}>{titular.dni||''}{titular.telefono?` — ${titular.telefono}`:''}</div>
                 </div>
               </div>
             </div>
@@ -731,7 +795,7 @@ function FichaScreen({id, onBack}) {
                 <div style={{fontSize:14,fontWeight:700}}>{d.nombre_completo}</div>
                 {d.es_titular&&<span className="chip" style={{fontSize:10}}>titular</span>}
               </div>
-              <div className="mono" style={{fontSize:11,color:'var(--ink-3)'}}>ÔÇá {d.fecha_fallecimiento} ┬À {d.fecha_inhumacion}</div>
+              <div className="mono" style={{fontSize:11,color:'var(--ink-3)'}}>✝ {d.fecha_fallecimiento} — {d.fecha_inhumacion}</div>
               {d.parentesco&&<div style={{fontSize:12,color:'var(--ink-2)',marginTop:3}}>{d.parentesco}</div>}
             </div>
           </React.Fragment>
@@ -766,7 +830,7 @@ function FichaScreen({id, onBack}) {
           <Ico d={icEdit} s={18}/>Editar
         </button>
         <button className="btn btn-primary" onClick={()=>setSucesoOpen(true)} style={{flex:1,height:52}}>
-          <Ico d={icPlus} s={18}/>A├▒adir suceso
+          <Ico d={icPlus} s={18}/>Añadir suceso
         </button>
       </div>
     </div>
@@ -815,7 +879,7 @@ function NuevoSucesoSheet({sepultura, onClose, onSaved}) {
   const save = async()=>{
     const target = picked;
     if(!target?.id) { toast('Selecciona una sepultura','warn'); return; }
-    if(!titulo.trim()) { toast('Pon un t├¡tulo','warn'); return; }
+    if(!titulo.trim()) { toast('Pon un título','warn'); return; }
     setSaving(true);
     try {
       await POST(`/cementerio/sepulturas/${target.id}/sucesos`, {
@@ -840,10 +904,10 @@ function NuevoSucesoSheet({sepultura, onClose, onSaved}) {
   };
 
   const tipos = [
-    ['anomalia','Anomal├¡a',icBell,'var(--danger)'],
+    ['anomalia','Anomalía',icBell,'var(--danger)'],
     ['mantenimiento','Mantenimiento',icSettings,'var(--warn)'],
-    ['inhumacion','Inhumaci├│n',icPlus,'var(--accent)'],
-    ['exhumacion','Exhumaci├│n',icArchive,'var(--ink-2)'],
+    ['inhumacion','Inhumación',icPlus,'var(--accent)'],
+    ['exhumacion','Exhumación',icArchive,'var(--ink-2)'],
     ['traslado','Traslado',icRight,'var(--info)'],
     ['otro','Otro','M12 2v20M2 12h20','var(--ink-3)'],
   ];
@@ -855,7 +919,7 @@ function NuevoSucesoSheet({sepultura, onClose, onSaved}) {
         <div className="row" style={{justifyContent:'space-between',marginBottom:14}}>
           <div>
             <div style={{fontSize:18,fontWeight:900}}>Nuevo suceso</div>
-            <div style={{fontSize:12,color:'var(--ink-3)',marginTop:3}}>Se registrar├í en tu ubicaci├│n actual</div>
+            <div style={{fontSize:12,color:'var(--ink-3)',marginTop:3}}>Se registrará en tu ubicación actual</div>
           </div>
           <div onClick={onClose} style={{width:32,height:32,borderRadius:8,background:'var(--surface)',border:'1px solid var(--line)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Ico d={icClose} s={16}/></div>
         </div>
@@ -882,7 +946,7 @@ function NuevoSucesoSheet({sepultura, onClose, onSaved}) {
             <Ico d={icPin} s={18} stroke="var(--ink-3)"/>
             <div style={{flex:1,minWidth:0}}>
               <div className="mono" style={{fontSize:12,fontWeight:800}}>{picked.codigo || `ID ${picked.id}`}</div>
-              <div style={{fontSize:12,color:'var(--ink-3)'}}>{picked.bloque?.codigo ? `${picked.bloque.codigo} ┬À `:''}{picked.zona?.nombre||''}</div>
+              <div style={{fontSize:12,color:'var(--ink-3)'}}>{picked.bloque?.codigo ? `${picked.bloque.codigo} — `:''}{picked.zona?.nombre||''}</div>
             </div>
             {fixedSep && <span className="chip" style={{fontSize:10}}>auto-detectado</span>}
           </div>
@@ -890,7 +954,7 @@ function NuevoSucesoSheet({sepultura, onClose, onSaved}) {
           <div style={{padding:'12px 14px',borderRadius:12,background:'var(--surface)',border:'1px solid var(--line)',marginBottom:14}}>
             <div className="row" style={{gap:10}}>
               <Ico d={icSearch} s={18} stroke="var(--ink-3)"/>
-              <input placeholder="Buscar por c├│digo o n├║meroÔÇª" value={q} onChange={e=>setQ(e.target.value)} />
+              <input placeholder="Buscar por código o número…" value={q} onChange={e=>setQ(e.target.value)} />
               {loadingSearch && <Spinner size={18}/>}
             </div>
             {res.length>0 && <div style={{marginTop:10,borderTop:'1px solid var(--line)'}}>
@@ -899,7 +963,7 @@ function NuevoSucesoSheet({sepultura, onClose, onSaved}) {
                   <div style={{width:8,height:8,borderRadius:'50%',background:it.estado==='libre'?'var(--accent)':it.estado==='reservada'?'var(--warn)':'var(--danger)'}}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div className="mono" style={{fontSize:12,fontWeight:800}}>{it.codigo||`ID ${it.id}`}</div>
-                    <div style={{fontSize:12,color:'var(--ink-3)'}}>{it.bloque?.codigo ? `${it.bloque.codigo} ┬À `:''}{it.zona?.nombre||''}</div>
+                    <div style={{fontSize:12,color:'var(--ink-3)'}}>{it.bloque?.codigo ? `${it.bloque.codigo} — `:''}{it.zona?.nombre||''}</div>
                   </div>
                   <Ico d={icRight} s={16} stroke="var(--ink-3)"/>
                 </div>
@@ -908,12 +972,12 @@ function NuevoSucesoSheet({sepultura, onClose, onSaved}) {
           </div>
         )}
 
-        <div className="field-label">T├¡tulo</div>
-        <input value={titulo} onChange={e=>setTitulo(e.target.value)} placeholder="Ej: Grieta en l├ípida frontal" />
+        <div className="field-label">Título</div>
+        <input value={titulo} onChange={e=>setTitulo(e.target.value)} placeholder="Ej: Grieta en lápida frontal" />
 
         <div style={{height:12}}/>
-        <div className="field-label">Descripci├│n</div>
-        <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Detalle del sucesoÔÇª" rows={3}/>
+        <div className="field-label">Descripción</div>
+        <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Detalle del suceso…" rows={3}/>
 
         <div style={{height:12}}/>
         <div className="field-label">Severidad</div>
@@ -970,51 +1034,126 @@ function EditSepSheet({s, onClose, onSaved}) {
   </div>;
 }
 
-// ÔöÇÔöÇÔöÇ MAPA ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ─── MAPA ────────────────────────────────────────────────────────────────
 function MapaScreen({onBack, onNav}) {
   const [sel, setSel] = useState(null);
-  const [sucesoOpen, setSucesoOpen] = useState(false);
-  const bloques = [{id:'NA',n:'Nichos A',t:'8├ù10',x:215,y:75,w:108,h:65},{id:'NB',n:'Nichos B',t:'6├ù12',x:215,y:155,w:108,h:55},{id:'CA',n:'Columbarios A',t:'5├ù8',x:70,y:265,w:88,h:80}];
-  return <div className="screen-inner">
-    <StickyHeader title="Plano del recinto" onBack={onBack}/>
-    <div style={{background:'#263325',position:'relative'}}>
-      <div style={{position:'absolute',inset:0,background:'radial-gradient(circle at 30% 40%,oklch(50% 0.04 120 / 0.4),transparent 50%),radial-gradient(circle at 70% 60%,oklch(45% 0.05 130 / 0.3),transparent 45%)'}}/>
-      <div style={{position:'absolute',right:12,bottom:12,zIndex:5}}>
-        <button className="btn btn-primary" onClick={()=>setSucesoOpen(true)} style={{height:48,padding:'0 16px'}}>
-          <Ico d={icPlus} s={18}/>Marcar aqu├¡
-        </button>
-      </div>
-      <svg viewBox="0 0 400 480" style={{width:'100%',display:'block',position:'relative'}}>
-        <path d="M58 58 L342 58 L342 432 L58 432 Z" fill="rgba(200,195,180,0.1)" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5"/>
-        <path d="M200 58 L200 432" stroke="rgba(220,210,190,0.3)" strokeWidth="5" strokeDasharray="4 7"/>
-        <path d="M58 240 L342 240" stroke="rgba(220,210,190,0.2)" strokeWidth="3" strokeDasharray="3 6"/>
-        <rect x="68" y="73" width="125" height="148" fill="rgba(170,150,120,0.12)" stroke="rgba(255,255,255,0.15)" strokeWidth="1" rx="3"/>
-        <text x="130" y="152" textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="11" fontWeight="600" fontFamily="system-ui">Zona Vieja</text>
-        {bloques.map(b=>(
-          <g key={b.id} onClick={()=>setSel(sel?.id===b.id?null:b)} style={{cursor:'pointer'}}>
-            <rect x={b.x} y={b.y} width={b.w} height={b.h} fill={sel?.id===b.id?"rgba(74,138,96,0.45)":"rgba(74,138,96,0.2)"} stroke={sel?.id===b.id?"#6aaa80":"rgba(100,180,130,0.6)"} strokeWidth={sel?.id===b.id?2:1.5} rx="4"/>
-            <text x={b.x+b.w/2} y={b.y+b.h/2-6} textAnchor="middle" fill="#fff" fontSize="13" fontWeight="800" fontFamily="ui-monospace,monospace">{b.id}</text>
-            <text x={b.x+b.w/2} y={b.y+b.h/2+10} textAnchor="middle" fill="rgba(255,255,255,0.7)" fontSize="9" fontFamily="ui-monospace,monospace">{b.t}</text>
-          </g>
-        ))}
-        <line x1="200" y1="432" x2="200" y2="475" stroke="rgba(220,210,190,0.4)" strokeWidth="6"/>
-        <text x="200" y="470" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="10" fontFamily="system-ui">Ôåæ Entrada</text>
-      </svg>
-    </div>
-    <div style={{padding:'14px 16px'}}>
-      {sel ? <div className="card" style={{padding:16}}>
-        <div className="row" style={{justifyContent:'space-between',marginBottom:12}}>
-          <div><div style={{fontSize:16,fontWeight:800}}>{sel.n}</div><div className="mono" style={{fontSize:11,color:'var(--ink-3)',marginTop:2}}>{sel.t} ┬À c├│digo {sel.id}</div></div>
-          <button className="btn btn-primary btn-sm" onClick={()=>onNav('nichos')}>Ver nichos</button>
+  const [zoom, setZoom] = useState(1);
+
+  // Real Somahoz cemetery — 10 official blocks, north→south layout
+  const BLOQUES = [
+    {codigo:'B2001',label:'Muro Norte',   unidades:52,  filas:4,cols:13,x:60, y:50, w:880,h:75 },
+    {codigo:'BA',   label:'Ampliación A', unidades:40,  filas:4,cols:10,x:60, y:215,w:218,h:155},
+    {codigo:'B8',   label:'Muro Sur',     unidades:128, filas:4,cols:32,x:320,y:215,w:620,h:155},
+    {codigo:'B7',   label:'Bloque 7',     unidades:56,  filas:4,cols:14,x:60, y:440,w:296,h:118},
+    {codigo:'B6',   label:'Bloque 6',     unidades:40,  filas:4,cols:10,x:406,y:440,w:196,h:108},
+    {codigo:'BD',   label:'Amp. D',       unidades:52,  filas:4,cols:13,x:652,y:440,w:288,h:128},
+    {codigo:'B2007',label:'Exento 2007',  unidades:40,  filas:4,cols:10,x:60, y:640,w:218,h:130},
+    {codigo:'B2017',label:'Amp. 2017',    unidades:40,  filas:4,cols:10,x:328,y:640,w:218,h:120},
+    {codigo:'B2020',label:'Amp. 2020',    unidades:24,  filas:4,cols:6, x:596,y:640,w:128,h:100},
+    {codigo:'B2025',label:'Amp. 2025',    unidades:48,  filas:4,cols:12,x:60, y:855,w:880,h:75 },
+  ];
+
+  const zUp = () => setZoom(z => Math.min(3, +(z + 0.5).toFixed(1)));
+  const zDn = () => setZoom(z => Math.max(1, +(z - 0.5).toFixed(1)));
+  const zRs = () => setZoom(1);
+
+  return (
+    <div className="screen-inner">
+      <StickyHeader title="Plano del recinto" subtitle="Vista satélite · Somahoz" onBack={onBack}/>
+
+      <div style={{position:'relative',overflow:'hidden',background:'#D4E8CC'}}>
+        {/* Zoom controls */}
+        <div style={{position:'absolute',right:12,top:12,zIndex:10,display:'flex',flexDirection:'column',gap:8}}>
+          {[{l:'+',a:zUp},{l:'−',a:zDn},{l:'⊙',a:zRs}].map(({l,a})=>(
+            <button key={l} onClick={a} style={{width:40,height:40,borderRadius:'50%',background:'rgba(255,255,255,0.95)',border:'1px solid rgba(15,23,42,0.10)',fontSize:l==='+'||l==='−'?20:15,fontWeight:700,cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.12)',display:'flex',alignItems:'center',justifyContent:'center',color:'#0F172A'}}>{l}</button>
+          ))}
         </div>
-        <div style={{fontSize:13,color:'var(--ink-2)'}}>Toca "Ver nichos" para explorar la cuadr├¡cula de este bloque con datos reales.</div>
-      </div> : <div style={{textAlign:'center',color:'var(--ink-3)',fontSize:13,padding:'12px 0'}}>Toca un bloque del plano para ver sus detalles</div>}
+
+        <div style={{transform:`scale(${zoom})`,transformOrigin:'center top',transition:'transform 0.2s ease'}}>
+          <svg viewBox="0 0 1000 1000" style={{width:'100%',display:'block'}} preserveAspectRatio="xMidYMin meet">
+
+            {/* Background */}
+            <rect x="0" y="0" width="1000" height="1000" fill="#D4E8CC"/>
+
+            {/* Dot grid */}
+            {(()=>{const d=[];for(let r=0;r<25;r++)for(let c=0;c<25;c++)d.push(<circle key={`d${r}-${c}`} cx={38+c*38} cy={16+r*38} r={2.3} fill="#8CB890" opacity={0.42}/>);return d;})()}
+
+            {/* Trees */}
+            {[[80,38,30],[920,38,30],[34,508,22],[966,508,22],[34,750,18],[966,755,18]].map(([cx,cy,r],i)=>(
+              <circle key={`t${i}`} cx={cx} cy={cy} r={r} fill="#5A9060" opacity={0.88}/>
+            ))}
+
+            {/* Pathways */}
+            <line x1="60"  y1="168" x2="940" y2="168" stroke="rgba(255,255,255,0.70)" strokeWidth="28" strokeLinecap="round"/>
+            <line x1="300" y1="215" x2="300" y2="370" stroke="rgba(255,255,255,0.58)" strokeWidth="20" strokeLinecap="round"/>
+            <line x1="60"  y1="405" x2="940" y2="405" stroke="rgba(255,255,255,0.64)" strokeWidth="24" strokeLinecap="round"/>
+            <line x1="60"  y1="600" x2="940" y2="600" stroke="rgba(255,255,255,0.62)" strokeWidth="22" strokeLinecap="round"/>
+            <line x1="60"  y1="808" x2="940" y2="808" stroke="rgba(255,255,255,0.58)" strokeWidth="20" strokeLinecap="round"/>
+
+            {/* Chapel */}
+            <path d="M456,165 L490,132 L524,165" fill="#C4B298" stroke="#7A6540" strokeWidth="2.5"/>
+            <rect x="456" y="165" width="68" height="40" rx="5" fill="#D0C0A4" stroke="#7A6540" strokeWidth="2.5"/>
+            <line x1="490" y1="139" x2="490" y2="185" stroke="#6A5530" strokeWidth="4" strokeLinecap="round"/>
+            <line x1="476" y1="151" x2="504" y2="151" stroke="#6A5530" strokeWidth="4" strokeLinecap="round"/>
+
+            {/* Blocks */}
+            {BLOQUES.map(b=>{
+              const active = sel?.codigo===b.codigo;
+              const fill   = active?'#B09468':'#C8B68E';
+              const stroke = active?'#2F1F06':'rgba(80,55,20,0.65)';
+              const sw     = active?5:2.5;
+              const inside = b.h<100;
+              const cols   = Math.max(3,Math.min(12,b.cols));
+              const lfs    = b.w>400?22:b.w>200?18:15;
+              const ufs    = lfs-5;
+              const vcLines=[]; for(let i=0;i<cols-1;i++) vcLines.push(i);
+              return (
+                <g key={b.codigo} onClick={()=>setSel(sel?.codigo===b.codigo?null:b)} style={{cursor:'pointer'}}>
+                  <rect x={b.x} y={b.y} width={b.w} height={b.h} rx="14" fill={fill} stroke={stroke} strokeWidth={sw}/>
+                  <g opacity="0.28">
+                    {vcLines.map(i=><line key={`vc${i}`} x1={b.x+(i+1)*b.w/cols} y1={b.y+4} x2={b.x+(i+1)*b.w/cols} y2={b.y+b.h-4} stroke="rgba(50,30,5,0.55)" strokeWidth="1.5"/>)}
+                    {[0,1,2].map(i=><line key={`hr${i}`} x1={b.x+4} y1={b.y+(i+1)*b.h/4} x2={b.x+b.w-4} y2={b.y+(i+1)*b.h/4} stroke="rgba(50,30,5,0.55)" strokeWidth="1.5"/>)}
+                  </g>
+                  {active&&<circle cx={b.x+b.w*0.12} cy={b.y+b.h*0.5} r="13" fill="#FFF" stroke="#1A0F00" strokeWidth="3.5"/>}
+                  {inside?(
+                    <>
+                      <text x={b.x+b.w/2} y={b.y+b.h*0.40} textAnchor="middle" dominantBaseline="middle" fontSize={lfs} fontWeight="800" fill="rgba(15,8,0,0.80)">{b.label}</text>
+                      <text x={b.x+b.w/2} y={b.y+b.h*0.78} textAnchor="middle" dominantBaseline="middle" fontSize={ufs} fontWeight="700" fill="rgba(15,8,0,0.55)">{b.unidades} nichos</text>
+                    </>
+                  ):(
+                    <>
+                      <text x={b.x+b.w/2} y={b.y+b.h+26} textAnchor="middle" fontSize={lfs} fontWeight="800" fill="rgba(15,8,0,0.80)">{b.label}</text>
+                      <text x={b.x+b.w/2} y={b.y+b.h+26+lfs-2} textAnchor="middle" fontSize={ufs} fontWeight="700" fill="rgba(15,8,0,0.50)">{b.unidades} nichos</text>
+                    </>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+
+      <div style={{padding:'12px 16px'}}>
+        {sel?(
+          <div className="card" style={{padding:16}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+              <div>
+                <div style={{fontSize:16,fontWeight:800}}>{sel.label}</div>
+                <div className="mono" style={{fontSize:11,color:'var(--ink-3)',marginTop:2}}>{sel.codigo} · {sel.filas}×{sel.cols} · {sel.unidades} nichos</div>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={()=>onNav('nichos')}>Ver nichos</button>
+            </div>
+            <div style={{fontSize:13,color:'var(--ink-2)'}}>Toca "Ver nichos" para explorar la cuadrícula de este bloque.</div>
+          </div>
+        ):(
+          <div style={{textAlign:'center',color:'var(--ink-3)',fontSize:13,padding:'12px 0'}}>Toca un bloque del plano para ver sus detalles</div>
+        )}
+      </div>
     </div>
-    {sucesoOpen && <NuevoSucesoSheet sepultura={null} onClose={()=>setSucesoOpen(false)} onSaved={()=>setSucesoOpen(false)}/>}
-  </div>;
+  );
 }
 
-// ÔöÇÔöÇÔöÇ GESTI├ôN ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ———————————————————— GESTIÓN ————————————————————
 function GestionScreen({onBack, onOpenFicha, onDataChanged}) {
   const [seg, setSeg] = useState('expedientes');
   const [q, setQ] = useState('');
@@ -1035,11 +1174,11 @@ function GestionScreen({onBack, onOpenFicha, onDataChanged}) {
   useEffect(()=>{ clearTimeout(timer.current); timer.current = setTimeout(load, q?450:0); return()=>clearTimeout(timer.current); },[seg,q]);
 
   return <div className="screen-inner">
-    <StickyHeader title="Gesti├│n" onBack={onBack}/>
+    <StickyHeader title="Gestión" onBack={onBack}/>
     <div style={{padding:'12px 16px'}}>
       <div className="input-wrap">
         <Ico d={icSearch} s={18} stroke="var(--ink-3)"/>
-        <input placeholder="Buscar expedientes, titularesÔÇª" value={q} onChange={e=>setQ(e.target.value)}/>
+        <input placeholder="Buscar expedientes, titulares…" value={q} onChange={e=>setQ(e.target.value)}/>
         {q&&<div onClick={()=>setQ('')} style={{cursor:'pointer',color:'var(--ink-3)'}}><Ico d={icClose} s={16}/></div>}
       </div>
     </div>
@@ -1060,7 +1199,7 @@ function GestionScreen({onBack, onOpenFicha, onDataChanged}) {
             </div>
             <div>
               <div style={{fontSize:14,fontWeight:900,color:'var(--accent-ink)'}}>Crear bloque nuevo</div>
-              <div style={{fontSize:12,color:'var(--ink-3)',marginTop:2}}>Previsualiza filas├ùcolumnas y sentido</div>
+              <div style={{fontSize:12,color:'var(--ink-3)',marginTop:2}}>Previsualiza filas×columnas y sentido</div>
             </div>
           </div>
           <Ico d={icRight} s={18} stroke="var(--accent)"/>
@@ -1068,7 +1207,7 @@ function GestionScreen({onBack, onOpenFicha, onDataChanged}) {
       </div>
     </div>
 
-    {loading && <div style={{padding:24}}><LoadView msg="BuscandoÔÇª"/></div>}
+    {loading && <div style={{padding:24}}><LoadView msg="Buscando…"/></div>}
     {err && <ErrBanner msg={err} onRetry={load}/>}
     {!loading && !err && <div style={{padding:'0 16px'}}>
       <div className="sec-title" style={{marginBottom:10}}>{data.length} resultado{data.length!==1?'s':''}</div>
@@ -1081,11 +1220,11 @@ function GestionScreen({onBack, onOpenFicha, onDataChanged}) {
               ? <div style={{padding:'12px 16px',display:'flex',gap:12,cursor:'pointer'}} onClick={()=>item.sepultura_id&&onOpenFicha(item.sepultura_id)}>
                   <div style={{width:42,height:42,borderRadius:8,background:'var(--surface-2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ico d={icFile} s={18}/></div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div className="mono" style={{fontSize:12,fontWeight:700}}>{item.numero_expediente||item.label||'ÔÇö'}</div>
-                    <div style={{fontSize:12,color:'var(--ink-2)',marginTop:2}}>{[item.zona_nombre,item.bloque_nombre].filter(Boolean).join(' ┬À ')}</div>
+                    <div className="mono" style={{fontSize:12,fontWeight:700}}>{item.numero_expediente||item.label||'—'}</div>
+                    <div style={{fontSize:12,color:'var(--ink-2)',marginTop:2}}>{[item.zona_nombre,item.bloque_nombre].filter(Boolean).join(' — ')}</div>
                     <div style={{marginTop:6}}>
                       <span className="chip" style={{fontSize:10,color:item.estado==='vigente'?'var(--accent)':item.estado==='caducada'?'var(--danger)':'var(--ink-3)',background:item.estado==='vigente'?'var(--accent-soft)':item.estado==='caducada'?'var(--danger-soft)':'var(--surface-2)',borderColor:'transparent'}}>
-                        <span className="chip-dot"/>{item.estado||'ÔÇö'}
+                        <span className="chip-dot"/>{item.estado||'—'}
                       </span>
                     </div>
                   </div>
@@ -1099,7 +1238,7 @@ function GestionScreen({onBack, onOpenFicha, onDataChanged}) {
                     <div style={{fontSize:14,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                       {item.nombre_completo||`${item.apellido1||''} ${item.apellido2||''}, ${item.nombre||''}`.trim()}
                     </div>
-                    <div className="mono" style={{fontSize:11,color:'var(--ink-3)'}}>{[item.dni,item.telefono].filter(Boolean).join(' ┬À ')}</div>
+                    <div className="mono" style={{fontSize:11,color:'var(--ink-3)'}}>{[item.dni,item.telefono].filter(Boolean).join(' — ')}</div>
                   </div>
                 </div>
             }
@@ -1165,7 +1304,7 @@ function CrearBloqueSheet({onClose, onSaved}) {
 
   const save = async()=>{
     if(!zonaId) { toast('Selecciona zona','warn'); return; }
-    if(!codigo.trim()) { toast('Pon un c├│digo','warn'); return; }
+    if(!codigo.trim()) { toast('Pon un código','warn'); return; }
     setSaving(true);
     try {
       await POST('/cementerio/admin/bloques', {
@@ -1190,7 +1329,7 @@ function CrearBloqueSheet({onClose, onSaved}) {
         <div className="row" style={{justifyContent:'space-between',marginBottom:14}}>
           <div>
             <div style={{fontSize:18,fontWeight:900}}>Crear bloque</div>
-            <div style={{fontSize:12,color:'var(--ink-3)',marginTop:3}}>Define la disposici├│n y previsual├¡zala antes de guardar</div>
+            <div style={{fontSize:12,color:'var(--ink-3)',marginTop:3}}>Define la disposición y previsualízala antes de guardar</div>
           </div>
           <div onClick={onClose} style={{width:32,height:32,borderRadius:8,background:'var(--surface)',border:'1px solid var(--line)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><Ico d={icClose} s={16}/></div>
         </div>
@@ -1207,7 +1346,7 @@ function CrearBloqueSheet({onClose, onSaved}) {
             </div>
           </div>
           <div style={{flex:1}}>
-            <div className="field-label">C├│digo</div>
+            <div className="field-label">Código</div>
             <input value={codigo} onChange={e=>setCodigo(e.target.value)} placeholder="B-C" />
           </div>
         </div>
@@ -1232,9 +1371,9 @@ function CrearBloqueSheet({onClose, onSaved}) {
           </div>
         </div>
 
-        <div className="field-label">Sentido de numeraci├│n</div>
+        <div className="field-label">Sentido de numeración</div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
-          {[['horiz_r','Horiz. ÔåÆ'],['horiz_l','Horiz. ÔåÉ'],['vert_d','Vert. Ôåô'],['vert_u','Vert. Ôåæ']].map(([k,l])=>(
+          {[['horiz_r','Horizontal →'],['horiz_l','Horizontal ←'],['vert_d','Vertical ↓'],['vert_u','Vertical ↑']].map(([k,l])=>(
             <div key={k} onClick={()=>setSent(k)} style={{padding:'12px 14px',borderRadius:12,cursor:'pointer',background:sent===k?'var(--ink)':'var(--surface)',color:sent===k?'#fff':'var(--ink)',border:'1px solid '+(sent===k?'var(--ink)':'var(--line)'),textAlign:'center',fontWeight:900}}>
               {l}
             </div>
@@ -1243,13 +1382,13 @@ function CrearBloqueSheet({onClose, onSaved}) {
 
         <div className="row gap-10" style={{marginBottom:14}}>
           <div style={{flex:1}}>
-            <div className="field-label">N├║mero inicial</div>
+            <div className="field-label">Número inicial</div>
             <input type="number" value={inicio} onChange={e=>setInicio(+e.target.value)} />
           </div>
           <div style={{flex:1}} />
         </div>
 
-        <div className="sec-title" style={{marginBottom:10}}>Previsualizaci├│n ┬À {Math.max(1,(+filas||1)) * Math.max(1,(+cols||1))} sepulturas</div>
+        <div className="sec-title" style={{marginBottom:10}}>Previsualización — {Math.max(1,(+filas||1)) * Math.max(1,(+cols||1))} sepulturas</div>
         <div className="card" style={{padding:12,overflowX:'auto'}}>
           <div style={{display:'grid',gridTemplateColumns:`repeat(${g.c}, 54px)`,gap:8}}>
             {Array.from({length:g.f}).flatMap((_,fi)=>(
@@ -1259,7 +1398,7 @@ function CrearBloqueSheet({onClose, onSaved}) {
               })
             ))}
           </div>
-          <div style={{marginTop:10,fontSize:11,color:'var(--ink-3)'}}>Nota: la previsualizaci├│n se limita a 12├ù12 por pantalla; al guardar se crear├ín todas.</div>
+          <div style={{marginTop:10,fontSize:11,color:'var(--ink-3)'}}>Nota: la previsualización se limita a 12×12 por pantalla; al guardar se crearán todas.</div>
         </div>
 
         <div style={{height:14}}/>
@@ -1282,9 +1421,9 @@ function AdminScreen({onBack, onDataChanged}) {
 
   const cfgs = {
     cementerios:{ep:'/cementerio/admin/cementerios',l:'Cementerios',fields:[{k:'nombre',l:'Nombre'},{k:'municipio',l:'Municipio'}]},
-    zonas:{ep:'/cementerio/admin/zonas',l:'Zonas',fields:[{k:'nombre',l:'Nombre'},{k:'codigo',l:'C├│digo'}]},
-    bloques:{ep:'/cementerio/admin/bloques',l:'Bloques',fields:[{k:'nombre',l:'Nombre'},{k:'codigo',l:'C├│digo'},{k:'filas',l:'Filas',t:'number'},{k:'columnas',l:'Columnas',t:'number'}]},
-    sepulturas:{ep:'/cementerio/admin/sepulturas',l:'Sepulturas',fields:[{k:'codigo',l:'C├│digo'},{k:'estado',l:'Estado'}]},
+    zonas:{ep:'/cementerio/admin/zonas',l:'Zonas',fields:[{k:'nombre',l:'Nombre'},{k:'codigo',l:'Código'}]},
+    bloques:{ep:'/cementerio/admin/bloques',l:'Bloques',fields:[{k:'nombre',l:'Nombre'},{k:'codigo',l:'Código'},{k:'filas',l:'Filas',t:'number'},{k:'columnas',l:'Columnas',t:'number'}]},
+    sepulturas:{ep:'/cementerio/admin/sepulturas',l:'Sepulturas',fields:[{k:'codigo',l:'Código'},{k:'estado',l:'Estado'}]},
   };
   const cfg = cfgs[seg];
 
@@ -1295,13 +1434,13 @@ function AdminScreen({onBack, onDataChanged}) {
   },[seg,rev]);
 
   const del = async item=>{
-    if(!window.confirm(`┬┐Eliminar "${item.nombre||item.codigo||item.id}"?`)) return;
+    if(!window.confirm(`¿Eliminar "${item.nombre||item.codigo||item.id}"?`)) return;
     try { await DEL(`${cfg.ep}/${item.id}`); toast('Eliminado'); setRev(r=>r+1); }
     catch(e){ toast(e.message,'warn'); }
   };
 
   return <div className="screen-inner">
-    <StickyHeader title="Administraci├│n" onBack={onBack}
+    <StickyHeader title="Administración" onBack={onBack}
       right={<button className="btn btn-primary btn-sm" onClick={()=>setSheet({mode:'create',item:{}})}><Ico d={icPlus} s={16}/>Nuevo</button>}
     />
     <div style={{padding:'12px 16px 0'}}>
@@ -1312,7 +1451,7 @@ function AdminScreen({onBack, onDataChanged}) {
       </div>
     </div>
     <div style={{padding:'14px 16px'}}>
-      {loading&&<LoadView msg={`Cargando ${cfg.l}ÔÇª`}/>}
+      {loading&&<LoadView msg={`Cargando ${cfg.l}…`}/>}
       {err&&<ErrBanner msg={err} onRetry={()=>setRev(r=>r+1)}/>}
       {!loading&&!err&&<>
         <div className="sec-title" style={{marginBottom:10}}>{data.length} {cfg.l.toLowerCase()}</div>
@@ -1324,7 +1463,7 @@ function AdminScreen({onBack, onDataChanged}) {
               <div style={{padding:'12px 16px',display:'flex',gap:10,alignItems:'center'}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:14,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{item.nombre||item.codigo||`#${item.id}`}</div>
-                  <div className="mono" style={{fontSize:10,color:'var(--ink-3)',marginTop:2}}>ID:{item.id}{item.municipio?` ┬À ${item.municipio}`:''}{item.filas?` ┬À ${item.filas}├ù${item.columnas}`:''}{item.estado?` ┬À ${item.estado}`:''}</div>
+                  <div className="mono" style={{fontSize:10,color:'var(--ink-3)',marginTop:2}}>ID:{item.id}{item.municipio?` — ${item.municipio}`:''}{item.filas?` — ${item.filas}×${item.columnas}`:''}{item.estado?` — ${item.estado}`:''}</div>
                 </div>
                 <div className="row gap-6">
                   <button className="btn btn-sm" onClick={()=>setSheet({mode:'edit',item})} style={{padding:'7px 10px'}}><Ico d={icEdit} s={14}/></button>
@@ -1379,7 +1518,7 @@ function BottomNav({active, onNav}) {
     {id:'home',l:'Inicio',ic:icHome},
     {id:'nichos',l:'Nichos',ic:icGrid},
     {id:'mapa',l:'Mapa',ic:icMap},
-    {id:'gestion',l:'Gesti├│n',ic:icArchive},
+    {id:'gestion',l:'Gestión',ic:icArchive},
   ];
   return <nav className="bottom-nav">
     {items.map(({id,l,ic})=>(
@@ -1407,7 +1546,7 @@ function App() {
   const [screen, setScreen] = useState(()=>_tok ? (localStorage.getItem('smz_scr')||'home') : 'login');
   const [user, setUser] = useState(()=>{ try{return JSON.parse(localStorage.getItem('smz_usr'));}catch{return null;} });
   const [fichaId, setFichaId] = useState(null);
-  const [dataRev, setDataRev] = useState(0); // refrescar cat├ílogos al cambiar datos
+  const [dataRev, setDataRev] = useState(0); // refrescar catálogos al cambiar datos
 
   window.__logout = ()=>{ setTok(null); setUser(null); setScreen('login'); };
 

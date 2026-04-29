@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
@@ -10,133 +11,84 @@ import {
   View,
 } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
-import type { Bloque, Sepultura, Zona } from '@/lib/types';
-import { NichoGrid } from '@/components/NichoGrid';
+import type { Bloque, Zona } from '@/lib/types';
+import { CrearBloqueModal } from '@/components/CrearBloqueModal';
+import { apiFetch } from '@/lib/laravel-api';
 
 export default function AdminScreen() {
   const { user, signOut } = useAuth();
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [bloques, setBloques] = useState<Bloque[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [crearModalOpen, setCrearModalOpen] = useState(false);
+  const [editBloque, setEditBloque] = useState<Bloque | null>(null);
 
   const [zonaId, setZonaId] = useState('');
+  const [nombre, setNombre] = useState('');
   const [codigo, setCodigo] = useState('');
   const [filas, setFilas] = useState('4');
   const [columnas, setColumnas] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const numFilasPreview = Math.max(1, Math.min(12, parseInt(filas, 10) || 4));
-  const numColumnasPreview = Math.max(1, Math.min(60, parseInt(columnas, 10) || 1));
-  const previewCount = numFilasPreview * numColumnasPreview;
-
-  const previewSepulturas: Sepultura[] = Array.from({ length: previewCount }, (_, idx) => {
-    const col = Math.floor(idx / numFilasPreview) + 1;
-    const fil = (idx % numFilasPreview) + 1;
-    return {
-      id: -(idx + 1),
-      zona_id: parseInt(zonaId || '0', 10) || 0,
-      bloque_id: null,
-      tipo: 'nicho',
-      numero: idx + 1,
-      fila: fil,
-      columna: col,
-      codigo: null,
-      estado: 'libre',
-      ubicacion_texto: null,
-      notas: null,
-    };
-  });
-
   const fetchData = async () => {
-    const [zonasRes, bloquesRes] = await Promise.all([
-      supabase.from('cemn_zonas').select('*').order('id'),
-      supabase.from('cemn_bloques').select('*').order('id'),
-    ]);
-    if (zonasRes.error) Alert.alert('Error', zonasRes.error.message);
-    if (bloquesRes.error) Alert.alert('Error', bloquesRes.error.message);
-    setZonas(zonasRes.data ?? []);
-    setBloques(bloquesRes.data ?? []);
+    const cat = await apiFetch<any>('/api/cementerio/catalogo');
+    if (!cat.ok) {
+      Alert.alert('Error', String(cat.error ?? 'No se pudo cargar catálogo'));
+      setZonas([]);
+      setBloques([]);
+      return;
+    }
+    setZonas(((cat.data as any)?.zonas ?? []) as Zona[]);
+    setBloques(((cat.data as any)?.bloques ?? []) as Bloque[]);
   };
 
   useEffect(() => {
     fetchData().finally(() => setLoading(false));
   }, []);
 
-  const crearBloque = async () => {
+  const zonaNameById = useMemo(() => new Map(zonas.map((z) => [z.id, z.nombre])), [zonas]);
+
+  const openEdit = (b: Bloque) => {
+    setEditBloque(b);
+    setZonaId(String(b.zona_id ?? ''));
+    setNombre(String((b as any).nombre ?? ''));
+    setCodigo(String(b.codigo ?? ''));
+    setFilas(String(b.filas ?? '4'));
+    setColumnas(String(b.columnas ?? '1'));
+  };
+
+  const closeEdit = () => {
+    setEditBloque(null);
+  };
+
+  const guardarEdicion = async () => {
+    if (!editBloque) return;
     if (!zonaId || !codigo.trim() || !columnas.trim()) {
-      Alert.alert('Error', 'Completa todos los campos obligatorios');
+      Alert.alert('Error', 'Completa los campos obligatorios');
       return;
     }
-
-    setSaving(true);
-
     const numFilas = parseInt(filas, 10) || 4;
-    const numColumnas = parseInt(columnas, 10);
-
-    const { data: nuevoBloque, error: bloqueError } = await supabase
-      .from('cemn_bloques')
-      .insert({
+    const numColumnas = parseInt(columnas, 10) || 1;
+    setSaving(true);
+    const res = await apiFetch<any>(`/api/cementerio/admin/bloques/${editBloque.id}`, {
+      method: 'PUT',
+      body: {
         zona_id: parseInt(zonaId, 10),
         codigo: codigo.trim(),
+        nombre: nombre.trim() || `Bloque ${codigo.trim()}`,
         filas: numFilas,
         columnas: numColumnas,
-      })
-      .select()
-      .single();
-
-    if (bloqueError || !nuevoBloque) {
-      Alert.alert('Error', bloqueError?.message ?? 'No se pudo crear el bloque');
-      setSaving(false);
+      },
+    });
+    setSaving(false);
+    if (!res.ok) {
+      Alert.alert('Error', String(res.error ?? 'No se pudo actualizar el bloque'));
       return;
     }
-
-    const sepulturas = [];
-    let numero = 1;
-
-    const { data: maxNumero } = await supabase
-      .from('cemn_sepulturas')
-      .select('numero')
-      .order('numero', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (maxNumero?.numero) numero = maxNumero.numero + 1;
-
-    for (let col = 1; col <= numColumnas; col++) {
-      for (let fil = 1; fil <= numFilas; fil++) {
-        sepulturas.push({
-          zona_id: parseInt(zonaId, 10),
-          bloque_id: nuevoBloque.id,
-          tipo: 'nicho' as const,
-          numero,
-          fila: fil,
-          columna: col,
-          codigo: `${zonas.find((z) => z.id === parseInt(zonaId, 10))?.codigo ?? ''}-${codigo.trim()}-N${numero}`,
-          estado: 'libre' as const,
-        });
-        numero++;
-      }
-    }
-
-    const { error: sepError } = await supabase.from('cemn_sepulturas').insert(sepulturas);
-
-    if (sepError) {
-      Alert.alert('Error', sepError.message);
-    } else {
-      Alert.alert(
-        'Bloque creado',
-        `${codigo.trim()} con ${sepulturas.length} nichos (${numFilas}×${numColumnas})`
-      );
-      setCodigo('');
-      setColumnas('');
-      setShowForm(false);
-      await fetchData();
-    }
-
-    setSaving(false);
+    Alert.alert('Bloque actualizado', `${codigo.trim()} (${numFilas}×${numColumnas})`);
+    closeEdit();
+    await fetchData();
   };
 
   if (loading) {
@@ -161,101 +113,11 @@ export default function AdminScreen() {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Bloques registrados</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowForm(!showForm)}
-        >
-          <FontAwesome name={showForm ? 'minus' : 'plus'} size={14} color="#FFF" />
-          <Text style={styles.addButtonText}>{showForm ? 'Cancelar' : 'Nuevo bloque'}</Text>
+        <TouchableOpacity style={styles.addButton} onPress={() => setCrearModalOpen(true)} activeOpacity={0.9}>
+          <FontAwesome name="plus" size={14} color="#FFF" />
+          <Text style={styles.addButtonText}>Nuevo bloque</Text>
         </TouchableOpacity>
       </View>
-
-      {showForm && (
-        <View style={styles.form}>
-          <Text style={styles.formLabel}>Zona</Text>
-          <View style={styles.zonaSelector}>
-            {zonas.map((z) => (
-              <TouchableOpacity
-                key={z.id}
-                style={[
-                  styles.zonaOption,
-                  zonaId === String(z.id) && styles.zonaOptionActive,
-                ]}
-                onPress={() => setZonaId(String(z.id))}
-              >
-                <Text
-                  style={[
-                    styles.zonaOptionText,
-                    zonaId === String(z.id) && styles.zonaOptionTextActive,
-                  ]}
-                >
-                  {z.nombre}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.formLabel}>Código del bloque</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ej: B9, B10..."
-            value={codigo}
-            onChangeText={setCodigo}
-            autoCapitalize="characters"
-          />
-
-          <View style={styles.row}>
-            <View style={styles.halfField}>
-              <Text style={styles.formLabel}>Filas (alturas)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="4"
-                value={filas}
-                onChangeText={setFilas}
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={styles.halfField}>
-              <Text style={styles.formLabel}>Columnas</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: 32"
-                value={columnas}
-                onChangeText={setColumnas}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          {columnas && filas && (
-            <Text style={styles.preview}>
-              Se crearán {parseInt(filas, 10) * parseInt(columnas, 10) || 0} nichos
-            </Text>
-          )}
-
-          {!!columnas.trim() && (
-            <View style={styles.previewBox}>
-              <Text style={styles.previewTitle}>Previsualización ({numFilasPreview}×{numColumnasPreview})</Text>
-              <Text style={styles.previewHint}>Esto es un dibujo aproximado. La numeración final se asigna al crear.</Text>
-              <View style={{ height: 280 }}>
-                <NichoGrid sepulturas={previewSepulturas} filas={numFilasPreview} columnas={numColumnasPreview} />
-              </View>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-            onPress={crearBloque}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={styles.saveButtonText}>Crear bloque y generar nichos</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
 
       <FlatList
         data={bloques}
@@ -263,21 +125,89 @@ export default function AdminScreen() {
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <View style={styles.bloqueRow}>
-            <View>
-              <Text style={styles.bloqueCodigo}>{item.codigo}</Text>
-              <Text style={styles.bloqueDetail}>
-                {(item as any).cemn_zonas?.nombre ?? 'Zona ?'} · {item.filas}F × {item.columnas}C
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.bloqueCodigo} numberOfLines={1}>{(item as any).nombre ?? item.codigo}</Text>
+              <Text style={styles.bloqueDetail} numberOfLines={1}>
+                {zonaNameById.get(item.zona_id) ?? (item as any).cemn_zonas?.nombre ?? `Zona ${item.zona_id}`} · {item.codigo} · {item.filas}F × {item.columnas}C
               </Text>
             </View>
-            <Text style={styles.bloqueNichos}>
-              {item.filas * item.columnas} nichos
-            </Text>
+            <Text style={styles.bloqueNichos}>{item.filas * item.columnas} nichos</Text>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => openEdit(item)} activeOpacity={0.85}>
+              <FontAwesome name="edit" size={16} color="rgba(15,23,42,0.70)" />
+            </TouchableOpacity>
           </View>
         )}
         ListEmptyComponent={
           <Text style={styles.emptyText}>No hay bloques registrados aún</Text>
         }
       />
+
+      <CrearBloqueModal
+        open={crearModalOpen}
+        onClose={() => setCrearModalOpen(false)}
+        onSaved={async () => {
+          setCrearModalOpen(false);
+          await fetchData();
+        }}
+      />
+
+      <Modal visible={!!editBloque} transparent animationType="slide" onRequestClose={closeEdit}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHead}>
+              <Text style={styles.modalTitle}>Editar bloque</Text>
+              <TouchableOpacity style={styles.iconBtn} onPress={closeEdit} activeOpacity={0.85}>
+                <FontAwesome name="times" size={18} color="rgba(15,23,42,0.70)" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.formLabel}>Zona</Text>
+            <View style={styles.zonaSelector}>
+              {zonas.map((z) => (
+                <TouchableOpacity
+                  key={z.id}
+                  style={[
+                    styles.zonaOption,
+                    zonaId === String(z.id) && styles.zonaOptionActive,
+                  ]}
+                  onPress={() => setZonaId(String(z.id))}
+                >
+                  <Text
+                    style={[
+                      styles.zonaOptionText,
+                      zonaId === String(z.id) && styles.zonaOptionTextActive,
+                    ]}
+                  >
+                    {z.nombre}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.formLabel}>Nombre</Text>
+            <TextInput style={styles.input} value={nombre} onChangeText={setNombre} placeholder="Bloque 1" />
+
+            <Text style={styles.formLabel}>Código</Text>
+            <TextInput style={styles.input} value={codigo} onChangeText={setCodigo} autoCapitalize="characters" />
+
+            <View style={styles.row}>
+              <View style={styles.halfField}>
+                <Text style={styles.formLabel}>Filas</Text>
+                <TextInput style={styles.input} value={filas} onChangeText={setFilas} keyboardType="numeric" />
+              </View>
+              <View style={styles.halfField}>
+                <Text style={styles.formLabel}>Columnas</Text>
+                <TextInput style={styles.input} value={columnas} onChangeText={setColumnas} keyboardType="numeric" />
+              </View>
+            </View>
+
+            <TouchableOpacity style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={guardarEdicion} disabled={saving} activeOpacity={0.9}>
+              {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>Guardar cambios</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -339,18 +269,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  form: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-  },
   formLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -398,23 +316,6 @@ const styles = StyleSheet.create({
   halfField: {
     flex: 1,
   },
-  preview: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#15803D',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  previewBox: {
-    marginTop: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-  },
-  previewTitle: { fontSize: 13, fontWeight: '800', color: '#1F2937' },
-  previewHint: { marginTop: 6, fontSize: 12, color: '#6B7280', fontWeight: '600' },
   saveButton: {
     backgroundColor: '#22C55E',
     borderRadius: 10,
@@ -459,6 +360,20 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '600',
   },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 16, maxHeight: '92%' },
+  modalHandle: { width: 44, height: 5, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.18)', alignSelf: 'center', marginBottom: 10 },
+  modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  modalTitle: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
   emptyText: {
     textAlign: 'center',
     color: '#9CA3AF',

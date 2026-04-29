@@ -14,12 +14,13 @@ export type PoligonoBloque = {
  */
 export const POLIGONOS_BLOQUES_SOMAHOZ: PoligonoBloque[] = [
   /**
-   * Ajuste inicial para `assets/images/unnamed.png`:
+   * Ajuste para `assets/images/unnamed.png`:
    * - La ortofoto está centrada y el resto es margen blanco.
    * - Estos polígonos están dibujados para el viewBox 0..1000 y deben
    *   "caer" encima de los trazos rojo/azul del propio PNG.
    *
-   * Si algún bloque no encaja al 100%, dime cuál y lo reajusto rápido.
+   * Importante: cuando se use `CementerioMapa` con `crop`,
+   * mantener (x:255 y:205 w:500 h:500) para que encaje.
    */
 
   // Coordenadas afinadas para `unnamed.png` con crop (x:255 y:205 w:500 h:500)

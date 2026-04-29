@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,13 +9,14 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import type { Difunto } from '@/lib/types';
 import { apiFetch } from '@/lib/laravel-api';
 
-type Tipo = 'exhumacion' | 'traslado';
+type Tipo = 'inhumacion' | 'exhumacion' | 'traslado' | 'reduccion';
 
 function hoyISO() {
   const d = new Date();
@@ -35,6 +36,7 @@ export default function ExhumacionTrasladoModal() {
   const [fecha, setFecha] = useState(hoyISO());
   const [obs, setObs] = useState('');
   const [saving, setSaving] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const difuntoSeleccionado = useMemo(
     () => difuntos.find((d) => d.id === difuntoId) ?? null,
@@ -62,7 +64,7 @@ export default function ExhumacionTrasladoModal() {
     run();
   }, [sepulturaId]);
 
-  const guardar = async () => {
+  const guardar = useCallback(async () => {
     try {
       if (!difuntoId) throw new Error('Selecciona un difunto.');
       if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
@@ -97,7 +99,12 @@ export default function ExhumacionTrasladoModal() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [difuntoId, fecha, obs, router, sepulturaId, tipo]);
+
+  const difuntoLabel = useMemo(() => {
+    const d = difuntos.find((x) => x.id === difuntoId);
+    return d?.nombre_completo ? String(d.nombre_completo) : 'Selecciona…';
+  }, [difuntoId, difuntos]);
 
   if (loading) {
     return (
@@ -111,187 +118,218 @@ export default function ExhumacionTrasladoModal() {
   return (
     <View style={s.screen}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
-        <Text style={s.h1}>Exhumación / Traslado</Text>
-        <Text style={s.sub}>
-          Sepultura: {Number.isFinite(Number(numero)) ? `N.º ${numero}` : `ID ${sepulturaId}`}
-        </Text>
+        <Text style={s.over}>ACTA DE MOVIMIENTO</Text>
+        <Text style={s.h1}>Registrar movimiento</Text>
 
         <View style={s.card}>
-          <Text style={s.label}>Tipo</Text>
-          <View style={s.row}>
-            {(['exhumacion', 'traslado'] as Tipo[]).map((t) => (
-              <TouchableOpacity
-                key={t}
-                style={[s.pill, tipo === t && s.pillActive]}
-                onPress={() => setTipo(t)}
-                activeOpacity={0.85}
-              >
-                <FontAwesome name={t === 'exhumacion' ? 'arrow-up' : 'exchange'} size={16} color={tipo === t ? '#15803D' : '#334155'} />
-                <Text style={[s.pillT, tipo === t && s.pillTActive]}>{t.toUpperCase()}</Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={s.label}>Tipo de movimiento</Text>
+          <View style={s.grid2}>
+            {([
+              { k: 'inhumacion', t: 'Inhumación', icon: 'arrow-down' as const },
+              { k: 'exhumacion', t: 'Exhumación', icon: 'arrow-up' as const },
+              { k: 'traslado', t: 'Traslado', icon: 'random' as const },
+              { k: 'reduccion', t: 'Reducción', icon: 'compress' as const },
+            ] as const).map((it) => {
+              const active = tipo === it.k;
+              const disabled = it.k === 'inhumacion' || it.k === 'reduccion';
+              return (
+                <TouchableOpacity
+                  key={it.k}
+                  style={[s.tipoBtn, active && s.tipoBtnActive, disabled && { opacity: 0.45 }]}
+                  onPress={() => {
+                    if (disabled) {
+                      Alert.alert('Próximamente', 'Este tipo de movimiento aún no está conectado.');
+                      return;
+                    }
+                    setTipo(it.k);
+                  }}
+                  activeOpacity={0.9}
+                >
+                  <View style={[s.tipoIcon, active && s.tipoIconActive]}>
+                    <FontAwesome name={it.icon} size={16} color={active ? '#2F3F35' : 'rgba(15,23,42,0.60)'} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[s.tipoT, active && s.tipoTActive]} numberOfLines={1}>
+                      {it.t}
+                    </Text>
+                    {disabled ? <Text style={s.tipoSoon}>Próximamente</Text> : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           <Text style={s.label}>Difunto</Text>
-          {difuntos.length === 0 ? (
-            <Text style={s.warn}>No hay difuntos vinculados a este nicho.</Text>
-          ) : (
-            <View style={{ gap: 10 }}>
-              {difuntos.map((d) => (
-                <TouchableOpacity
-                  key={d.id}
-                  style={[s.difItem, difuntoId === d.id && s.difItemActive]}
-                  onPress={() => setDifuntoId(d.id)}
-                  activeOpacity={0.85}
-                >
-                  <FontAwesome name={difuntoId === d.id ? 'check-circle' : 'circle-o'} size={18} color={difuntoId === d.id ? '#16A34A' : '#94A3B8'} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.difName}>{d.nombre_completo}</Text>
-                    {d.fecha_fallecimiento ? <Text style={s.difSub}>Fallecido: {d.fecha_fallecimiento}</Text> : null}
-                  </View>
-                </TouchableOpacity>
-              ))}
+          <TouchableOpacity
+            style={[s.select, difuntos.length === 0 && { opacity: 0.6 }]}
+            onPress={() => (difuntos.length ? setPickerOpen(true) : null)}
+            activeOpacity={0.9}
+            disabled={difuntos.length === 0}
+          >
+            <Text style={s.selectT} numberOfLines={1}>
+              {difuntoLabel}
+            </Text>
+            <FontAwesome name="chevron-down" size={16} color="rgba(15,23,42,0.40)" />
+          </TouchableOpacity>
+
+          <Text style={s.label}>Fecha</Text>
+          <View style={s.dateRow}>
+            <TextInput
+              style={[s.input, { flex: 1, marginTop: 0 }]}
+              value={fecha}
+              onChangeText={setFecha}
+              placeholder="AAAA-MM-DD"
+              placeholderTextColor="rgba(15,23,42,0.28)"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
+            />
+            <View style={s.calIcon}>
+              <FontAwesome name="calendar" size={16} color="rgba(15,23,42,0.50)" />
             </View>
-          )}
+          </View>
 
-          <Text style={s.label}>Fecha del movimiento (AAAA-MM-DD)</Text>
-          <TextInput
-            style={s.input}
-            value={fecha}
-            onChangeText={setFecha}
-            placeholder="AAAA-MM-DD"
-            placeholderTextColor="#9CA3AF"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-          />
-
-          <Text style={s.label}>Observaciones</Text>
+          <Text style={s.label}>Descripción</Text>
           <TextInput
             style={[s.input, { minHeight: 90 }]}
             value={obs}
             onChangeText={setObs}
-            placeholder="Ej: Traslado al Bloque B7 / autorización pendiente…"
-            placeholderTextColor="#9CA3AF"
+            placeholder="Detalles del acta…"
+            placeholderTextColor="rgba(15,23,42,0.28)"
             multiline
             textAlignVertical="top"
           />
-
-          {difuntoSeleccionado ? (
-            <View style={s.summary}>
-              <Text style={s.summaryT}>
-                Se registrará {tipo.toUpperCase()} para:
-              </Text>
-              <Text style={s.summaryName}>{difuntoSeleccionado.nombre_completo}</Text>
-              <Text style={s.summaryHint}>
-                Si tras este suceso el nicho queda vacío, el sistema lo devolverá automáticamente a estado LIBRE.
-              </Text>
-            </View>
-          ) : null}
         </View>
       </ScrollView>
 
-      <View style={s.bottom}>
-        <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => router.back()} activeOpacity={0.85}>
-          <Text style={s.btnGhostT}>Cancelar</Text>
-        </TouchableOpacity>
+      <View style={s.bottomSingle}>
         <TouchableOpacity
-          style={[s.btn, s.btnPrimary, (saving || difuntos.length === 0) && { opacity: 0.6 }]}
+          style={[s.primary, (saving || difuntos.length === 0) && { opacity: 0.6 }]}
           onPress={guardar}
           disabled={saving || difuntos.length === 0}
-          activeOpacity={0.85}
+          activeOpacity={0.9}
         >
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryT}>Guardar suceso</Text>}
+          {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryT}>Registrar movimiento</Text>}
         </TouchableOpacity>
       </View>
+
+      <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
+        <View style={s.pickerBackdrop}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setPickerOpen(false)} />
+          <View style={s.pickerSheet}>
+            <Text style={s.pickerTitle}>Selecciona un difunto</Text>
+            <ScrollView style={{ maxHeight: 320 }}>
+              {difuntos.map((d) => {
+                const active = d.id === difuntoId;
+                return (
+                  <TouchableOpacity
+                    key={d.id}
+                    style={[s.pickerRow, active && s.pickerRowActive]}
+                    onPress={() => {
+                      setDifuntoId(d.id);
+                      setPickerOpen(false);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={s.pickerRowT} numberOfLines={1}>
+                      {d.nombre_completo}
+                    </Text>
+                    {active ? <FontAwesome name="check" size={16} color="#2F3F35" /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8FAFC' },
+  screen: { flex: 1, backgroundColor: '#F3EFE6' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#F8FAFC' },
   centerT: { color: '#64748B', fontWeight: '800' },
-  h1: { fontSize: 22, fontWeight: '900', color: '#0F172A' },
-  sub: { marginTop: 6, color: '#475569', fontWeight: '700' },
+  over: { fontSize: 11, fontWeight: '900', letterSpacing: 1.6, color: 'rgba(15,23,42,0.45)' },
+  h1: { marginTop: 4, fontSize: 20, fontWeight: '900', color: '#0F172A' },
   card: {
     marginTop: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7F3EA',
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(15,23,42,0.08)',
     gap: 10,
   },
-  label: { marginTop: 6, fontSize: 12, fontWeight: '900', color: '#334155' },
-  row: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  pill: {
+  label: { marginTop: 10, fontSize: 12, fontWeight: '900', color: 'rgba(15,23,42,0.70)' },
+
+  grid2: { marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  tipoBtn: {
+    width: '48.5%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 999,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F1F5F9',
+    borderColor: 'rgba(15,23,42,0.10)',
   },
-  pillActive: { backgroundColor: '#DCFCE7', borderColor: '#86EFAC' },
-  pillT: { fontSize: 12, fontWeight: '900', color: '#334155' },
-  pillTActive: { color: '#15803D' },
-  warn: { color: '#B45309', fontWeight: '800', marginTop: 4 },
-  difItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
+  tipoBtnActive: { borderColor: 'rgba(47,63,53,0.55)', backgroundColor: 'rgba(47,63,53,0.06)' },
+  tipoIcon: { width: 30, height: 30, borderRadius: 10, backgroundColor: 'rgba(15,23,42,0.06)', alignItems: 'center', justifyContent: 'center' },
+  tipoIconActive: { backgroundColor: 'rgba(47,63,53,0.12)' },
+  tipoT: { fontSize: 13, fontWeight: '900', color: 'rgba(15,23,42,0.75)' },
+  tipoTActive: { color: '#0F172A' },
+  tipoSoon: { marginTop: 2, fontSize: 11, fontWeight: '800', color: 'rgba(15,23,42,0.45)' },
+
+  select: {
+    marginTop: 8,
+    height: 46,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+    borderColor: 'rgba(15,23,42,0.10)',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
-  difItemActive: { backgroundColor: '#ECFDF5', borderColor: '#86EFAC' },
-  difName: { fontWeight: '900', color: '#0F172A' },
-  difSub: { marginTop: 2, color: '#64748B', fontWeight: '700', fontSize: 12 },
+  selectT: { flex: 1, fontWeight: '900', color: 'rgba(15,23,42,0.80)' },
+
+  dateRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  calIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(15,23,42,0.10)', alignItems: 'center', justifyContent: 'center' },
   input: {
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderColor: 'rgba(15,23,42,0.10)',
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
-    backgroundColor: '#FFF',
+    color: '#0F172A',
+    backgroundColor: '#FFFFFF',
   },
-  summary: {
-    marginTop: 10,
-    borderRadius: 14,
-    padding: 12,
-    backgroundColor: '#0F172A',
-  },
-  summaryT: { color: '#E2E8F0', fontWeight: '900', fontSize: 12 },
-  summaryName: { marginTop: 6, color: '#FFF', fontWeight: '900', fontSize: 14 },
-  summaryHint: { marginTop: 8, color: '#CBD5E1', fontWeight: '700', fontSize: 12, lineHeight: 16 },
-  bottom: {
+
+  bottomSingle: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 26 : 14,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    flexDirection: 'row',
-    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(243,239,230,0.92)',
   },
-  btn: { flex: 1, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  btnGhost: { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  btnGhostT: { color: '#0F172A', fontWeight: '900' },
-  btnPrimary: { backgroundColor: '#16A34A' },
-  btnPrimaryT: { color: '#fff', fontWeight: '900' },
+  primary: { height: 54, borderRadius: 999, backgroundColor: '#2F3F35', alignItems: 'center', justifyContent: 'center' },
+  primaryT: { color: '#FFFFFF', fontWeight: '900' },
+
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  pickerSheet: { backgroundColor: '#F7F4EE', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 16, paddingBottom: 18 },
+  pickerTitle: { fontSize: 14, fontWeight: '900', color: '#0F172A', marginBottom: 10 },
+  pickerRow: { paddingVertical: 12, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(15,23,42,0.10)', backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 },
+  pickerRowActive: { borderColor: 'rgba(47,63,53,0.55)', backgroundColor: 'rgba(47,63,53,0.06)' },
+  pickerRowT: { flex: 1, fontWeight: '900', color: 'rgba(15,23,42,0.85)' },
 });
 

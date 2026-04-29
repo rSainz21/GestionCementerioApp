@@ -39,9 +39,13 @@ class SepulturaDocumentoController extends Controller
             'descripcion' => $data['descripcion'] ?? null,
         ]);
 
+        $fresh = $doc->fresh();
+
         return response()->json([
             'message' => 'Documento adjuntado correctamente.',
-            'item' => $doc->fresh(),
+            'item' => array_merge($fresh->toArray(), [
+                'url' => $fresh->ruta_archivo ? ('/storage/'.ltrim($fresh->ruta_archivo, '/')) : null,
+            ]),
         ]);
     }
 }
