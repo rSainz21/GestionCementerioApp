@@ -322,7 +322,7 @@ async function guardar() {
       }
 
       fd.append('difunto[foto]', fotoFile.value);
-      await api.post('/api/cementerio/nuevo-caso', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post('/api/cementerio/nuevo-caso', fd);
     } else {
       await api.post('/api/cementerio/nuevo-caso', form);
     }

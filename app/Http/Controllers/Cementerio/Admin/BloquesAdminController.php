@@ -9,6 +9,7 @@ use App\Models\CemnZona;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\QueryException;
 
 class BloquesAdminController extends Controller
 {
@@ -149,7 +150,21 @@ class BloquesAdminController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $item = CemnBloque::query()->findOrFail($id);
-        $item->delete();
+
+        try {
+            DB::transaction(function () use ($item) {
+                // Borrado destructivo: primero sepulturas del bloque.
+                // Si hubiera dependencias (concesiones/difuntos/documentos) MySQL lanzará FK error.
+                CemnSepultura::query()->where('bloque_id', $item->id)->delete();
+                $item->delete();
+            });
+        } catch (QueryException $e) {
+            // Evitar 500 sin contexto en UI.
+            return response()->json([
+                'message' => 'No se puede borrar el bloque porque tiene registros relacionados (concesiones, difuntos o documentos).',
+            ], 422);
+        }
+
         return response()->json(['ok' => true]);
     }
 }

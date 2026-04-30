@@ -898,10 +898,10 @@ async function onUploadFotoTitular(ev) {
     const fd = new FormData();
     if (item.value?.difunto_titular?.id) {
       fd.append('foto', file);
-      await api.post(`/api/cementerio/difuntos/${item.value.difunto_titular.id}/foto`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post(`/api/cementerio/difuntos/${item.value.difunto_titular.id}/foto`, fd);
     } else {
       fd.append('imagen', file);
-      await api.post(`/api/cementerio/sepulturas/${item.value.id}/imagen`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post(`/api/cementerio/sepulturas/${item.value.id}/imagen`, fd);
     }
     imageCacheBust.value += 1;
     await load(item.value.id);
@@ -923,7 +923,7 @@ async function onUploadDocumento(ev) {
   try {
     const fd = new FormData();
     fd.append('archivo', file);
-    await api.post(`/api/cementerio/sepulturas/${item.value.id}/documentos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    await api.post(`/api/cementerio/sepulturas/${item.value.id}/documentos`, fd);
     await load(item.value.id);
   } catch (e) {
     docsError.value = e?.response?.data?.message ?? 'No se pudo adjuntar el documento.';

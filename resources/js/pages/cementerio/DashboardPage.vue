@@ -240,7 +240,17 @@
               <span v-if="selectedConcesion.zona_nombre"> · Zona {{ selectedConcesion.zona_nombre }}</span>
             </div>
           </div>
-          <button class="btn btn--ghost" type="button" @click="clearSelectedConcesion">Cerrar</button>
+          <div class="result__actions">
+            <button
+              v-if="selectedConcesion.sepultura_id"
+              class="btn btn--primary"
+              type="button"
+              @click="openSepultura(selectedConcesion.sepultura_id)"
+            >
+              Ver sepultura
+            </button>
+            <button class="btn btn--ghost" type="button" @click="clearSelectedConcesion">Cerrar</button>
+          </div>
         </div>
       </div>
     </section>
@@ -434,6 +444,9 @@ function selectConcesion(it) {
   selectedConcesion.value = it;
   concesionSearch.value = it?.concesionario || it?.label || '';
   concesionItems.value = [];
+  if (it?.sepultura_id) {
+    openSepultura(it.sepultura_id);
+  }
 }
 function clearSelectedConcesion() { selectedConcesion.value = null; }
 
@@ -463,6 +476,9 @@ function selectDifunto(it) {
   selectedDifunto.value = it;
   difuntoSearch.value = it?.nombre_completo || it?.label || '';
   difuntoItems.value = [];
+  if (it?.sepultura_id) {
+    openSepultura(it.sepultura_id);
+  }
 }
 function clearSelectedDifunto() { selectedDifunto.value = null; }
 

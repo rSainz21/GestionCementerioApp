@@ -174,6 +174,7 @@ const loading = ref(false);
 const error = ref(null);
 
 const sepulturas = ref([]);
+let triedBloques = new Set();
 
 const bloquesFiltrados = computed(() => {
   const list = props.bloques.filter((b) => (zonaId.value ? b.zona_id === zonaId.value : false));
@@ -205,13 +206,30 @@ async function cargarSepulturasDelBloque(id) {
 
 watch(bloqueId, async (newId) => {
   if (!newId) return;
+  triedBloques.add(newId);
   await cargarSepulturasDelBloque(newId);
+
+  // Si estamos en modo "libres" y este bloque no tiene huecos, probar el siguiente bloque de la zona.
+  if (props.selectionMode === 'libres' && zonaId.value) {
+    const hasLibre = sepulturas.value.some((s) => String(s?.estado ?? 'libre').toLowerCase() === 'libre');
+    if (!hasLibre) {
+      const next = bloquesFiltrados.value.find((b) => !triedBloques.has(b.id));
+      if (next && next.id !== newId) {
+        bloqueId.value = next.id;
+      }
+    }
+  }
 });
 
 watch(zonaId, () => {
   bloqueId.value = null;
   sepulturas.value = [];
   error.value = null;
+  triedBloques = new Set();
+
+  // Auto-seleccionar primer bloque de la zona para no obligar a hacer 2 clics (y permitir auto-búsqueda de libres).
+  const first = bloquesFiltrados.value[0] ?? null;
+  if (first?.id) bloqueId.value = first.id;
 });
 
 watch(
