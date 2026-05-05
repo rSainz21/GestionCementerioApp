@@ -1,134 +1,72 @@
-# Portfolio técnico — Conect@ 2.0 (Cementerio)
+# Conect@ 2.0 — Módulo Cementerio (Portfolio)
 
-Este repositorio contiene un **módulo completo de Cementerio** desarrollado para un entorno municipal, con:
+[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+![Laravel](https://img.shields.io/badge/Laravel-12-red)
+![Vue](https://img.shields.io/badge/Vue-3-42b883)
+![Expo](https://img.shields.io/badge/Expo-54-black)
 
-- **Backend**: Laravel (API REST, permisos, validaciones, auditoría de cambios, subida de documentos/fotos, despliegue Docker).
-- **Web**: Vue 3 + PrimeVue (panel de gestión del módulo).
-- **App**: Expo/React Native (uso en campo: mapa, ficha de sepultura, flujos operativos, modo offline con cola de sincronización).
-- **Wrapper APK** (opcional): Capacitor para empaquetar una PWA como APK instalable.
+Repositorio **full‑stack** (API + Web + App de campo) orientado a portfolio: arquitectura, UX y operación real en un módulo municipal de cementerio.
 
-> Nota: esta es una versión orientada a portfolio. **No** incluye credenciales reales ni infraestructura privada.
+> **Importante**: repo sin credenciales reales. Checklist de publicación en `docs/portfolio/SEGURIDAD_Y_PRIVACIDAD.md`.
 
-## Qué puedes ver rápido (para recruiters)
+## Qué es (1 minuto)
+
+Sistema para gestión de cementerio con foco operativo:
+
+- **Inventario** de unidades, zonas y bloques.
+- **Concesiones** (expedientes) y titulares.
+- **Difuntos** vinculados a unidades.
+- **Documentos/Fotos** como evidencias.
+- **App de campo** con mapa + ficha y soporte offline (cola + sincronización).
+
+## Stack
+
+- **Backend**: Laravel 12 · PHP 8.2 · Sanctum (Bearer) · Spatie permissions · DomPDF
+- **Web**: Vue 3 · Vite · PrimeVue (Aura) · Pinia · Vue Router
+- **App**: Expo / React Native · Expo Router · Leaflet (web) · RN Maps (nativo)
+- **DB**: SQLite (dev) / MySQL (prod)
+- **Ops**: Docker Compose (despliegue LAN)
+
+## Ruta rápida para evaluarlo
 
 - **Resumen ejecutivo**: `docs/portfolio/RESUMEN_PARA_EMPRESAS.md`
 - **Arquitectura**: `docs/portfolio/ARQUITECTURA.md`
-- **Funcionalidades**: `docs/portfolio/FEATURES.md`
-- **Cómo ejecutar demo**: `docs/portfolio/COMO_EJECUTAR_DEMO.md`
-- **Privacidad/seguridad**: `docs/portfolio/SEGURIDAD_Y_PRIVACIDAD.md`
-- **Mi contribución**: `docs/portfolio/MI_APORTACION.md`
+- **Features**: `docs/portfolio/FEATURES.md`
+- **Demo local**: `docs/portfolio/COMO_EJECUTAR_DEMO.md`
+- **Mi aportación**: `docs/portfolio/MI_APORTACION.md`
 
-## Estructura del repo (alto nivel)
+## Estructura del repo
 
-- `app/`, `routes/`, `database/`: API Laravel del módulo Cementerio.
-- `resources/js/`: Web (Vue) del módulo Cementerio.
-- `cementerio-app/`: App Expo (React Native / web) para trabajo en campo.
-- `mobile-apk/`: APK wrapper (Capacitor) para PWA `/movil`.
-- `docs/`: documentación de despliegue + portfolio.
+- `app/`, `routes/`, `database/`: API Laravel
+- `resources/js/`: Web (Vue)
+- `cementerio-app/`: App Expo (campo)
+- `mobile-apk/`: wrapper APK (opcional)
+- `docs/portfolio/`: documentación de portfolio
+
+## Quickstart (dev)
+
+### Backend + Web
+
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+
+npm install
+npm run dev
+```
+
+### App de campo
+
+```bash
+cd cementerio-app
+cp .env.example .env
+# EXPO_PUBLIC_LARAVEL_BASE=http://TU_HOST:8000
+npm install
+npm run start
+```
 
 ## Licencia
 
-Este repositorio se publica con fines de **visibilidad profesional**. Si vas a abrirlo públicamente, revisa `docs/portfolio/SEGURIDAD_Y_PRIVACIDAD.md` para evitar exponer datos o endpoints reales.
-
-# 🏛️ Sistema de Gestión Integral de Cementerios Municipales
-
-Este proyecto representa la **Transformación Digital y Regularización de la Gestión de los cementerios municipales del Ayuntamiento de Los Corrales de Buelna**.  
-
-El sistema sustituye un modelo analógico fragmentado y obsoleto por una solución tecnológica avanzada basada en un **Sistema de Información Geográfica (SIG)**.
-
----
-
-## 📌 Visión del Proyecto
-
-El objetivo es resolver deficiencias críticas identificadas en el modelo de gestión actual:
-
-- ⚖️ **Inseguridad Jurídica**  
-  Eliminación de la ambigüedad en la titularidad causada por anotaciones manuscritas y documentos antiguos.
-
-- 🗺️ **Obsolescencia Cartográfica**  
-  Creación de una correspondencia unívoca entre el "papel" y el "terreno" mediante mapas dinámicos.
-
-- 🪦 **Registros "Huérfanos"**  
-  Recuperación de la trazabilidad de restos que carecen de ubicación física en los planos actuales.
-
-- 💰 **Control Económico**  
-  Gestión sistemática de vencimientos de concesiones para evitar la pérdida de lucro cesante.
-
----
-
-## 🛠️ Stack Tecnológico
-
-La API ha sido desarrollada con una arquitectura moderna y segura:
-
-- **Lenguaje:** Java 17  
-- **Framework:** Spring Boot 4.0.3  
-- **Seguridad:** Spring Security con JWT (JSON Web Token) y encriptación de contraseñas con BCrypt  
-- **Persistencia:** Spring Data JPA / Hibernate  
-- **Base de Datos:** MySQL  
-- **Documentación:** Swagger UI (`/swagger-ui.html`)
-
----
-
-## 🚀 Funcionalidades Principales
-
-El backend expone servicios diseñados para cubrir el ciclo de vida completo de la gestión funeraria:
-
-### 1. 🗺️ Gestión SIG y Estructuras Paramétricas
-
-- **Generador Dinámico**  
-  Permite crear bloques de nichos especificando filas, columnas y sentido de numeración para adaptarse a la realidad física de cada cementerio.
-
-- **Geoposicionamiento**  
-  Cada unidad (nicho, tumba, panteón) cuenta con coordenadas GPS para localización precisa.
-
----
-
-### 2. 🧑‍🔧 Regularización y Trabajo de Campo
-
-- **Bandeja de Restos Huérfanos**  
-  Interfaz para gestionar registros antiguos sin ubicación física.
-
-- **Vinculación In Situ**  
-  Funcionalidad para que los operarios vinculen restos a huecos físicos mediante el método de *drag & drop* sobre el mapa tras la verificación en campo.
-
----
-
-### 3. 📁 Expediente Digital 360°
-
-- **Gestión Multimedia**  
-  Almacenamiento de fotos de lápidas para auditoría visual y estado de conservación.
-
-- **Repositorio Documental**  
-  Digitalización de títulos de propiedad, solicitudes y actas de defunción.
-
----
-
-### 4. ⚙️ Administración y Control
-
-- **Gestión de Concesiones**  
-  Sistema de alertas de caducidad y control de herederos.
-
-- **Módulo Económico**  
-  Control de impagos, emisión de padrones de mantenimiento y liquidación de tasas.
-
----
-
-## 📋 Configuración del Entorno
-
-### Requisitos
-
-- Java 17 o superior  
-- MySQL Server  
-- Gradle (incluido mediante `gradlew`)  
-
-### Instalación
-
-1. Clonar el repositorio  
-2. Configurar las credenciales de la base de datos en:  
-
-src/main/resources/application.properties
-
-3. Construir y ejecutar la aplicación:
-
-```bash
-./gradlew bootRun
+MIT. Ver `LICENSE`.
