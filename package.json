@@ -10,7 +10,6 @@
         "apexcharts": ">=5.10.0",
         "axios": "^1.7.0",
         "leaflet": "^1.9.4",
-        "marked": "^13.0.3",
         "pinia": "^2.2.0",
         "primeicons": "^7.0.0",
         "primevue": "^4.5.0",

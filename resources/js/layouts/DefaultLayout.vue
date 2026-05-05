@@ -18,20 +18,13 @@
           <i class="pi pi-home" />
           <span>Inicio</span>
         </router-link>
-        <router-link class="nav__item" to="/cementerio/gestion" active-class="nav__item--active">
+<router-link class="nav__item" to="/cementerio/gestion" active-class="nav__item--active">
           <i class="pi pi-database" />
           <span>Gestión</span>
         </router-link>
         <router-link class="nav__item" to="/cementerio/nuevo" active-class="nav__item--active">
           <i class="pi pi-plus-circle" />
           <span>Nuevo caso</span>
-        </router-link>
-
-        <div class="nav__divider" />
-        <div class="nav__section">SOPORTE</div>
-        <router-link class="nav__item" to="/cementerio/ayuda" active-class="nav__item--active">
-          <i class="pi pi-book" />
-          <span>Ayuda</span>
         </router-link>
       </nav>
 
@@ -160,11 +153,6 @@ watch(() => route.fullPath, () => {
   opacity: 0.45;
   padding: 8px 8px 4px;
   text-transform: uppercase;
-}
-.nav__divider {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.07);
-  margin: 8px 0;
 }
 
 .nav__item {
