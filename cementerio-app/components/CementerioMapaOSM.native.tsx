@@ -5,11 +5,10 @@ import type { HotspotPolygon, SomahozHotspotId } from '@/lib/mapa-somahoz-hotspo
 import { Semantic } from '@/components/ui';
 import type { BloqueOficial } from '@/lib/bloques-oficiales';
 import type { Sepultura } from '@/lib/types';
-import { normalizarEstadoEditable } from '@/lib/estado-sepultura';
+import { normalizarEstadoDb } from '@/lib/estado-sepultura';
 import { SOMAHOZ_BBOX, SOMAHOZ_BLOQUES_LATLON, vbToLatLon } from '@/lib/somahoz-geo';
 import { SOMAHOZ_YELLOW_MARKERS } from '@/lib/somahoz-yellow-markers';
 import { loadYellowMarkerPositions } from '@/lib/mapa-yellow-store';
-import { loadCustomMarkers, type CustomMarker } from '@/lib/mapa-custom-markers-store';
 
 type Props = {
   height: number;
@@ -29,6 +28,22 @@ type Props = {
   customBloques?: Array<{ codigo: string; coordinates: Array<{ latitude: number; longitude: number }> }> | null;
   onPressYellowMarker?: (id: string) => void;
   yellowReloadNonce?: number;
+  estadoFiltro?: 'todos' | 'libre' | 'ocupada' | 'reservada' | 'clausurada';
+  geoSepulturas?: Array<{
+    id: number;
+    numero: number | null;
+    lat: number;
+    lon: number;
+    tipo: string;
+    estado?: string | null;
+    titular?: string | null;
+    bloque_codigo?: string | null;
+    zona_nombre?: string | null;
+  }>;
+  allowDragGeoSepulturas?: boolean;
+  onDragGeoSepultura?: (id: number, latitude: number, longitude: number) => void;
+  onPressGeoSepultura?: (id: number) => void;
+  highlightGeoSepulturaId?: number | null;
 };
 
 const SOMAHOZ_CENTER = {
@@ -156,9 +171,14 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
   customBloques,
   onPressYellowMarker,
   yellowReloadNonce,
+  estadoFiltro = 'todos',
+  geoSepulturas,
+  allowDragGeoSepulturas = false,
+  onDragGeoSepultura,
+  onPressGeoSepultura,
+  highlightGeoSepulturaId,
 }: Props) {
   const [yellowById, setYellowById] = useState<Record<string, { latitude: number; longitude: number }> | null>(null);
-  const [customMarkers, setCustomMarkers] = useState<CustomMarker[]>([]);
 
   useEffect(() => {
     loadYellowMarkerPositions()
@@ -170,11 +190,16 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
       .catch(() => setYellowById({}));
   }, [yellowReloadNonce]);
 
-  useEffect(() => {
-    loadCustomMarkers()
-      .then((all) => setCustomMarkers(Array.isArray(all) ? all : []))
-      .catch(() => setCustomMarkers([]));
-  }, [yellowReloadNonce]);
+  const sepsGeo = Array.isArray(geoSepulturas) ? geoSepulturas : [];
+
+  const colorByEstado = (estado?: string | null) => {
+    const e = String(estado ?? '').toLowerCase();
+    if (e === 'libre') return 'rgba(34,197,94,0.95)';
+    if (e === 'reservada') return 'rgba(255,230,0,0.96)';
+    if (e === 'mantenimiento') return 'rgba(239,68,68,0.95)';
+    if (e === 'ocupada') return 'rgba(148,163,184,0.95)';
+    return 'rgba(148,163,184,0.95)';
+  };
 
   const region = useMemo(() => {
     // Más “cerca” por defecto: encuadra el recinto sin tanto aire
@@ -204,7 +229,7 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
     if (grids.length === 0) return [];
     // seguimos usando el polígono en VB para la distribución de rejilla (PCA)
     // (si luego pasamos a GeoJSON real, lo ideal es generar posiciones en lat/lon)
-    const polysByCode = new Map(require('@/lib/mapa-somahoz').POLIGONOS_BLOQUES_SOMAHOZ.map((p: any) => [String(p.codigo), p]));
+    const polysByCode = new Map<string, any>(require('@/lib/mapa-somahoz').POLIGONOS_BLOQUES_SOMAHOZ.map((p: any) => [String(p.codigo), p]));
     const out: Array<{ code: string; lat: number; lon: number }> = [];
     const MAX_POINTS = 5200; // evita saturar el render
     for (const g of grids) {
@@ -216,7 +241,7 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
       const filas = Number((g as any)?.filas);
       const columnas = Number((g as any)?.columnas);
       if (!Number.isFinite(filas) || !Number.isFinite(columnas) || filas <= 0 || columnas <= 0) continue;
-      const positions = gridPositionsInPoly(poly.puntos, filas, columnas, true);
+      const positions = gridPositionsInPoly((poly as any).puntos, filas, columnas, true);
       for (let i = 0; i < positions.length && out.length < MAX_POINTS; i++) {
         const ll = vbToLatLon(positions[i]);
         out.push({ code, lat: ll.latitude, lon: ll.longitude });
@@ -243,7 +268,7 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
         id: Number((sorted[i] as any)?.id ?? i),
         lat: ll.latitude,
         lon: ll.longitude,
-        estado: normalizarEstadoEditable((sorted[i] as any)?.estado),
+        estado: normalizarEstadoDb((sorted[i] as any)?.estado),
       });
     }
     return out;
@@ -266,13 +291,29 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
         onRegionChangeComplete={(r) => setLastRegion(r)}
         maxZoomLevel={22}
         minZoomLevel={17}
-        mapType={Platform.OS === 'ios' ? 'standard' : 'none'}
+        // Fallback robusto: satélite nativo (Google/Apple) siempre visible,
+        // aunque fallen o tarden las teselas Esri (`UrlTile`).
+        mapType="satellite"
       >
+        {/* Contorno del recinto (verde discontinuo) */}
+        <Polygon
+          coordinates={[
+            { latitude: SOMAHOZ_BBOX.north, longitude: SOMAHOZ_BBOX.west },
+            { latitude: SOMAHOZ_BBOX.north, longitude: SOMAHOZ_BBOX.east },
+            { latitude: SOMAHOZ_BBOX.south, longitude: SOMAHOZ_BBOX.east },
+            { latitude: SOMAHOZ_BBOX.south, longitude: SOMAHOZ_BBOX.west },
+          ]}
+          strokeWidth={3}
+          strokeColor="rgba(34,197,94,0.95)"
+          lineDashPattern={[10, 8]}
+          fillColor="rgba(0,0,0,0.00)"
+        />
         {/* Teselas: satélite real (Esri World Imagery) */}
         <UrlTile
           urlTemplate="https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
           maximumZ={20}
           flipY={false}
+          zIndex={999}
         />
 
         {/* Posición GPS del operario */}
@@ -321,11 +362,11 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
           return (
             <Polygon
               key={`b-${p.codigo}`}
-              coordinates={p.puntos.map(vbToLatLon)}
+              coordinates={((p as any).puntos ?? []).map(vbToLatLon)}
               tappable
-              strokeWidth={active ? 3 : 2}
-              strokeColor={active ? 'rgba(59,130,246,0.95)' : 'rgba(30,58,95,0.65)'}
-              fillColor={active ? 'rgba(59,130,246,0.18)' : 'rgba(0,0,0,0.01)'}
+              strokeWidth={active ? 4 : 3}
+              strokeColor={active ? 'rgba(59,130,246,0.98)' : 'rgba(30,58,95,0.85)'}
+              fillColor={active ? 'rgba(59,130,246,0.14)' : 'rgba(0,0,0,0.02)'}
               onPress={() => onPressBlock(String(p.codigo))}
             />
           );
@@ -344,13 +385,17 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
         ))}
 
         {/* Nichos del bloque seleccionado (coloreados por estado) */}
-        {selectedNiches.map((pt) => {
+        {selectedNiches
+          .filter((pt) => estadoFiltro === 'todos' || pt.estado === estadoFiltro)
+          .map((pt) => {
           const fill =
             pt.estado === 'libre'
               ? 'rgba(34,197,94,0.95)'
               : pt.estado === 'ocupada'
                 ? 'rgba(239,68,68,0.95)'
-                : 'rgba(59,130,246,0.90)';
+                : pt.estado === 'reservada'
+                  ? 'rgba(245,158,11,0.95)'
+                  : 'rgba(100,116,139,0.95)';
           const isHit = highlightSepulturaId != null && Number(pt.id) === Number(highlightSepulturaId);
           return (
             <Circle
@@ -362,7 +407,7 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
               strokeWidth={2}
             />
           );
-        })}
+          })}
         {/* Números amarillos (como en la foto) */}
         {SOMAHOZ_YELLOW_MARKERS.map((m) => (
           <Marker
@@ -376,21 +421,27 @@ export const CementerioMapaOSM = memo(function CementerioMapaOSM({
           </Marker>
         ))}
 
-        {/* Marcadores custom */}
-        {customMarkers.map((m) => (
+        {/* Sepulturas con lat/lon (BD) */}
+        {sepsGeo.map((m) => (
           <Marker
-            key={`cm-${m.id}`}
-            coordinate={{ latitude: Number(m.latitude), longitude: Number(m.longitude) }}
+            key={`sg-${m.id}`}
+            coordinate={{ latitude: Number(m.lat), longitude: Number(m.lon) }}
+            draggable={!!allowDragGeoSepulturas}
+            onDragEnd={(e: any) => {
+              const c = (e as any)?.nativeEvent?.coordinate;
+              if (!c) return;
+              onDragGeoSepultura?.(Number(m.id), Number(c.latitude), Number(c.longitude));
+            }}
+            onPress={() => onPressGeoSepultura?.(Number(m.id))}
           >
             <View
               style={[
                 s.yellow,
-                m.kind === 'sepultura' && s.green,
-                m.kind === 'columbario' && s.blue,
-                m.kind === 'panteon' && s.purple,
+                { backgroundColor: colorByEstado(m.estado) },
+                highlightGeoSepulturaId != null && Number(m.id) === Number(highlightGeoSepulturaId) ? { transform: [{ scale: 1.15 }], borderColor: 'rgba(255,255,255,0.95)', borderWidth: 3 } : null,
               ]}
             >
-              <Text style={s.yellowT}>{String(m.label ?? '').slice(0, 3)}</Text>
+              <Text style={s.yellowT}>{String(m.numero ?? m.id).slice(0, 3)}</Text>
             </View>
           </Marker>
         ))}

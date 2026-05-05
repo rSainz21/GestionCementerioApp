@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ESTADO_COLORS } from '@/constants/Colors';
 import type { Bloque, Sepultura } from '@/lib/types';
-import { normalizarEstadoEditable } from '@/lib/estado-sepultura';
+import { normalizarEstadoDb } from '@/lib/estado-sepultura';
 
 interface Props {
   bloque: Bloque;
@@ -13,13 +13,20 @@ interface Props {
 function BloqueCardBase({ bloque, sepulturas }: Props) {
   const router = useRouter();
 
-  const stats = {
-    total: sepulturas.length,
-    libre: sepulturas.filter((s) => normalizarEstadoEditable(s.estado) === 'libre').length,
-    ocupada: sepulturas.filter((s) => normalizarEstadoEditable(s.estado) === 'ocupada').length,
-  };
+  let libre = 0;
+  let ocupada = 0;
+  let reservada = 0;
+  let otras = 0;
+  for (const s of sepulturas) {
+    const e = normalizarEstadoDb(s.estado);
+    if (e === 'libre') libre++;
+    else if (e === 'ocupada') ocupada++;
+    else if (e === 'reservada') reservada++;
+    else if (e === 'clausurada' || e === 'mantenimiento') otras++;
+  }
+  const stats = { total: sepulturas.length, libre, ocupada, reservada, otras };
 
-  const ocupacion = stats.total > 0 ? (stats.ocupada / stats.total) * 100 : 0;
+  const ocupacion = stats.total > 0 ? Math.max(0, Math.min(100, (100 * (stats.total - stats.libre)) / stats.total)) : 0;
 
   return (
     <TouchableOpacity
@@ -35,34 +42,46 @@ function BloqueCardBase({ bloque, sepulturas }: Props) {
       </View>
 
       <View style={styles.barContainer}>
-        {stats.ocupada > 0 && (
-          <View
-            style={[
-              styles.barSegment,
-              { flex: stats.ocupada, backgroundColor: ESTADO_COLORS.ocupada },
-            ]}
-          />
-        )}
-        {stats.libre > 0 && (
-          <View
-            style={[
-              styles.barSegment,
-              { flex: stats.libre, backgroundColor: ESTADO_COLORS.libre },
-            ]}
-          />
-        )}
+        {stats.ocupada > 0 ? (
+          <View style={[styles.barSegment, { flex: stats.ocupada, backgroundColor: ESTADO_COLORS.ocupada }]} />
+        ) : null}
+        {stats.reservada > 0 ? (
+          <View style={[styles.barSegment, { flex: stats.reservada, backgroundColor: ESTADO_COLORS.reservada }]} />
+        ) : null}
+        {stats.otras > 0 ? (
+          <View style={[styles.barSegment, { flex: stats.otras, backgroundColor: ESTADO_COLORS.clausurada }]} />
+        ) : null}
+        {stats.libre > 0 ? (
+          <View style={[styles.barSegment, { flex: stats.libre, backgroundColor: ESTADO_COLORS.libre }]} />
+        ) : null}
       </View>
 
       <View style={styles.stats}>
-        <View style={styles.statItem}>
-          <View style={[styles.dot, { backgroundColor: ESTADO_COLORS.ocupada }]} />
-          <Text style={styles.statText}>{stats.ocupada}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <View style={[styles.dot, { backgroundColor: ESTADO_COLORS.libre }]} />
-          <Text style={styles.statText}>{stats.libre}</Text>
-        </View>
-        <Text style={styles.ocupacion}>{ocupacion.toFixed(0)}% ocupado</Text>
+        {stats.ocupada > 0 ? (
+          <View style={styles.statItem}>
+            <View style={[styles.dot, { backgroundColor: ESTADO_COLORS.ocupada }]} />
+            <Text style={styles.statText}>{stats.ocupada}</Text>
+          </View>
+        ) : null}
+        {stats.reservada > 0 ? (
+          <View style={styles.statItem}>
+            <View style={[styles.dot, { backgroundColor: ESTADO_COLORS.reservada }]} />
+            <Text style={styles.statText}>{stats.reservada}</Text>
+          </View>
+        ) : null}
+        {stats.otras > 0 ? (
+          <View style={styles.statItem}>
+            <View style={[styles.dot, { backgroundColor: ESTADO_COLORS.clausurada }]} />
+            <Text style={styles.statText}>{stats.otras}</Text>
+          </View>
+        ) : null}
+        {stats.libre > 0 ? (
+          <View style={styles.statItem}>
+            <View style={[styles.dot, { backgroundColor: ESTADO_COLORS.libre }]} />
+            <Text style={styles.statText}>{stats.libre}</Text>
+          </View>
+        ) : null}
+        {stats.total > 0 ? <Text style={styles.ocupacion}>{ocupacion.toFixed(0)}% no libre</Text> : null}
       </View>
     </TouchableOpacity>
   );

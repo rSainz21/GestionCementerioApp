@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { StyleSheet, View, ViewProps } from 'react-native';
-import { Radius, Shadow } from './tokens';
+import { Radius, Semantic, Shadow } from './tokens';
 
 function AppCardBase(props: ViewProps & { padded?: boolean }) {
   const { style, padded = true, ...rest } = props;
@@ -20,10 +20,10 @@ export const AppCard = memo(AppCardBase);
 
 const s = StyleSheet.create({
   base: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Semantic.surface,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.10)',
+    borderColor: Semantic.border,
     ...Shadow.card,
   },
   padded: { padding: 14 },

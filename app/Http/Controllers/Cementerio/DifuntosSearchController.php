@@ -13,6 +13,9 @@ class DifuntosSearchController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $limit = min(max((int) $request->query('limit', 100), 1), 500);
+        $page = max((int) $request->query('page', 1), 1);
+        $effectiveLimit = mb_strlen($q) >= 2 ? min($limit, 100) : $limit;
+        $offset = ($page - 1) * $effectiveLimit;
 
         $query = CemnDifunto::query()
             ->with([
@@ -35,7 +38,9 @@ class DifuntosSearchController extends Controller
             });
         }
 
-        $items = $query->limit(mb_strlen($q) >= 2 ? min($limit, 100) : $limit)
+        $items = $query
+            ->offset($offset)
+            ->limit($effectiveLimit)
             ->get()
             ->map(function (CemnDifunto $d) {
                 $dni = $d->tercero?->dni;
@@ -66,7 +71,14 @@ class DifuntosSearchController extends Controller
             })
             ->values();
 
-        return response()->json(['items' => $items]);
+        return response()->json([
+            'items' => $items,
+            'meta' => [
+                'page' => $page,
+                'per_page' => $effectiveLimit,
+                'has_more' => $items->count() === $effectiveLimit,
+            ],
+        ]);
     }
 }
 

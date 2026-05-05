@@ -25,6 +25,7 @@ use App\Http\Controllers\Cementerio\SepulturaDifuntosController;
 use App\Http\Controllers\Cementerio\WorkflowInhumacionController;
 use App\Http\Controllers\Cementerio\WorkflowExhumacionController;
 use App\Http\Controllers\Cementerio\SepulturasGeoController;
+use App\Http\Controllers\Cementerio\SepulturasPlanoController;
 use App\Http\Controllers\Cementerio\ConcesionTercerosController;
 use App\Http\Controllers\Cementerio\NfcTagsController;
 
@@ -53,6 +54,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/sepulturas/search', [SepulturasSearchController::class, 'index'])
             ->middleware('permission:cementerio.ver');
         Route::get('/sepulturas/geo', [SepulturasGeoController::class, 'index'])
+            ->middleware('permission:cementerio.ver');
+        Route::get('/sepulturas/plano', [SepulturasPlanoController::class, 'index'])
             ->middleware('permission:cementerio.ver');
         Route::get('/stats', [CementerioStatsController::class, 'index'])
             ->middleware('permission:cementerio.ver');

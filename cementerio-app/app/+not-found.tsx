@@ -6,12 +6,20 @@ import { Text, View } from '@/components/Themed';
 export default function NotFoundScreen() {
   return (
     <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
+      <Stack.Screen options={{ title: 'No encontrado' }} />
       <View style={styles.container}>
-        <Text style={styles.title}>This screen doesn't exist.</Text>
+        <Text style={styles.kicker}>404</Text>
+        <Text style={styles.title}>Esta pantalla no existe</Text>
+        <Text style={styles.sub}>
+          La ruta que has abierto no corresponde a ninguna vista de la app. Vuelve al inicio o inicia sesión de nuevo.
+        </Text>
 
-        <Link href="/login" style={styles.link}>
-          <Text style={styles.linkText}>Ir al inicio de sesión</Text>
+        <Link href="/(tabs)/inicio" style={styles.linkPrimary}>
+          <Text style={styles.linkPrimaryText}>Ir al inicio</Text>
+        </Link>
+
+        <Link href="/login" style={styles.linkSecondary}>
+          <Text style={styles.linkSecondaryText}>Ir al inicio de sesión</Text>
         </Link>
       </View>
     </>
@@ -23,18 +31,53 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 24,
+  },
+  kicker: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 2,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 10,
   },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
+  sub: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 28,
+    maxWidth: 320,
   },
-  linkText: {
-    fontSize: 14,
-    color: '#2e78b7',
+  linkPrimary: {
+    marginTop: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    backgroundColor: '#15803D',
+    minWidth: 220,
+    alignItems: 'center',
+  },
+  linkPrimaryText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  linkSecondary: {
+    marginTop: 16,
+    paddingVertical: 12,
+  },
+  linkSecondaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1266A3',
+    textAlign: 'center',
   },
 });

@@ -14,6 +14,7 @@ import {
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { apiFetch } from '@/lib/laravel-api';
+import { fetchCementerioListAllPages } from '@/lib/cementerio-paginated-list';
 import { unwrapItem } from '@/lib/normalize';
 
 type Seg = 'expedientes' | 'titulares' | 'difuntos';
@@ -32,12 +33,14 @@ export default function GestionTabScreen() {
   const [lastError, setLastError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const baseForSeg = (s: Seg, limit: number) =>
+  const pathForSeg = (s: Seg) =>
     s === 'expedientes'
-      ? `/api/cementerio/concesiones?limit=${limit}`
+      ? '/api/cementerio/concesiones'
       : s === 'titulares'
-        ? `/api/cementerio/terceros?limit=${limit}`
-        : `/api/cementerio/difuntos?limit=${limit}`;
+        ? '/api/cementerio/terceros'
+        : '/api/cementerio/difuntos';
+
+  const baseForSeg = (s: Seg, limit: number) => `${pathForSeg(s)}?limit=${limit}`;
 
   const asItems = (data: any): any[] => {
     const d = unwrapItem<any>(data);
@@ -50,15 +53,19 @@ export default function GestionTabScreen() {
   };
 
   const fetchAllBySearch = async (s: Seg) => {
-    const limit = 200;
+    const limit = 500;
     const base = baseForSeg(s, limit);
     // Muchos backends no devuelven nada con q vacío o de 1 carácter.
     // Usamos tokens comunes de 2+ chars para “volcar” la lista.
     const tokens = [
-      'an', 'ar', 'al', 'as', 'de', 'la', 'el', 'ma', 'me', 'mi', 'mo',
-      'jo', 'ju', 'pe', 'pa', 'po', 'ca', 'co', 'cr', 'sa', 'se', 'si',
-      'ra', 're', 'ri', 'ro', 'ta', 'te', 'ti', 'to', 'na', 'ne', 'ni', 'no',
-      '00', '01', '02', '10', '11', '20',
+      'an', 'ar', 'al', 'as', 'ad', 'at', 'ac', 'ag', 'au', 'ay', 'de', 'da', 'di', 'do', 'du', 'la', 'le', 'li', 'lo', 'lu',
+      'el', 'en', 'er', 'es', 'ex', 'ma', 'me', 'mi', 'mo', 'mu', 'ña', 'ño', 'nu',
+      'jo', 'ja', 'je', 'ji', 'ju', 'pe', 'pa', 'pi', 'po', 'pu', 'ca', 'ce', 'ci', 'co', 'cu', 'cr', 'ch',
+      'sa', 'se', 'si', 'so', 'su', 'sc', 'ga', 'ge', 'gi', 'go', 'gu', 'fa', 'fe', 'fi', 'fo', 'fu',
+      'ra', 're', 'ri', 'ro', 'ru', 'va', 've', 'vi', 'vo', 'vu', 'ta', 'te', 'ti', 'to', 'tu', 'tr',
+      'na', 'ne', 'ni', 'no', 'nu', 'ba', 'be', 'bi', 'bo', 'bu', 'br', 'bl', 'ha', 'he', 'hi', 'ho', 'hu',
+      'za', 'ze', 'zi', 'zo', 'zu', 'ya', 'ye', 'yi', 'yo', 'yu', 'xa', 'xe', 'xi', 'xo', 'xu', 'wa', 'we', 'wi', 'wo',
+      '00', '01', '02', '03', '10', '11', '12', '20', '21', '22', '30', '99',
     ];
     const out: any[] = [];
     const seen = new Set<number>();
@@ -83,8 +90,8 @@ export default function GestionTabScreen() {
     setLoading(true);
     setLastError(null);
     const t = query.trim();
-    const limit = 200;
-
+    const limit = 500;
+    const path = pathForSeg(s);
     const base = baseForSeg(s, limit);
 
     const tryFetch = async (url: string) => {
@@ -104,11 +111,22 @@ export default function GestionTabScreen() {
         delete (next as any)[s];
         return next;
       });
-      const r1 = await tryFetch(`${base}&q=${encodeURIComponent(t)}`);
-      if (!r1.ok) setLastError(typeof r1.error === 'string' ? r1.error : JSON.stringify(r1.error));
-      setRows(r1.items);
+      const paged = await fetchCementerioListAllPages({ pathNoQuery: path, q: t, limit });
+      if (!paged.ok) setLastError(paged.error ?? 'Error');
+      setRows(paged.items);
       setLoading(false);
       return;
+    }
+
+    const pagedEmpty = await fetchCementerioListAllPages({ pathNoQuery: path, q: '', limit });
+    if (pagedEmpty.ok && pagedEmpty.items.length > 0) {
+      setRows(pagedEmpty.items);
+      setLoadedAll((p) => ({ ...p, [s]: true }));
+      setLoading(false);
+      return;
+    }
+    if (!pagedEmpty.ok) {
+      setLastError(pagedEmpty.error ?? 'Error');
     }
 
     // Sin búsqueda: algunos backends devuelven vacío si no hay `q`.

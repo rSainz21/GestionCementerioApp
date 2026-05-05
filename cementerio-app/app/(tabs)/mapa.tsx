@@ -9,7 +9,7 @@ import { BLOQUES_OFICIALES, type ZonaLabel, formatRango } from '@/lib/bloques-of
 import { unwrapItem } from '@/lib/normalize';
 import { CementerioMapaOSM } from '@/components/CementerioMapaOSM';
 import { PlanoGeneralMapa, type PlanoGeneralMapaHandle } from '@/components/PlanoGeneralMapa';
-import { normalizarEstadoEditable } from '@/lib/estado-sepultura';
+import { normalizarEstadoDb } from '@/lib/estado-sepultura';
 import { AppButton, AppCard, AppPill, AppSkeleton, Radius, Semantic, Space } from '@/components/ui';
 import { POLIGONOS_BLOQUES_SOMAHOZ } from '@/lib/mapa-somahoz';
 import { buildPlanoBlocksSomahoz } from '@/lib/plano-somahoz';
@@ -20,7 +20,7 @@ import { SOMAHOZ_YELLOW_MARKERS } from '@/lib/somahoz-yellow-markers';
 export default function MapaScreen() {
   const params = useLocalSearchParams<{ focus_sepultura_id?: string; focus_lat?: string; focus_lon?: string; focus_acc?: string }>();
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const planoRef = useRef<PlanoGeneralMapaHandle | null>(null);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -29,7 +29,7 @@ export default function MapaScreen() {
   const [bloqueCodes, setBloqueCodes] = useState<Set<string>>(new Set());
   const [bloquesRaw, setBloquesRaw] = useState<any[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [viewMode, setViewMode] = useState<'satelite' | 'plano'>('plano');
+  const [viewMode, setViewMode] = useState<'satelite' | 'plano'>('satelite');
   const [zona, setZona] = useState<'ALL' | ZonaLabel>('ALL');
   const [highlightSepId, setHighlightSepId] = useState<number | null>(null);
   const [activeHotspot, setActiveHotspot] = useState<SomahozHotspotId | null>(null);
@@ -47,13 +47,18 @@ export default function MapaScreen() {
     }, [])
   );
 
-  // Ajuste “encuadre”: si el contenedor es muy alto respecto al ancho (móvil),
-  // con `meet` queda mucho margen blanco arriba/abajo. Mejor un alto casi cuadrado.
+  // Encuadre: calculamos con alto real para que no quede “cortado” por barra + sheet + tabs.
   const mapH = useMemo(() => {
     const w = Number(width || 0);
-    if (!Number.isFinite(w) || w <= 0) return 520;
-    return Math.min(520, Math.max(320, Math.round(w * 0.92)));
-  }, [width]);
+    const h = Number(height || 0);
+    if (!Number.isFinite(w) || w <= 0) return 420;
+    if (!Number.isFinite(h) || h <= 0) return Math.min(520, Math.max(320, Math.round(w * 0.92)));
+
+    // topBar flotante (~64) + margen + sheet flotante (~150) + margen + algo de tabbar
+    const available = h - 64 - 12 - 150 - 12 - 56;
+    const byWidth = Math.round(w * 0.95);
+    return Math.max(260, Math.min(byWidth, available));
+  }, [width, height]);
 
   const abrirBloquePorCodigo = useCallback(
     async (codigo: string) => {
@@ -80,6 +85,17 @@ export default function MapaScreen() {
       if (intersect) inside = !inside;
     }
     return inside;
+  }, []);
+
+  // Coordenadas OSM (mismo bbox que `CementerioMapaOSM.native`)
+  const vbToLatLon = useCallback((p: { x: number; y: number }) => {
+    const south = 43.2483426;
+    const north = 43.2491123;
+    const west = -4.0582794;
+    const east = -4.0575471;
+    const longitude = west + (p.x / 1000) * (east - west);
+    const latitude = north - (p.y / 1000) * (north - south);
+    return { latitude, longitude };
   }, []);
 
   const gpsNearestBlock = useCallback(
@@ -127,17 +143,6 @@ export default function MapaScreen() {
     },
     [vbToLatLon]
   );
-
-  // Coordenadas OSM (mismo bbox que `CementerioMapaOSM.native`)
-  const vbToLatLon = useCallback((p: { x: number; y: number }) => {
-    const south = 43.2483426;
-    const north = 43.2491123;
-    const west = -4.0582794;
-    const east = -4.0575471;
-    const longitude = west + (p.x / 1000) * (east - west);
-    const latitude = north - (p.y / 1000) * (north - south);
-    return { latitude, longitude };
-  }, []);
 
   const onPressHotspot = useCallback(
     (id: SomahozHotspotId) => {
@@ -447,12 +452,16 @@ export default function MapaScreen() {
   const statsSelected = useMemo(() => {
     let libre = 0;
     let ocupada = 0;
+    let reservada = 0;
+    let otras = 0;
     for (const s of sepulturasBloque) {
-      const e = normalizarEstadoEditable((s as any)?.estado);
+      const e = normalizarEstadoDb((s as any)?.estado);
       if (e === 'libre') libre++;
       else if (e === 'ocupada') ocupada++;
+      else if (e === 'reservada') reservada++;
+      else if (e === 'clausurada' || e === 'mantenimiento') otras++;
     }
-    return { libre, ocupada, total: sepulturasBloque.length };
+    return { libre, ocupada, reservada, otras, total: sepulturasBloque.length };
   }, [sepulturasBloque]);
 
   useEffect(() => {
@@ -533,7 +542,7 @@ export default function MapaScreen() {
                 hotspots={SOMAHOZ_HOTSPOTS}
                 activeHotspotId={activeHotspot}
                 onPressHotspot={onPressHotspot}
-                onPressYellowMarker={(n) => {
+                onPressYellowMarker={(n: string) => {
                   const m = SOMAHOZ_YELLOW_MARKERS.find((x) => x.id === n);
                   if (!m) return;
                   if (m.action === 'bloque' && m.codigoBloque) abrirBloquePorCodigo(m.codigoBloque);
@@ -563,21 +572,19 @@ export default function MapaScreen() {
             )}
 
             <View style={s.modePill}>
-              <AppPill label="foto" active={viewMode === 'satelite'} onPress={() => setViewMode('satelite')} />
+              <AppPill label="satélite" active={viewMode === 'satelite'} onPress={() => setViewMode('satelite')} />
               <AppPill label="plano" active={viewMode === 'plano'} onPress={() => setViewMode('plano')} />
             </View>
           </View>
         )}
 
         <View style={s.floatRight}>
-          <FloatBtn
-            icon="search-plus"
-            onPress={() => planoRef.current?.zoomIn()}
-          />
-          <FloatBtn
-            icon="crosshairs"
-            onPress={() => planoRef.current?.reset()}
-          />
+          {viewMode === 'plano' ? (
+            <>
+              <FloatBtn icon="search-plus" onPress={() => planoRef.current?.zoomIn()} />
+              <FloatBtn icon="crosshairs" onPress={() => planoRef.current?.reset()} />
+            </>
+          ) : null}
           {gpsHere ? (
             <View style={s.gpsBadge}>
               <Text style={s.gpsBadgeOver}>GPS</Text>
@@ -597,7 +604,7 @@ export default function MapaScreen() {
             </View>
           ) : null}
           <FloatBtn icon="clone" onPress={() => Alert.alert('Capas', 'Pendiente: selector de capas')} />
-          <FloatBtn icon="pencil" onPress={() => router.push('/mapa-editor')} />
+          {/* "Editar" ya existe arriba: evitamos duplicado */}
         </View>
       </View>
 
@@ -612,7 +619,13 @@ export default function MapaScreen() {
               Bloque {selectedCodigo} · {(selectedBloque as any)?.zona_nombre ?? (selectedBloque as any)?.zona?.nombre ?? '—'}
             </Text>
             <Text style={s.bottomSub} numberOfLines={1}>
-              {sepulturasLoading ? 'Cargando…' : `${statsSelected.total} nichos · ${statsSelected.ocupada} ocupadas · ${statsSelected.libre} libres`}
+              {sepulturasLoading
+                ? 'Cargando…'
+                : `${statsSelected.total} nichos · ${statsSelected.ocupada} ocup. · ${statsSelected.libre} libres${
+                    statsSelected.reservada || statsSelected.otras
+                      ? ` · ${statsSelected.reservada} reserv. · ${statsSelected.otras} claus./mant.`
+                      : ''
+                  }`}
             </Text>
           </View>
           <TouchableOpacity
@@ -776,13 +789,25 @@ function FloatBtn({ icon, onPress }: { icon: any; onPress: () => void }) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Semantic.screenBg },
   topBar: {
-    paddingTop: 14,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    zIndex: 50,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Semantic.screenBg,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
   },
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
   searchWrap: {
@@ -809,7 +834,8 @@ const s = StyleSheet.create({
     gap: 8,
   },
   editBtnT: { fontWeight: '900', color: '#0F172A' },
-  mapStage: { flex: 1, paddingBottom: 10, justifyContent: 'center' },
+  // Reservamos espacio para la barra flotante + sheet flotante
+  mapStage: { flex: 1, paddingTop: 68, paddingBottom: 130, justifyContent: 'center' },
   pwaMapWrap: {
     width: '100%',
     borderRadius: 14,
@@ -827,7 +853,7 @@ const s = StyleSheet.create({
   },
   center: { alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
   centerT: { color: 'rgba(15,23,42,0.65)', fontWeight: '900' },
-  floatRight: { position: 'absolute', right: 18, top: 74, gap: 10 },
+  floatRight: { position: 'absolute', right: 14, top: 84, gap: 10 },
   fbtn: {
     width: 40,
     height: 40,
@@ -854,13 +880,13 @@ const s = StyleSheet.create({
 
   modePill: {
     position: 'absolute',
-    right: 12,
-    bottom: 12,
+    right: 10,
+    bottom: 10,
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     padding: 6,
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderWidth: 1,
     borderColor: 'rgba(15,23,42,0.10)',
   },
@@ -922,7 +948,23 @@ const s = StyleSheet.create({
   },
   overlayRowT: { fontSize: 14, fontWeight: '900', color: Semantic.text },
 
-  sheet: { backgroundColor: Semantic.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 14, borderTopWidth: 1, borderTopColor: Semantic.border },
+  // Sheet compacta flotante para ganar mapa visible
+  sheet: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    bottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+    shadowColor: '#000',
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
+  },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetTitle: { fontWeight: '900', color: Semantic.text, letterSpacing: 1.2, fontSize: 12 },
   markBtn: { height: 40, borderRadius: 14, backgroundColor: Semantic.primary, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },

@@ -45,6 +45,7 @@ class CemnSepultura extends Model
     const ESTADO_OCUPADA    = 'ocupada';
     const ESTADO_RESERVADA  = 'reservada';
     const ESTADO_CLAUSURADA = 'clausurada';
+    const ESTADO_MANTENIMIENTO = 'mantenimiento';
 
     // ── Relaciones ─────────────────────────────────────────────────────────
 

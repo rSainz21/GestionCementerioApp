@@ -198,6 +198,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import api from '@/services/api';
+import { toApiErrorMessage } from '@/utils/apiErrors';
 
 const props = defineProps({
   sepulturaId: { type: Number, default: null },
@@ -303,7 +304,7 @@ async function load(id) {
     item.value = res.data?.item ?? null;
     emit('loaded', item.value);
   } catch (e) {
-    error.value = e?.response?.data?.message ?? 'No se pudo cargar el detalle de la unidad.';
+    error.value = toApiErrorMessage(e, 'No se pudo cargar el detalle de la unidad.');
     emit('error', error.value);
   } finally {
     loading.value = false;
@@ -325,7 +326,7 @@ async function onUploadFotoTitular(ev) {
     });
     await load(item.value.id);
   } catch (e) {
-    fotoError.value = e?.response?.data?.message ?? 'No se pudo guardar la foto.';
+    fotoError.value = toApiErrorMessage(e, 'No se pudo guardar la foto.');
   } finally {
     fotoSaving.value = false;
     if (ev?.target) ev.target.value = '';
@@ -346,7 +347,7 @@ async function onUploadDocumento(ev) {
     });
     await load(item.value.id);
   } catch (e) {
-    docsError.value = e?.response?.data?.message ?? 'No se pudo adjuntar el documento.';
+    docsError.value = toApiErrorMessage(e, 'No se pudo adjuntar el documento.');
   } finally {
     docsSaving.value = false;
     if (ev?.target) ev.target.value = '';

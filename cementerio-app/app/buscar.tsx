@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { apiFetch } from '@/lib/laravel-api';
 import { AppCard, AppSkeleton } from '@/components/ui';
 import { AppTopBar } from '@/components/ui';
-import { colorParaEstadoSepulturaDb, etiquetaEstadoVisibleDb } from '@/lib/estado-sepultura';
+import { colorParaEstadoSepulturaDb } from '@/lib/estado-sepultura';
 
 type SepulturaHit = {
   id: number;
@@ -35,10 +43,6 @@ type ConcesionHit = {
   concesionario?: string | null;
   label?: string | null;
 };
-
-function debounceMs() {
-  return 250;
-}
 
 export default function BuscarScreen() {
   const router = useRouter();
@@ -87,7 +91,7 @@ export default function BuscarScreen() {
       setBloques(bloquesFiltrados);
 
       setLoading(false);
-    }, debounceMs());
+    }, 250);
 
     return () => {
       alive = false;
@@ -112,6 +116,8 @@ export default function BuscarScreen() {
     return { bg: 'rgba(245,158,11,0.18)', fg: '#92400E' };
   };
 
+  const totalResults = difuntos.length + concesiones.length + sepulturas.length + bloques.length;
+
   return (
     <View style={s.screen}>
       <View style={s.top}>
@@ -126,12 +132,20 @@ export default function BuscarScreen() {
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="Nombre, apellidos o DNI…"
+            placeholder="Nombre, DNI, código de nicho…"
             placeholderTextColor="rgba(15,23,42,0.40)"
             style={s.searchInput}
             autoCapitalize="none"
             autoCorrect={false}
+            autoFocus
+            returnKeyType="search"
+            accessibilityLabel="Campo de búsqueda"
           />
+          {q.length > 0 ? (
+            <TouchableOpacity onPress={() => setQ('')} activeOpacity={0.7} hitSlop={8}>
+              <FontAwesome name="times-circle" size={16} color="rgba(15,23,42,0.35)" />
+            </TouchableOpacity>
+          ) : null}
           {loading ? <ActivityIndicator size="small" color="#15803D" /> : null}
         </View>
 
@@ -141,6 +155,7 @@ export default function BuscarScreen() {
             onPress={() => setTab('difuntos')}
             activeOpacity={0.85}
           >
+            <FontAwesome name="user" size={12} color={tab === 'difuntos' ? '#0F172A' : 'rgba(15,23,42,0.45)'} style={{ marginRight: 6 }} />
             <Text style={[s.segT, tab === 'difuntos' && s.segTActive]}>Difuntos</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -148,23 +163,37 @@ export default function BuscarScreen() {
             onPress={() => setTab('concesiones')}
             activeOpacity={0.85}
           >
+            <FontAwesome name="file-text-o" size={12} color={tab === 'concesiones' ? '#0F172A' : 'rgba(15,23,42,0.45)'} style={{ marginRight: 6 }} />
             <Text style={[s.segT, tab === 'concesiones' && s.segTActive]}>Concesiones</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={s.body}>
+      <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+        {/* Estado vacío inicial */}
         {!hasQuery ? (
-          <AppCard padded>
-            <Text style={s.h1}>Buscar</Text>
-            <Text style={s.p}>Escribe al menos 2 caracteres. Ejemplos: “García”, “12345678”, “B8”, “N23”.</Text>
-          </AppCard>
+          <View style={s.emptyState}>
+            <View style={s.emptyIcon}>
+              <FontAwesome name="search" size={28} color="rgba(15,23,42,0.20)" />
+            </View>
+            <Text style={s.emptyTitle}>Buscar en el cementerio</Text>
+            <Text style={s.emptyP}>
+              Escribe al menos 2 caracteres para buscar por nombre, DNI, código de nicho o número de expediente.
+            </Text>
+            <View style={s.exampleRow}>
+              <ExampleChip label='"García"' />
+              <ExampleChip label='"12345678"' />
+              <ExampleChip label='"B8"' />
+              <ExampleChip label='"N23"' />
+            </View>
+          </View>
         ) : null}
 
+        {/* Loading skeletons */}
         {hasQuery && loading ? (
-          <AppCard padded style={{ marginTop: 12 }}>
-            <View style={{ gap: 10 }}>
-              {Array.from({ length: 8 }).map((_, i) => (
+          <AppCard padded style={{ marginTop: 12, marginHorizontal: 12 }}>
+            <View style={{ gap: 12 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
                 <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <AppSkeleton h={34} w={34} r={12} />
                   <View style={{ flex: 1 }}>
@@ -178,9 +207,10 @@ export default function BuscarScreen() {
           </AppCard>
         ) : null}
 
-        {bloques.length > 0 || sepulturas.length > 0 ? (
-          <View style={{ marginTop: 12 }}>
-            <Text style={s.sectionTitle}>Accesos rápidos</Text>
+        {/* Resultados rápidos de bloques y sepulturas */}
+        {(bloques.length > 0 || sepulturas.length > 0) && !loading ? (
+          <View style={{ marginTop: 12, paddingHorizontal: 12 }}>
+            <Text style={s.sectionTitle}>ACCESOS RÁPIDOS</Text>
             <AppCard padded style={{ marginTop: 8 }}>
               <View style={{ gap: 10 }}>
                 {bloques.slice(0, 6).map((b) => (
@@ -189,6 +219,8 @@ export default function BuscarScreen() {
                     title={String(b.codigo ?? b.nombre ?? `Bloque ${b.id}`)}
                     subtitle={b.zona_nombre ? `Zona ${b.zona_nombre}` : 'Bloque'}
                     icon="th-large"
+                    iconBg="rgba(59,130,246,0.12)"
+                    iconColor="#2563EB"
                     onPress={() => router.push(`/bloque/${encodeURIComponent(String(b.codigo ?? b.id))}`)}
                   />
                 ))}
@@ -216,53 +248,81 @@ export default function BuscarScreen() {
           </View>
         ) : null}
 
-        <View style={{ marginTop: 14 }}>
-          <Text style={s.sectionTitle}>{headerHint}</Text>
-          <AppCard padded style={{ marginTop: 8 }}>
-            <View style={{ gap: 10 }}>
-              {tab === 'difuntos'
-                ? difuntos.slice(0, 18).map((d) => (
-                    <Row
-                      key={`d-${d.id}`}
-                      title={String(d.nombre_completo ?? d.label ?? `Difunto ${d.id}`)}
-                      subtitle={String(d.label ?? '')}
-                      icon="user"
-                      onPress={() => {
-                        const sid = Number(d.sepultura_id);
-                        if (Number.isFinite(sid) && sid > 0) router.push(`/sepultura/${sid}`);
-                      }}
-                    />
-                  ))
-                : concesiones.slice(0, 18).map((c) => {
-                    const exp = c.numero_expediente ?? c.label ?? `Expediente ${c.id}`;
-                    const sub = [c.sepultura_codigo ? `Sepultura ${c.sepultura_codigo}` : null, c.concesionario ? String(c.concesionario) : null]
-                      .filter(Boolean)
-                      .join(' · ');
-                    const chip = chipColor(c.estado);
-                    return (
+        {/* Lista principal de resultados */}
+        {hasQuery && !loading ? (
+          <View style={{ marginTop: 14, paddingHorizontal: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={s.sectionTitle}>{headerHint.toUpperCase()}</Text>
+              {totalResults > 0 ? (
+                <Text style={s.countBadge}>{totalResults} total</Text>
+              ) : null}
+            </View>
+            <AppCard padded style={{ marginTop: 8 }}>
+              <View style={{ gap: 10 }}>
+                {tab === 'difuntos'
+                  ? difuntos.slice(0, 20).map((d) => (
                       <Row
-                        key={`c-${c.id}`}
-                        title={String(exp)}
-                        subtitle={sub}
-                        icon="file-text-o"
-                        right={
-                          <View style={[s.chip, { backgroundColor: chip.bg }]}>
-                            <Text style={[s.chipT, { color: chip.fg }]}>{String(c.estado ?? '—')}</Text>
-                          </View>
-                        }
+                        key={`d-${d.id}`}
+                        title={String(d.nombre_completo ?? d.label ?? `Difunto ${d.id}`)}
+                        subtitle={d.dni ? `DNI: ${d.dni}` : String(d.label ?? '')}
+                        icon="user"
                         onPress={() => {
-                          const sid = Number(c.sepultura_id);
+                          const sid = Number(d.sepultura_id);
                           if (Number.isFinite(sid) && sid > 0) router.push(`/sepultura/${sid}`);
                         }}
                       />
-                    );
-                  })}
+                    ))
+                  : concesiones.slice(0, 20).map((c) => {
+                      const exp = c.numero_expediente ?? c.label ?? `Expediente ${c.id}`;
+                      const sub = [c.sepultura_codigo ? `Sepultura ${c.sepultura_codigo}` : null, c.concesionario ? String(c.concesionario) : null]
+                        .filter(Boolean)
+                        .join(' · ');
+                      const chip = chipColor(c.estado);
+                      return (
+                        <Row
+                          key={`c-${c.id}`}
+                          title={String(exp)}
+                          subtitle={sub}
+                          icon="file-text-o"
+                          right={
+                            <View style={[s.chip, { backgroundColor: chip.bg }]}>
+                              <Text style={[s.chipT, { color: chip.fg }]}>{String(c.estado ?? '—')}</Text>
+                            </View>
+                          }
+                          onPress={() => {
+                            const sid = Number(c.sepultura_id);
+                            if (Number.isFinite(sid) && sid > 0) router.push(`/sepultura/${sid}`);
+                          }}
+                        />
+                      );
+                    })}
 
-              {empty ? <Text style={s.emptyT}>Sin resultados</Text> : null}
-            </View>
-          </AppCard>
-        </View>
-      </View>
+                {empty ? (
+                  <View style={s.emptyResults}>
+                    <FontAwesome name="inbox" size={24} color="rgba(15,23,42,0.20)" />
+                    <Text style={s.emptyT}>Sin resultados para "{q.trim()}"</Text>
+                    <Text style={s.emptyHint}>Prueba con otro nombre, DNI o código</Text>
+                    {tab === 'difuntos' && concesiones.length > 0 ? (
+                      <Text style={s.emptySwitchHint}>Hay {concesiones.length} coincidencia{concesiones.length === 1 ? '' : 's'} en la pestaña Concesiones.</Text>
+                    ) : null}
+                    {tab === 'concesiones' && difuntos.length > 0 ? (
+                      <Text style={s.emptySwitchHint}>Hay {difuntos.length} coincidencia{difuntos.length === 1 ? '' : 's'} en la pestaña Difuntos.</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+            </AppCard>
+          </View>
+        ) : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+function ExampleChip({ label }: { label: string }) {
+  return (
+    <View style={s.exChip}>
+      <Text style={s.exChipT}>{label}</Text>
     </View>
   );
 }
@@ -271,19 +331,23 @@ function Row({
   title,
   subtitle,
   icon,
+  iconBg,
+  iconColor,
   onPress,
   right,
 }: {
   title: string;
   subtitle?: string;
-  icon: any;
+  icon: React.ComponentProps<typeof FontAwesome>['name'];
+  iconBg?: string;
+  iconColor?: string;
   onPress: () => void;
-  right?: any;
+  right?: React.ReactNode;
 }) {
   return (
     <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.85}>
-      <View style={s.rowIcon}>
-        <FontAwesome name={icon} size={14} color="#0F172A" />
+      <View style={[s.rowIcon, iconBg ? { backgroundColor: iconBg } : null]}>
+        <FontAwesome name={icon} size={14} color={iconColor ?? '#0F172A'} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={s.rowTitle} numberOfLines={1}>
@@ -295,7 +359,7 @@ function Row({
           </Text>
         ) : null}
       </View>
-      {right ?? <FontAwesome name="chevron-right" size={14} color="rgba(15,23,42,0.45)" />}
+      {right ?? <FontAwesome name="chevron-right" size={14} color="rgba(15,23,42,0.35)" />}
     </TouchableOpacity>
   );
 }
@@ -304,7 +368,7 @@ const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F3EFE6' },
   top: { paddingTop: 0, paddingHorizontal: 12, paddingBottom: 8 },
   searchWrap: {
-    height: 40,
+    height: 44,
     borderRadius: 14,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -325,21 +389,65 @@ const s = StyleSheet.create({
     borderColor: 'rgba(15,23,42,0.08)',
     gap: 6,
   },
-  segBtn: { flex: 1, height: 34, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  segBtnActive: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(15,23,42,0.12)' },
-  segT: { fontSize: 12, fontWeight: '900', color: 'rgba(15,23,42,0.55)' },
+  segBtn: { flex: 1, height: 36, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  segBtnActive: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(15,23,42,0.12)', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  segT: { fontSize: 13, fontWeight: '800', color: 'rgba(15,23,42,0.55)' },
   segTActive: { color: '#0F172A' },
-  body: { paddingHorizontal: 12, paddingBottom: 20 },
-  h1: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
-  p: { marginTop: 8, fontSize: 13, fontWeight: '700', color: 'rgba(15,23,42,0.60)', lineHeight: 18 },
-  sectionTitle: { marginTop: 2, fontSize: 12, letterSpacing: 1.2, fontWeight: '900', color: 'rgba(15,23,42,0.65)' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rowIcon: { width: 28, height: 28, borderRadius: 10, backgroundColor: 'rgba(21,128,61,0.10)', alignItems: 'center', justifyContent: 'center' },
-  rowTitle: { fontWeight: '900', color: '#0F172A' },
+  body: { flex: 1 },
+
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 40,
+    paddingHorizontal: 32,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: 'rgba(15,23,42,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '900', color: '#0F172A', textAlign: 'center' },
+  emptyP: { marginTop: 8, fontSize: 13, fontWeight: '700', color: 'rgba(15,23,42,0.55)', lineHeight: 18, textAlign: 'center' },
+  exampleRow: { marginTop: 16, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
+  exChip: {
+    height: 30,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15,23,42,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exChipT: { fontSize: 12, fontWeight: '800', color: 'rgba(15,23,42,0.55)' },
+
+  // Results
+  sectionTitle: { fontSize: 11, letterSpacing: 1.2, fontWeight: '900', color: 'rgba(15,23,42,0.55)' },
+  countBadge: { fontSize: 11, fontWeight: '800', color: 'rgba(15,23,42,0.40)' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
+  rowIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(21,128,61,0.10)', alignItems: 'center', justifyContent: 'center' },
+  rowTitle: { fontWeight: '900', color: '#0F172A', fontSize: 14 },
   rowSub: { marginTop: 2, fontSize: 12, fontWeight: '700', color: 'rgba(15,23,42,0.55)' },
   dot: { width: 12, height: 12, borderRadius: 4 },
   chip: { paddingHorizontal: 10, height: 26, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   chipT: { fontSize: 11, fontWeight: '900', textTransform: 'lowercase' },
-  emptyT: { textAlign: 'center', fontWeight: '900', color: 'rgba(15,23,42,0.55)' },
-});
 
+  emptyResults: { alignItems: 'center', paddingVertical: 20, gap: 8 },
+  emptyT: { textAlign: 'center', fontWeight: '900', color: 'rgba(15,23,42,0.55)' },
+  emptyHint: { textAlign: 'center', fontSize: 12, fontWeight: '700', color: 'rgba(15,23,42,0.40)' },
+  emptySwitchHint: {
+    marginTop: 10,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#15803D',
+    paddingHorizontal: 8,
+  },
+
+  h1: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
+  p: { marginTop: 8, fontSize: 13, fontWeight: '700', color: 'rgba(15,23,42,0.60)', lineHeight: 18 },
+});

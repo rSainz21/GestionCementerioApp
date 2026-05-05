@@ -46,12 +46,12 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { ref, watch } from 'vue';
 
 const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
 const sidebarOpen = ref(false);
 
@@ -59,7 +59,7 @@ const title = computed(() => route.meta?.title || 'Cementerio');
 
 async function logout() {
   await auth.logout();
-  location.href = '/login';
+  await router.push({ path: '/login' });
 }
 
 watch(
@@ -165,12 +165,17 @@ watch(
   align-items: center;
   gap: 10px;
   padding: 0 18px;
-  background: white;
+  background: rgba(255, 255, 255, 0.92);
   border-bottom: 1px solid rgba(23, 35, 31, 0.10);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 .topbar__title { font-weight: 900; color: var(--c2-text, #17231F); }
 
 .content { padding: 18px; }
+.content :deep(.page) { max-width: 1180px; margin: 0 auto; }
 
 .iconbtn {
   width: 40px;
@@ -205,6 +210,21 @@ watch(
 
 @media (max-width: 980px) {
   .sidebar { width: min(88vw, 320px); }
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    grid-template-columns: 280px 1fr;
+  }
+  .overlay { display: none; }
+  .sidebar {
+    position: sticky;
+    transform: none;
+    top: 0;
+    box-shadow: 0 0 0 rgba(0,0,0,0);
+  }
+  .main { min-height: 100vh; }
+  .iconbtn { display: none; }
 }
 </style>
 

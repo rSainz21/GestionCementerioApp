@@ -587,21 +587,26 @@ export default function SepulturaScreen() {
     }
 
     try {
-      // VALIDACIONES STRICT MODE
+      // NOTAS: deben poder guardarse aunque no haya GPS.
+      // Solo exigimos precisión si el usuario intenta guardar coordenadas.
       if (!codigoOk) {
-        throw new Error('No se puede guardar: la sepultura no tiene un código válido.');
+        Alert.alert('No se puede guardar', 'La sepultura no tiene un código válido.');
+        return;
       }
-      if (!gpsOk) {
-        throw new Error('GPS no válido: se requiere precisión < 5 m antes de guardar.');
+      if (gps && !gpsOk) {
+        Alert.alert('GPS no válido', 'Se requiere precisión < 5 m para guardar coordenadas.');
+        return;
       }
 
-      // Patch simple (sin foto). Evidencias: "Documento/Foto".
       const res = await apiFetch<any>(`/api/cementerio/sepulturas/${sep.id}`, { method: 'PUT', body: payload });
-      if (!res.ok) throw new Error(typeof res.error === 'string' ? res.error : 'No se pudo guardar la auditoría');
+      if (!res.ok) {
+        Alert.alert('Error', typeof res.error === 'string' ? res.error : 'No se pudo guardar.');
+        return;
+      }
       await fetchAll();
-      Alert.alert('Guardado', 'Auditoría guardada.');
+      Alert.alert('Guardado', 'Cambios guardados.');
     } catch (e: any) {
-      // Offline: guardamos en cola
+      // Offline: solo en error real de red/cliente.
       await enqueueAuditPatch({
         sepulturaId: sep.id,
         estado: auditEstado,
@@ -753,6 +758,32 @@ export default function SepulturaScreen() {
                   label="Ubicación"
                   value={`${String(sep.cemn_zonas?.nombre ?? '—')} · Bloque ${String(sep.cemn_bloques?.codigo ?? '—')} · F${String(sep.fila ?? '—')} C${String(sep.columna ?? '—')}`}
                 />
+                <Text style={s.fichaInputLabel}>Ubicación (texto descriptivo)</Text>
+                <TextInput
+                  style={s.fichaInput}
+                  value={auditUbicacion}
+                  onChangeText={setAuditUbicacion}
+                  placeholder="Muro sur, 3ª fila…"
+                  placeholderTextColor="rgba(15,23,42,0.35)"
+                />
+                <Text style={s.fichaInputLabel}>Notas</Text>
+                <TextInput
+                  style={[s.fichaInput, s.fichaTextArea]}
+                  value={auditNotas}
+                  onChangeText={setAuditNotas}
+                  placeholder="Observaciones…"
+                  placeholderTextColor="rgba(15,23,42,0.35)"
+                  multiline
+                  textAlignVertical="top"
+                />
+                <TouchableOpacity
+                  style={[s.fichaSaveBtn, savingAudit && { opacity: 0.6 }]}
+                  onPress={guardarAuditoria}
+                  disabled={savingAudit}
+                  activeOpacity={0.9}
+                >
+                  {savingAudit ? <ActivityIndicator color="#FFFFFF" /> : <Text style={s.fichaSaveBtnT}>Guardar notas</Text>}
+                </TouchableOpacity>
                 <Field
                   label="Coordenadas GPS"
                   value={sep.lat && sep.lon ? `${Number(sep.lat).toFixed(6)}, ${Number(sep.lon).toFixed(6)}` : '—'}
@@ -1415,6 +1446,29 @@ const s = StyleSheet.create({
   fichaInlineLink: { paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderTopWidth: 1, borderTopColor: 'rgba(15,23,42,0.08)' },
   fichaInlineL: { color: 'rgba(15,23,42,0.55)', fontSize: 11, fontWeight: '800' },
   fichaInlineR: { color: '#0F172A', fontSize: 13, fontWeight: '900' },
+
+  fichaInputLabel: { marginTop: 12, fontSize: 12, fontWeight: '900', color: 'rgba(15,23,42,0.65)' },
+  fichaInput: {
+    marginTop: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  fichaTextArea: { minHeight: 92 },
+  fichaSaveBtn: {
+    marginTop: 12,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#2F6B4E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fichaSaveBtnT: { fontWeight: '900', color: '#FFFFFF' },
 
   fichaEmpty: { color: 'rgba(15,23,42,0.55)', fontWeight: '800' },
   fichaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(15,23,42,0.08)' },

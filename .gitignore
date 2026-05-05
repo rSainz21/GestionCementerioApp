@@ -1,5 +1,13 @@
+# Cursor: ignorar estado local
 .cursor/
 .vscode/
+
+# Agentes / artefactos locales
+.claude/
+_market_research/
+_tmp*/
+_anexo*
+_fill_anexo.ps1
 
 # OS
 .DS_Store
@@ -25,6 +33,7 @@ yarn-error.log*
 /.zed
 /auth.json
 /node_modules
+node_modules/
 /public/build
 /public/hot
 /public/storage

@@ -13,6 +13,9 @@ class TercerosSearchController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $limit = min(max((int) $request->query('limit', 100), 1), 500);
+        $page = max((int) $request->query('page', 1), 1);
+        $effectiveLimit = mb_strlen($q) >= 2 ? min($limit, 100) : $limit;
+        $offset = ($page - 1) * $effectiveLimit;
 
         $query = CemnTercero::query();
 
@@ -29,7 +32,8 @@ class TercerosSearchController extends Controller
             ->orderBy('apellido1')
             ->orderBy('apellido2')
             ->orderBy('nombre')
-            ->limit(mb_strlen($q) >= 2 ? min($limit, 100) : $limit)
+            ->offset($offset)
+            ->limit($effectiveLimit)
             ->get([
                 'id',
                 'dni',
@@ -55,7 +59,14 @@ class TercerosSearchController extends Controller
             })
             ->values();
 
-        return response()->json(['items' => $items]);
+        return response()->json([
+            'items' => $items,
+            'meta' => [
+                'page' => $page,
+                'per_page' => $effectiveLimit,
+                'has_more' => $items->count() === $effectiveLimit,
+            ],
+        ]);
     }
 }
 

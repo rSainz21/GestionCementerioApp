@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import type { EstadoSepultura } from '@/lib/types';
 import { apiFetch } from '@/lib/laravel-api';
+import { ensureNetInfoConfiguredForWeb } from '@/lib/netinfo-web-config';
 
 export type AuditPatch = {
   sepulturaId: number;
@@ -58,6 +59,7 @@ async function applySepulturaUpdate(p: AuditPatch) {
 }
 
 export async function processAuditQueue(): Promise<{ processed: number; remaining: number }> {
+  ensureNetInfoConfiguredForWeb();
   const net = await NetInfo.fetch();
   if (!net.isConnected) {
     const q0 = await readQueue();

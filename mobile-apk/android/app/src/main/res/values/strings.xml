@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cementerio Somahoz</string>
+    <string name="title_activity_main">Cementerio Somahoz</string>
+    <string name="package_name">com.somahoz.cementerio</string>
+    <string name="custom_url_scheme">com.somahoz.cementerio</string>
+</resources>

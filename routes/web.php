@@ -6,7 +6,7 @@ Route::get('/', function () {
     return view('app');
 });
 
-// Diagn?stico r?pido para confirmar qu? Laravel est? sirviendo :8000
+// Diagnóstico rápido para confirmar que Laravel está sirviendo (p. ej. :8000)
 Route::get('/__pwa_proxy', function () {
     return response()->json([
         'app' => config('app.name'),
@@ -18,10 +18,10 @@ Route::get('/__pwa_proxy', function () {
 });
 
 /**
- * PWA m?vil.
+ * PWA móvil.
  *
  * Importante: estas rutas deben ir ANTES del fallback general,
- * o `/movil` quedar? capturada por el SPA principal.
+ * o `/movil` quedará capturada por el SPA principal.
  */
 Route::get('/movil', fn () => view('movil'))->name('pwa.movil');
 Route::get('/movil/{any}', fn () => view('movil'))

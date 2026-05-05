@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
+import { Alert, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, type NativeSyntheticEvent } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { SOMAHOZ_BBOX, vbToLatLon } from '@/lib/somahoz-geo';
@@ -8,6 +7,20 @@ import { SOMAHOZ_YELLOW_MARKERS } from '@/lib/somahoz-yellow-markers';
 import { loadYellowMarkerPositions, resetYellowMarkerPositions, saveYellowMarkerPositions } from '@/lib/mapa-yellow-store';
 import { Semantic } from '@/components/ui';
 import { loadCustomMarkers, removeCustomMarker, saveCustomMarkers, type CustomMarker, type CustomMarkerKind } from '@/lib/mapa-custom-markers-store';
+
+type MapMarkerDragEndEvent = NativeSyntheticEvent<{ coordinate: { latitude: number; longitude: number } }>;
+
+type MapComp = React.ComponentType<any>;
+let MapView: MapComp | null = null;
+let Marker: MapComp | null = null;
+let UrlTile: MapComp | null = null;
+
+if (Platform.OS !== 'web') {
+  const rnMaps = require('react-native-maps');
+  MapView = rnMaps.default;
+  Marker = rnMaps.Marker;
+  UrlTile = rnMaps.UrlTile;
+}
 
 const SOMAHOZ_CENTER = {
   latitude: 43.2487102,
@@ -70,6 +83,14 @@ export default function NumerosEditorNative() {
     Alert.alert('Reset', 'Volvemos a las posiciones por defecto.');
   };
 
+  if (!MapView || !Marker || !UrlTile) {
+    return (
+      <View style={[s.screen, { alignItems: 'center', justifyContent: 'center', padding: 16 }]}>
+        <Text style={{ fontWeight: '900', color: Semantic.text }}>Vista de mapa no disponible en web.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={s.screen}>
       <View style={s.top}>
@@ -99,7 +120,7 @@ export default function NumerosEditorNative() {
             key={`y-${m.id}`}
             coordinate={m.coord}
             draggable
-            onDragEnd={(e) => {
+            onDragEnd={(e: MapMarkerDragEndEvent) => {
               const c = e.nativeEvent.coordinate;
               setDirty(true);
               setPos((prev) => ({ ...prev, [m.id]: c }));
@@ -116,7 +137,7 @@ export default function NumerosEditorNative() {
             key={`cm-${m.id}`}
             coordinate={{ latitude: Number(m.latitude), longitude: Number(m.longitude) }}
             draggable
-            onDragEnd={(e) => {
+            onDragEnd={(e: MapMarkerDragEndEvent) => {
               const c = e.nativeEvent.coordinate;
               setDirty(true);
               setCustom((prev) => prev.map((x) => (x.id === m.id ? { ...x, latitude: c.latitude, longitude: c.longitude } : x)));

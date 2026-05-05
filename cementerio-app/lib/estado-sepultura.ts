@@ -15,7 +15,7 @@ export function normalizarEstadoDb(estado: string | null | undefined): EstadoSep
   const e = String(estado ?? '')
     .trim()
     .toLowerCase();
-  if (e === 'libre' || e === 'ocupada' || e === 'reservada' || e === 'clausurada') return e;
+  if (e === 'libre' || e === 'ocupada' || e === 'reservada' || e === 'clausurada' || e === 'mantenimiento') return e as any;
   return 'ocupada';
 }
 

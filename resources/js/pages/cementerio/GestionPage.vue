@@ -43,6 +43,14 @@ import CrudConcesiones from '@/components/cementerio/admin/CrudConcesiones.vue';
   border: 1px solid rgba(23, 35, 31, 0.10);
   box-shadow: 0 6px 18px rgba(23, 35, 31, 0.06);
   overflow: hidden;
+  padding: 12px 12px 16px;
+}
+.card :deep(.p-tabview-panels) {
+  padding-top: 14px;
+}
+.card :deep(.p-tabview-tablist) {
+  flex-wrap: wrap;
+  gap: 4px;
 }
 </style>
 

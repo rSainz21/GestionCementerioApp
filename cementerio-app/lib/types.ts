@@ -2,7 +2,7 @@
 export type EstadoSepultura = 'libre' | 'ocupada';
 
 /** Valores que pueden existir en PostgreSQL (histórico); en UI se normalizan a libre/ocupada */
-export type EstadoSepulturaDb = EstadoSepultura | 'reservada' | 'clausurada';
+export type EstadoSepulturaDb = EstadoSepultura | 'reservada' | 'clausurada' | 'mantenimiento';
 export type TipoSepultura = 'sepultura' | 'nicho' | 'columbario' | 'panteon';
 export type TipoConcesion = 'perpetua' | 'temporal';
 export type EstadoConcesion = 'vigente' | 'caducada' | 'renovada' | 'transferida' | 'anulada';

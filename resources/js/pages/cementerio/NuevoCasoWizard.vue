@@ -5,7 +5,7 @@
         <h2 class="title">Nuevo caso</h2>
         <div class="subtitle">Wizard guiado para alta de concesión y asignación de unidad.</div>
       </div>
-      <button class="btn btn--ghost" type="button" @click="$router?.back?.()">
+      <button class="btn btn--ghost" type="button" @click="router.back()">
         Volver
       </button>
     </header>
@@ -50,6 +50,7 @@
                 {{ it.label }}
               </button>
             </div>
+            <div v-else-if="titularQueryLen >= 2" class="help muted">Sin coincidencias.</div>
             <div v-else class="help muted">Escribe al menos 2 caracteres.</div>
           </div>
 
@@ -184,8 +185,10 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import SelectorNichosGrid from '@/components/cementerio/SelectorNichosGrid.vue';
 import api from '@/services/api';
+import { toApiErrorMessage } from '@/utils/apiErrors';
 
 const steps = [
   { id: 'titular', num: 1, label: 'Titular' },
@@ -194,11 +197,14 @@ const steps = [
   { id: 'resumen', num: 4, label: 'Resumen' },
 ];
 
+const router = useRouter();
 const step = ref('titular');
 const titularSearch = ref('');
 const titularItems = ref([]);
 const titularLoading = ref(false);
 let titularTimer = null;
+
+const titularQueryLen = computed(() => (titularSearch.value?.trim() ?? '').length);
 
 const catalogo = reactive({ zonas: [], bloques: [] });
 
@@ -328,9 +334,7 @@ async function guardar() {
     }
     saveOk.value = true;
   } catch (e) {
-    saveError.value =
-      e?.response?.data?.message ??
-      (e?.response?.data?.errors ? 'Revisa los campos del formulario.' : 'Error al guardar el caso.');
+    saveError.value = toApiErrorMessage(e, 'Error al guardar el caso.');
   } finally {
     saving.value = false;
   }

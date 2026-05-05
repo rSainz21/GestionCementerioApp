@@ -68,6 +68,7 @@
                     {{ it.label }}
                   </button>
                 </div>
+                <div v-else-if="concesionQueryLen >= 2" class="help muted">Sin coincidencias.</div>
                 <div v-else class="help muted">Escribe al menos 2 caracteres.</div>
               </div>
             </div>
@@ -98,17 +99,18 @@
                     {{ it.label }}
                   </button>
                 </div>
+                <div v-else-if="difuntoQueryLen >= 2" class="help muted">Sin coincidencias.</div>
                 <div v-else class="help muted">Escribe al menos 2 caracteres.</div>
               </div>
             </div>
 
-            <button class="quick__tile quick__tile--disabled" type="button" disabled>
-              <div class="quick__icon"><i class="pi pi-wrench" /></div>
+            <router-link class="quick__tile quick__tile--muted" to="/cementerio/gestion">
+              <div class="quick__icon"><i class="pi pi-database" /></div>
               <div class="quick__text">
-                <div class="quick__title">Función 4</div>
-                <div class="quick__sub">Pendiente de definir.</div>
+                <div class="quick__title">Datos base</div>
+                <div class="quick__sub">Cementerios, zonas, bloques, unidades y concesiones.</div>
               </div>
-            </button>
+            </router-link>
           </div>
         </div>
       </section>
@@ -116,17 +118,16 @@
       <section class="card">
         <div class="card__body">
           <div class="card__title">Ocupación</div>
-          <ApexChart v-if="chartSeries.length" type="donut" height="260" :options="chartOptions" :series="chartSeries" />
-          <div v-else class="muted">Cargando…</div>
+          <ApexChart v-if="chartReady" type="donut" height="260" :options="chartOptions" :series="chartSeries" />
+          <div v-else class="muted">{{ statsLoading ? 'Cargando…' : 'Sin datos de ocupación.' }}</div>
         </div>
       </section>
     </div>
 
-    <section class="card card--mapa">
+    <section id="mapa-unidades" class="card card--mapa">
       <div class="card__body">
         <div class="card__title">Mapa de unidades</div>
       </div>
-      <div id="mapa-unidades"></div>
       <MapaUnidades />
     </section>
 
@@ -189,9 +190,11 @@
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api';
+import { toApiErrorMessage } from '@/utils/apiErrors';
 import ApexChart from 'vue3-apexcharts';
 import MapaUnidades from '@/components/cementerio/MapaUnidades.vue';
 const stats = reactive({});
+const statsLoading = ref(true);
 const error = ref(null);
 const router = useRouter();
 
@@ -207,13 +210,19 @@ const difuntoLoading = ref(false);
 const selectedDifunto = ref(null);
 let difuntoTimer = null;
 
+const concesionQueryLen = computed(() => (concesionSearch.value?.trim() ?? '').length);
+const difuntoQueryLen = computed(() => (difuntoSearch.value?.trim() ?? '').length);
+
 async function load() {
   error.value = null;
+  statsLoading.value = true;
   try {
     const res = await api.get('/api/cementerio/stats');
     Object.assign(stats, res.data ?? {});
   } catch (e) {
-    error.value = e?.response?.data?.message ?? 'No se pudo cargar el dashboard.';
+    error.value = toApiErrorMessage(e, 'No se pudo cargar el dashboard.');
+  } finally {
+    statsLoading.value = false;
   }
 }
 
@@ -292,6 +301,11 @@ const chartSeries = computed(() => {
   const reservadas = Number(stats.reservadas ?? 0);
   const clausuradas = Number(stats.clausuradas ?? 0);
   return [libres, ocupadas, reservadas, clausuradas];
+});
+
+const chartReady = computed(() => {
+  if (statsLoading.value) return false;
+  return chartSeries.value.some((n) => Number(n) > 0);
 });
 
 const chartOptions = computed(() => ({
@@ -381,7 +395,7 @@ onMounted(load);
 }
 
 .quick__tile {
-  border: 2px solid rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(23, 35, 31, 0.14);
   border-radius: 12px;
   padding: 12px;
   background: white;
@@ -399,9 +413,13 @@ onMounted(load);
   box-shadow: 0 0 0 4px rgba(17, 134, 82, 0.08);
 }
 
-.quick__tile--disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.quick__tile--muted {
+  border-color: rgba(23, 35, 31, 0.14);
+  box-shadow: none;
+}
+.quick__tile--muted:hover {
+  border-color: rgba(17, 134, 82, 0.35);
+  background: rgba(17, 134, 82, 0.04);
 }
 
 .quick__icon {

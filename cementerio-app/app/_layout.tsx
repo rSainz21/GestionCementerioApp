@@ -10,6 +10,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+import { ensureNetInfoConfiguredForWeb } from '@/lib/netinfo-web-config';
+import { ToastProvider } from '@/lib/toast-context';
+import { OfflineBanner } from '@/components/ui/OfflineBanner';
 
 export { ErrorBoundary } from 'expo-router';
 /** Arrancar en login: sin sesión no se ve el mapa; con sesión se redirige a las pestañas. */
@@ -19,7 +22,7 @@ SplashScreen.preventAutoHideAsync();
 
 const LightTheme = {
   ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, primary: '#15803D', background: '#F8FAFC', card: '#FFFFFF', text: '#1F2937', border: '#E5E7EB' },
+  colors: { ...DefaultTheme.colors, primary: '#15803D', background: '#F3EFE6', card: '#FFFFFF', text: '#1F2937', border: '#E5E7EB' },
 };
 const DarkThemeCustom = {
   ...DarkTheme,
@@ -31,6 +34,9 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
+  useEffect(() => {
+    ensureNetInfoConfiguredForWeb();
+  }, []);
   useEffect(() => { if (error) throw error; }, [error]);
   useEffect(() => { if (loaded) SplashScreen.hideAsync(); }, [loaded]);
   if (!loaded) return null;
@@ -38,7 +44,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <RootLayoutNav />
+        <ToastProvider>
+          <RootLayoutNav />
+        </ToastProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );
@@ -64,11 +72,11 @@ function RootLayoutNav() {
     if (user && enLogin) {
       router.replace('/(tabs)/campo');
     }
-  }, [user, loading, segments]); // router.replace estable (exhaustive-deps)
+  }, [user, loading, segments]);
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3EFE6' }}>
         <ActivityIndicator size="large" color="#15803D" />
       </View>
     );
@@ -76,6 +84,7 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkThemeCustom : LightTheme}>
+      <OfflineBanner />
       <Stack screenOptions={{ headerBackTitle: 'Atrás' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false, animation: 'fade' }} />
@@ -95,7 +104,6 @@ function RootLayoutNav() {
         <Stack.Screen name="nueva-concesion" options={{ title: 'Nueva concesión', presentation: 'modal' }} />
         <Stack.Screen name="buscar" options={{ title: 'Buscar', presentation: 'modal' }} />
         <Stack.Screen name="gestion-registros" options={{ title: 'Registros' }} />
-        {/* Pantallas de gestión avanzada se activan en Fase 2 (evitar depender de backends antiguos). */}
       </Stack>
     </ThemeProvider>
   );

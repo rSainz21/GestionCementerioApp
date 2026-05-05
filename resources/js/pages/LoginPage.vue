@@ -6,17 +6,17 @@
         <div class="subtitle">Inicia sesión para acceder al módulo de Cementerio.</div>
       </div>
 
-      <div class="card__body">
+      <form class="card__body" @submit.prevent="doLogin">
         <div class="field">
-          <label class="label">Usuario o email</label>
-          <input v-model="username" class="input" autocomplete="username" />
+          <label class="label" for="login-user">Usuario o email</label>
+          <input id="login-user" v-model="username" class="input" autocomplete="username" />
         </div>
         <div class="field">
-          <label class="label">Contraseña</label>
-          <input v-model="password" class="input" type="password" autocomplete="current-password" />
+          <label class="label" for="login-pass">Contraseña</label>
+          <input id="login-pass" v-model="password" class="input" type="password" autocomplete="current-password" />
         </div>
 
-        <button class="btn btn--primary" type="button" :disabled="loading" @click="doLogin">
+        <button class="btn btn--primary" type="submit" :disabled="loading">
           {{ loading ? 'Entrando…' : 'Entrar' }}
         </button>
 
@@ -24,7 +24,7 @@
         <div class="help muted">
           Credenciales de dev: <strong>admin</strong> / <strong>admin2026</strong>
         </div>
-      </div>
+      </form>
     </div>
   </div>
 </template>
@@ -33,6 +33,7 @@
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { toApiErrorMessage } from '@/utils/apiErrors';
 
 const router = useRouter();
 const route = useRoute();
@@ -51,7 +52,7 @@ async function doLogin() {
     const redirect = route.query.redirect ? String(route.query.redirect) : '/cementerio';
     await router.replace(redirect);
   } catch (e) {
-    error.value = e?.response?.data?.message ?? 'No se pudo iniciar sesión.';
+    error.value = toApiErrorMessage(e, 'No se pudo iniciar sesión.');
   } finally {
     loading.value = false;
   }

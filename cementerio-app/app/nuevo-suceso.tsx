@@ -14,7 +14,7 @@ import {
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Bloque, Sepultura } from '@/lib/types';
-import { etiquetaEstadoVisible, normalizarEstadoEditable } from '@/lib/estado-sepultura';
+import { colorParaEstadoSepulturaDb, etiquetaEstadoVisible } from '@/lib/estado-sepultura';
 import { NichoGrid } from '@/components/NichoGrid';
 import { apiFetch } from '@/lib/laravel-api';
 import { unwrapItem } from '@/lib/normalize';
@@ -353,7 +353,7 @@ export default function NuevoSucesoModal() {
                     onPress={() => setSelected(item)}
                     activeOpacity={0.85}
                   >
-                    <View style={[s.dot, { backgroundColor: normalizarEstadoEditable(item.estado) === 'libre' ? '#22C55E' : '#EF4444' }]} />
+                    <View style={[s.dot, { backgroundColor: colorParaEstadoSepulturaDb(item.estado) }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={s.rowT}>{item.cemn_bloques?.codigo ?? '—'} · N.º {item.numero ?? item.id}</Text>
                       <Text style={s.rowSub}>{item.cemn_zonas?.nombre ?? '—'} · {item.codigo ?? 'Sin código'}</Text>

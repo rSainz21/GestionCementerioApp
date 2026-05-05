@@ -12,6 +12,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { apiFetch } from '@/lib/laravel-api';
+import { fetchCementerioListAllPages } from '@/lib/cementerio-paginated-list';
 import { AppCard, AppPill } from '@/components/ui';
 
 type Tab = 'difuntos' | 'terceros' | 'concesiones';
@@ -40,14 +41,11 @@ export default function GestionScreen() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const q = search.trim();
-    const qParam = q.length >= 2 ? `&q=${encodeURIComponent(q)}` : '';
-    let path = '';
-    if (tab === 'difuntos') path = `/api/cementerio/difuntos?limit=150${qParam}`;
-    else if (tab === 'terceros') path = `/api/cementerio/terceros?limit=150${qParam}`;
-    else path = `/api/cementerio/concesiones?limit=150${qParam}`;
+    const pathNoQuery =
+      tab === 'difuntos' ? '/api/cementerio/difuntos' : tab === 'terceros' ? '/api/cementerio/terceros' : '/api/cementerio/concesiones';
 
-    const r = await apiFetch<{ items: any[] }>(path);
-    setData(r.ok ? ((r.data as any)?.items ?? []) : []);
+    const r = await fetchCementerioListAllPages({ pathNoQuery, q, limit: 500 });
+    setData(r.items);
     setLoading(false);
   }, [tab, search]);
 

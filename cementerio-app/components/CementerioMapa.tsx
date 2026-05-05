@@ -10,7 +10,7 @@ import { POLIGONOS_BLOQUES_SOMAHOZ } from '@/lib/mapa-somahoz';
 import type { HotspotPolygon, SomahozHotspotId } from '@/lib/mapa-somahoz-hotspots';
 import type { YellowMarker } from '@/lib/somahoz-yellow-markers';
 import type { Sepultura } from '@/lib/types';
-import { normalizarEstadoEditable } from '@/lib/estado-sepultura';
+import { colorParaEstadoSepulturaDb } from '@/lib/estado-sepultura';
 
 type Props = {
   blocks: BloqueOficial[];
@@ -521,9 +521,7 @@ function CementerioMapaBase(
               {selectedCodigo && nichesOverlay.length > 0 ? (
                 <G>
                   {nichesOverlay.map(({ sep, x, y, radius }) => {
-                    const estado = normalizarEstadoEditable((sep as any)?.estado);
-                    const fill =
-                      estado === 'libre' ? 'rgba(34,197,94,0.95)' : estado === 'ocupada' ? 'rgba(239,68,68,0.95)' : 'rgba(59,130,246,0.90)';
+                    const fill = colorParaEstadoSepulturaDb((sep as any)?.estado);
                     const isHit = highlightSepulturaId != null && Number((sep as any)?.id) === Number(highlightSepulturaId);
                     return (
                       <G key={`sep-${(sep as any)?.id ?? (sep as any)?.numero ?? `${x}-${y}`}`}>
@@ -547,6 +545,7 @@ function CementerioMapaBase(
                           height={(isHit ? radius + 2 : radius) * 2}
                           rx={Math.max(2, (isHit ? radius + 2 : radius) * 0.28)}
                           fill={fill}
+                          fillOpacity={0.92}
                           stroke="rgba(255,255,255,0.85)"
                           strokeWidth={2}
                           onPress={() => onPressNicho?.(sep)}

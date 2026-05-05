@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import { normalizarEstadoEditable } from '@/lib/estado-sepultura';
+import { colorParaEstadoSepulturaDb } from '@/lib/estado-sepultura';
 import type { Sepultura } from '@/lib/types';
 
 export type PlanoGeneralMapaHandle = {
@@ -306,13 +306,7 @@ function PlanoGeneralMapaBase(
                         // Más grande para comodidad y legibilidad (plano)
                         const radius = Math.max(5.6, Math.min(14.5, Math.min(cellW, cellH) * 0.34));
 
-                        const estado = normalizarEstadoEditable((sep as any)?.estado);
-                        const fill =
-                          estado === 'libre'
-                            ? 'rgba(34,197,94,0.95)'
-                            : estado === 'ocupada'
-                              ? 'rgba(239,68,68,0.95)'
-                              : 'rgba(59,130,246,0.90)';
+                        const fill = colorParaEstadoSepulturaDb((sep as any)?.estado);
                         const isHit = highlightSepulturaId != null && Number((sep as any)?.id) === Number(highlightSepulturaId);
 
                         return (
@@ -330,6 +324,7 @@ function PlanoGeneralMapaBase(
                               height={(isHit ? radius + 2 : radius) * 2}
                               rx={Math.max(2, (isHit ? radius + 2 : radius) * 0.28)}
                               fill={fill}
+                              fillOpacity={0.92}
                               stroke="rgba(255,255,255,0.85)"
                               strokeWidth={2.8}
                             />

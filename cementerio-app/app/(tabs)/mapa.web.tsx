@@ -7,7 +7,7 @@ import { apiFetch } from '@/lib/laravel-api';
 import { BLOQUES_OFICIALES, type ZonaLabel, formatRango } from '@/lib/bloques-oficiales';
 import { CementerioMapaOSM } from '@/components/CementerioMapaOSM';
 import { PlanoGeneralMapa, type PlanoGeneralMapaHandle } from '@/components/PlanoGeneralMapa';
-import { normalizarEstadoEditable } from '@/lib/estado-sepultura';
+import { normalizarEstadoDb } from '@/lib/estado-sepultura';
 import { AppSkeleton, Radius, Semantic, Space } from '@/components/ui';
 import { AppPill } from '@/components/ui';
 import { POLIGONOS_BLOQUES_SOMAHOZ } from '@/lib/mapa-somahoz';
@@ -18,13 +18,13 @@ import { SOMAHOZ_YELLOW_MARKERS } from '@/lib/somahoz-yellow-markers';
 export default function MapaScreenWeb() {
   const params = useLocalSearchParams<{ focus_sepultura_id?: string }>();
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const planoRef = useRef<PlanoGeneralMapaHandle | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCodigo, setSelectedCodigo] = useState<string | null>(null);
   const [bloqueCodes, setBloqueCodes] = useState<Set<string>>(new Set());
   const [bloquesRaw, setBloquesRaw] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<'satelite' | 'plano'>('plano');
+  const [viewMode, setViewMode] = useState<'satelite' | 'plano'>('satelite');
   const [zona, setZona] = useState<'ALL' | ZonaLabel>('ALL');
   const [highlightSepId, setHighlightSepId] = useState<number | null>(null);
   const [activeHotspot, setActiveHotspot] = useState<SomahozHotspotId | null>(null);
@@ -41,9 +41,14 @@ export default function MapaScreenWeb() {
 
   const mapH = useMemo(() => {
     const w = Number(width || 0);
-    if (!Number.isFinite(w) || w <= 0) return 520;
-    return Math.min(520, Math.max(320, Math.round(w * 0.55)));
-  }, [width]);
+    const h = Number(height || 0);
+    if (!Number.isFinite(w) || w <= 0) return 420;
+    if (!Number.isFinite(h) || h <= 0) return Math.min(520, Math.max(320, Math.round(w * 0.55)));
+
+    const available = h - 64 - 12 - 150 - 12 - 56;
+    const byWidth = Math.round(w * 0.62);
+    return Math.max(260, Math.min(byWidth, available));
+  }, [width, height]);
 
   const abrirBloquePorCodigo = useCallback(
     async (codigo: string) => {
@@ -181,12 +186,16 @@ export default function MapaScreenWeb() {
   const statsSelected = useMemo(() => {
     let libre = 0;
     let ocupada = 0;
+    let reservada = 0;
+    let otras = 0;
     for (const s of sepulturasBloque) {
-      const e = normalizarEstadoEditable((s as any)?.estado);
+      const e = normalizarEstadoDb((s as any)?.estado);
       if (e === 'libre') libre++;
       else if (e === 'ocupada') ocupada++;
+      else if (e === 'reservada') reservada++;
+      else if (e === 'clausurada' || e === 'mantenimiento') otras++;
     }
-    return { libre, ocupada, total: sepulturasBloque.length };
+    return { libre, ocupada, reservada, otras, total: sepulturasBloque.length };
   }, [sepulturasBloque]);
 
   const schematicBlocks = useMemo(() => {
@@ -270,9 +279,9 @@ export default function MapaScreenWeb() {
                 hotspots={SOMAHOZ_HOTSPOTS}
                 activeHotspotId={activeHotspot}
                 onPressHotspot={onPressHotspot}
-                onPressYellowMarker={(m) => {
-                  if (m.action === 'bloque' && m.codigoBloque) abrirBloquePorCodigo(m.codigoBloque);
-                  else if (m.action === 'columbarios') Alert.alert('Columbarios', 'Pendiente: vista especial de columbarios.');
+                onPressYellowMarker={(m: any) => {
+                  if (m?.action === 'bloque' && m?.codigoBloque) abrirBloquePorCodigo(String(m.codigoBloque));
+                  else if (m?.action === 'columbarios') Alert.alert('Columbarios', 'Pendiente: vista especial de columbarios.');
                   else Alert.alert('Tanatorio', 'Tanatorio (Fuera de recinto)');
                 }}
                 blocks={blocks as any}
@@ -295,17 +304,21 @@ export default function MapaScreenWeb() {
             )}
 
             <View style={s.modePill}>
-              <AppPill label="satelite" active={viewMode === 'satelite'} onPress={() => setViewMode('satelite')} />
+              <AppPill label="satélite" active={viewMode === 'satelite'} onPress={() => setViewMode('satelite')} />
               <AppPill label="plano" active={viewMode === 'plano'} onPress={() => setViewMode('plano')} />
             </View>
           </View>
         )}
 
         <View style={s.floatRight}>
-          <FloatBtn icon="search-plus" onPress={() => planoRef.current?.zoomIn()} />
-          <FloatBtn icon="crosshairs" onPress={() => planoRef.current?.reset()} />
+          {viewMode === 'plano' ? (
+            <>
+              <FloatBtn icon="search-plus" onPress={() => planoRef.current?.zoomIn()} />
+              <FloatBtn icon="crosshairs" onPress={() => planoRef.current?.reset()} />
+            </>
+          ) : null}
           <FloatBtn icon="clone" onPress={() => Alert.alert('Capas', 'Pendiente: selector de capas')} />
-          <FloatBtn icon="pencil" onPress={() => router.push('/mapa-editor')} />
+          {/* "Editar" ya existe arriba: evitamos duplicado */}
         </View>
       </View>
 
@@ -319,7 +332,13 @@ export default function MapaScreenWeb() {
               Bloque {selectedCodigo} · {(selectedBloque as any)?.zona_nombre ?? (selectedBloque as any)?.zona?.nombre ?? '—'}
             </Text>
             <Text style={s.bottomSub} numberOfLines={1}>
-              {sepulturasLoading ? 'Cargando…' : `${statsSelected.total} nichos · ${statsSelected.ocupada} ocupadas · ${statsSelected.libre} libres`}
+              {sepulturasLoading
+                ? 'Cargando…'
+                : `${statsSelected.total} nichos · ${statsSelected.ocupada} ocup. · ${statsSelected.libre} libres${
+                    statsSelected.reservada || statsSelected.otras
+                      ? ` · ${statsSelected.reservada} reserv. · ${statsSelected.otras} claus./mant.`
+                      : ''
+                  }`}
             </Text>
           </View>
           <TouchableOpacity
@@ -433,14 +452,22 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Semantic.screenBg },
   topBar: {
-    paddingTop: 14,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    zIndex: 50,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Semantic.screenBg,
-  },
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+    boxShadow: '0 10px 28px rgba(0,0,0,0.12)',
+  } as any,
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
   searchWrap: { flex: 1, height: 40, borderRadius: 12, backgroundColor: '#FFF', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
   searchT: { flex: 1, fontSize: 13, fontWeight: '800', color: 'rgba(15,23,42,0.55)' },
@@ -457,7 +484,7 @@ const s = StyleSheet.create({
     gap: 8,
   },
   editBtnT: { fontWeight: '900', color: '#0F172A' },
-  mapStage: { flex: 1, paddingHorizontal: 12, paddingBottom: 10, justifyContent: 'center' },
+  mapStage: { flex: 1, paddingHorizontal: 12, paddingTop: 68, paddingBottom: 130, justifyContent: 'center' },
   pwaMapWrap: {
     width: '100%',
     borderRadius: 14,
@@ -468,7 +495,7 @@ const s = StyleSheet.create({
     position: 'relative',
   },
   center: { alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
-  floatRight: { position: 'absolute', right: 18, top: 74, gap: 10 },
+  floatRight: { position: 'absolute', right: 14, top: 84, gap: 10 },
   fbtn: {
     width: 40,
     height: 40,
@@ -558,7 +585,17 @@ const s = StyleSheet.create({
   },
   overlayCloseBtnT: { fontWeight: '900', color: Semantic.textSecondary },
 
-  sheet: { backgroundColor: Semantic.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 14, borderTopWidth: 1, borderTopColor: Semantic.border },
+  sheet: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    bottom: 10,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+  },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetTitle: { fontWeight: '900', color: Semantic.text, letterSpacing: 1.2, fontSize: 12 },
   markBtn: { height: 40, borderRadius: 14, backgroundColor: Semantic.primary, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },

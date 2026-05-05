@@ -1,3 +1,35 @@
+# Portfolio técnico — Conect@ 2.0 (Cementerio)
+
+Este repositorio contiene un **módulo completo de Cementerio** desarrollado para un entorno municipal, con:
+
+- **Backend**: Laravel (API REST, permisos, validaciones, auditoría de cambios, subida de documentos/fotos, despliegue Docker).
+- **Web**: Vue 3 + PrimeVue (panel de gestión del módulo).
+- **App**: Expo/React Native (uso en campo: mapa, ficha de sepultura, flujos operativos, modo offline con cola de sincronización).
+- **Wrapper APK** (opcional): Capacitor para empaquetar una PWA como APK instalable.
+
+> Nota: esta es una versión orientada a portfolio. **No** incluye credenciales reales ni infraestructura privada.
+
+## Qué puedes ver rápido (para recruiters)
+
+- **Resumen ejecutivo**: `docs/portfolio/RESUMEN_PARA_EMPRESAS.md`
+- **Arquitectura**: `docs/portfolio/ARQUITECTURA.md`
+- **Funcionalidades**: `docs/portfolio/FEATURES.md`
+- **Cómo ejecutar demo**: `docs/portfolio/COMO_EJECUTAR_DEMO.md`
+- **Privacidad/seguridad**: `docs/portfolio/SEGURIDAD_Y_PRIVACIDAD.md`
+- **Mi contribución**: `docs/portfolio/MI_APORTACION.md`
+
+## Estructura del repo (alto nivel)
+
+- `app/`, `routes/`, `database/`: API Laravel del módulo Cementerio.
+- `resources/js/`: Web (Vue) del módulo Cementerio.
+- `cementerio-app/`: App Expo (React Native / web) para trabajo en campo.
+- `mobile-apk/`: APK wrapper (Capacitor) para PWA `/movil`.
+- `docs/`: documentación de despliegue + portfolio.
+
+## Licencia
+
+Este repositorio se publica con fines de **visibilidad profesional**. Si vas a abrirlo públicamente, revisa `docs/portfolio/SEGURIDAD_Y_PRIVACIDAD.md` para evitar exponer datos o endpoints reales.
+
 # 🏛️ Sistema de Gestión Integral de Cementerios Municipales
 
 Este proyecto representa la **Transformación Digital y Regularización de la Gestión de los cementerios municipales del Ayuntamiento de Los Corrales de Buelna**.  

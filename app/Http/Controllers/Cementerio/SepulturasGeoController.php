@@ -19,7 +19,13 @@ class SepulturasGeoController extends Controller
             ->whereNotNull('lat')
             ->whereNotNull('lon')
             ->limit($limit)
-            ->get(['id', 'numero', 'lat', 'lon', 'estado', 'bloque_id', 'tipo'])
+            ->with([
+                'bloque:id,codigo',
+                'zona:id,nombre',
+                'difuntoTitular:id,sepultura_id,nombre_completo,fecha_inhumacion',
+                'concesionVigente:id,sepultura_id,fecha_vencimiento,numero_expediente',
+            ])
+            ->get(['id', 'numero', 'lat', 'lon', 'estado', 'bloque_id', 'zona_id', 'tipo'])
             ->map(function (CemnSepultura $s) {
                 return [
                     'id' => $s->id,
@@ -28,7 +34,14 @@ class SepulturasGeoController extends Controller
                     'lon' => $s->lon,
                     'estado' => $s->estado,
                     'bloque_id' => $s->bloque_id,
+                    'bloque_codigo' => $s->bloque?->codigo,
+                    'zona_id' => $s->zona_id,
+                    'zona_nombre' => $s->zona?->nombre,
                     'tipo' => $s->tipo,
+                    'titular' => $s->difuntoTitular?->nombre_completo,
+                    'fecha_inhumacion' => $s->difuntoTitular?->fecha_inhumacion,
+                    'expediente' => $s->concesionVigente?->numero_expediente,
+                    'caducidad' => $s->concesionVigente?->fecha_vencimiento,
                 ];
             })
             ->values();

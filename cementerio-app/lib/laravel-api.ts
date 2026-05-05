@@ -5,19 +5,27 @@ export const AUTH_TOKEN_KEY = 'cementerio_laravel_token';
 
 let volatileToken: string | null = null;
 
+function readPublicBase(): string {
+  // Orden de preferencia:
+  // 1) EXPO_PUBLIC_LARAVEL_BASE (histórico)
+  // 2) EXPO_PUBLIC_API_BASE (nuevo: muchos builds lo usan)
+  const b1 = (process.env.EXPO_PUBLIC_LARAVEL_BASE as string | undefined) ?? '';
+  const b2 = (process.env.EXPO_PUBLIC_API_BASE as string | undefined) ?? '';
+  const base = String(b1 || b2).trim().replace(/\/+$/, '');
+  return base;
+}
+
 function getBase(): string {
-  const b = (process.env.EXPO_PUBLIC_LARAVEL_BASE as string | undefined) ?? '';
-  const base = String(b).trim().replace(/\/+$/, '');
+  const base = readPublicBase();
   if (!base) {
-    throw new Error('Falta EXPO_PUBLIC_LARAVEL_BASE (base URL del backend Laravel)');
+    throw new Error('Falta base del backend. Define EXPO_PUBLIC_LARAVEL_BASE o EXPO_PUBLIC_API_BASE (URL del Laravel, sin / final).');
   }
   return base;
 }
 
 /** Base pública del backend (sin barra final). No lanza si falta env. */
 export function getLaravelBaseUrl(): string {
-  const b = (process.env.EXPO_PUBLIC_LARAVEL_BASE as string | undefined) ?? '';
-  return String(b).trim().replace(/\/+$/, '');
+  return readPublicBase();
 }
 
 /**
@@ -33,6 +41,31 @@ export function resolveMediaUrl(href: string | null | undefined): string {
   const normalized = t.replace(/^\/+/, '');
   const path = normalized.startsWith('storage/') ? `/${normalized}` : `/storage/${normalized}`;
   return base ? `${base}${path}` : path;
+}
+
+/** Mensaje legible para toasts / login (422, 403, etc.). */
+function extractLaravelErrorMessage(payload: unknown, status: number): string {
+  if (typeof payload === 'string' && payload.trim()) return payload.trim();
+  if (payload == null || typeof payload !== 'object') {
+    return status === 0 ? 'Sin conexión con el servidor.' : `Error ${status}`;
+  }
+  const p = payload as Record<string, unknown>;
+  const m = p.message;
+  if (typeof m === 'string' && m.trim()) return m.trim();
+  const errors = p.errors;
+  if (errors && typeof errors === 'object') {
+    for (const v of Object.values(errors)) {
+      const arr = Array.isArray(v) ? v : [v];
+      const first = arr.find((x) => x != null && String(x).trim());
+      if (first != null) return String(first).trim();
+    }
+  }
+  if (status === 401) return 'Sesión no válida o caducada.';
+  if (status === 403) return 'No tienes permiso para esta acción.';
+  if (status === 404) return 'Recurso no encontrado.';
+  if (status === 422) return 'Datos no válidos.';
+  if (status >= 500) return 'Error en el servidor. Inténtalo más tarde.';
+  return `Error ${status}`;
 }
 
 async function getToken(): Promise<string | null> {
@@ -87,22 +120,37 @@ export async function apiFetch<T>(
     }
   }
 
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: opts.method ?? 'GET',
-      headers,
-      body,
-    });
-  } catch (e: any) {
-    const method = (opts.method ?? 'GET').toUpperCase();
-    const msg = e?.message ?? String(e);
-    console.error(`[apiFetch] ${method} ${url} -> NETWORK_ERROR`, msg);
-    return {
-      ok: false,
-      status: 0,
-      error: `NETWORK_ERROR: ${msg}\nURL: ${url}\nSi estás en web, suele ser CORS (OPTIONS) o que el backend no es accesible desde tu red.`,
-    };
+  const MAX_RETRIES = 2;
+  let res: Response | null = null;
+  let lastNetErr: string = '';
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      res = await fetch(url, {
+        method: opts.method ?? 'GET',
+        headers,
+        body,
+      });
+      break; // Éxito: salir del bucle de reintentos
+    } catch (e: any) {
+      lastNetErr = e?.message ?? String(e);
+      const isLastAttempt = attempt === MAX_RETRIES;
+      if (isLastAttempt) {
+        const method = (opts.method ?? 'GET').toUpperCase();
+        console.error(`[apiFetch] ${method} ${url} -> NETWORK_ERROR (${attempt + 1} intentos)`, lastNetErr);
+        return {
+          ok: false,
+          status: 0,
+          error: `NETWORK_ERROR: ${lastNetErr}\nURL: ${url}\nSe reintentó ${MAX_RETRIES} veces.\nSi estás en web, suele ser CORS (OPTIONS) o que el backend no es accesible desde tu red.`,
+        };
+      }
+      // Esperar antes de reintentar (backoff exponencial corto)
+      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+    }
+  }
+
+  if (!res) {
+    return { ok: false, status: 0, error: 'NETWORK_ERROR: no se obtuvo respuesta del servidor' };
   }
 
   if (res.status === 204) return { ok: true, data: {} as T };
@@ -127,11 +175,11 @@ export async function apiFetch<T>(
   const payload = parsedJson ?? rawText ?? {};
 
   if (!res.ok) {
-    const msg = (payload as any)?.message ?? payload;
+    const extracted = extractLaravelErrorMessage(payload, res.status);
     const trimmed =
-      typeof msg === 'string' && msg.length > 1200
-        ? `${msg.slice(0, 1200)}…`
-        : msg;
+      typeof extracted === 'string' && extracted.length > 1200
+        ? `${extracted.slice(0, 1200)}…`
+        : extracted;
     // Log detallado para poder ver el error real (500, validaciones, etc.)
     console.error(`[apiFetch] ${method} ${url} -> ${res.status}`, payload);
     return { ok: false, status: res.status, error: trimmed };

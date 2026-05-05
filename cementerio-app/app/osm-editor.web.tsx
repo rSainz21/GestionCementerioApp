@@ -28,10 +28,11 @@ const s = StyleSheet.create({
     paddingLeft: 14,
     paddingRight: 14,
     borderRadius: 12,
-    border: `1px solid ${Semantic.border}`,
+    borderWidth: 1,
+    borderColor: Semantic.border,
     backgroundColor: '#fff',
     fontWeight: 900,
   },
-  iframe: { width: '100%', height: '100%', border: '0px' },
+  iframe: { width: '100%', height: '100%', borderWidth: 0 },
 });
 

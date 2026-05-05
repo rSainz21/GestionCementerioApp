@@ -404,21 +404,29 @@ function HomeScreen({onNav, user, onLogout}) {
       </div>
       {loading ? <LoadView msg="Cargando estadísticas…"/> :
        err ? <ErrBanner msg={err} onRetry={load}/> :
-       stats && <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+       stats && (()=>{
+        const lib=Number(stats.libres??stats.sepulturas_libres??0);
+        const ocu=Number(stats.ocupadas??stats.sepulturas_ocupadas??0);
+        const res=Number(stats.reservadas??0);
+        const cla=Number(stats.clausuradas??0);
+        const man=Number(stats.mantenimiento??0);
+        const sum=lib+ocu+res+cla+man;
+        const tot=Number(stats.total??stats.sepulturas_total??0)||sum;
+        return <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
         <div className="stat">
           <div className="stat-label">Ocupadas</div>
           <div className="row gap-6" style={{alignItems:'baseline'}}>
-            <div className="stat-num">{stats.ocupadas??stats.sepulturas_ocupadas??'—'}</div>
-            <div style={{fontSize:12,color:'var(--ink-3)'}} className="mono">/ {stats.sepulturas_total??'—'}</div>
+            <div className="stat-num">{ocu}</div>
+            <div style={{fontSize:12,color:'var(--ink-3)'}} className="mono">/ {tot > 0 ? tot : '—'}</div>
           </div>
-          {stats.sepulturas_total && <div style={{height:3,background:'var(--surface-3)',borderRadius:2,marginTop:8,overflow:'hidden'}}>
-            <div style={{height:'100%',width:`${Math.round(((stats.ocupadas??stats.sepulturas_ocupadas??0)/stats.sepulturas_total)*100)}%`,background:'var(--ink-2)'}}/>
+          {tot>0 && <div style={{height:3,background:'var(--surface-3)',borderRadius:2,marginTop:8,overflow:'hidden'}}>
+            <div style={{height:'100%',width:`${Math.min(100,Math.round((ocu/tot)*100))}%`,background:'var(--ink-2)'}}/>
           </div>}
         </div>
         <div className="stat">
           <div className="stat-label">Libres</div>
-          <div className="stat-num" style={{color:'var(--accent)'}}>{stats.libres??stats.sepulturas_libres??'—'}</div>
-          <div style={{fontSize:11,color:'var(--ink-3)',marginTop:4}}>{stats.reservadas??0} reservadas</div>
+          <div className="stat-num" style={{color:'var(--accent)'}}>{lib}</div>
+          <div style={{fontSize:11,color:'var(--ink-3)',marginTop:4}}>{res} reservadas</div>
         </div>
         <div className="stat" style={{background:'var(--warn-soft)',borderColor:'transparent'}}>
           <div className="stat-label" style={{color:'var(--warn)'}}>Por caducar</div>
@@ -430,7 +438,7 @@ function HomeScreen({onNav, user, onLogout}) {
           <div className="stat-num" style={{color:'var(--danger)'}}>{stats.concesiones_caducadas??'—'}</div>
           <div style={{fontSize:11,color:'var(--danger)',marginTop:4}}>concesiones</div>
         </div>
-      </div>}
+      </div>;})()}
     </div>
 
     <div style={{padding:'20px 16px 0'}}>

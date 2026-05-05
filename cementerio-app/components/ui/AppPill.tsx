@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { StyleSheet, Text, TextStyle, TouchableOpacity, ViewStyle } from 'react-native';
-import { Radius, Type } from './tokens';
+import { Radius, Semantic, Type } from './tokens';
 
 function AppPillBase(props: {
   label: string;
@@ -40,13 +40,13 @@ const s = StyleSheet.create({
     height: 36,
     paddingHorizontal: 14,
     borderRadius: Radius.pill,
-    backgroundColor: 'rgba(15,23,42,0.06)',
+    backgroundColor: Semantic.surface2,
     borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.10)',
+    borderColor: Semantic.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  active: { backgroundColor: '#0F172A', borderColor: '#0F172A' },
+  active: { backgroundColor: Semantic.accent, borderColor: Semantic.accent },
   t: { ...Type.sub, color: 'rgba(15,23,42,0.75)', textTransform: 'capitalize' },
   tActive: { color: '#FFFFFF' },
 });
