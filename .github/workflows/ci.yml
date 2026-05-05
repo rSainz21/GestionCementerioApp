@@ -19,6 +19,16 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Prepare Laravel env (SQLite)
+        run: |
+          cp .env.example .env
+          mkdir -p database
+          test -f database/database.sqlite || touch database/database.sqlite
+          php artisan key:generate --ansi
+
+      - name: Migrate database
+        run: php artisan migrate --force --ansi
+
       - name: Laravel tests
         run: php artisan test --no-interaction
 
