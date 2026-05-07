@@ -1,0 +1,13 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Serve static files that exist inside public/ directly (assets, images, build, storage…)
+    RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f
+    RewriteRule ^(.*)$ public/$1 [L,QSA]
+
+    RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -d
+    RewriteRule ^(.*)$ public/$1 [L,QSA]
+
+    # Everything else → Laravel entry point
+    RewriteRule ^ public/index.php [L]
+</IfModule>

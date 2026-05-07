@@ -1,0 +1,17 @@
+:root {
+  --c2-primary: #118652;
+  --c2-primary-dark: #0D6B42;
+  --c2-primary-light: #1CA46B;
+  --c2-secondary: #C9A227;
+  --c2-tertiary: #1266A3;
+  --c2-danger: #A61B1B;
+  --c2-warning: #C44536;
+  --c2-success: #0F7A4A;
+  --c2-sidebar-bg: #0E2F2A;
+  --c2-bg: #F5F7F4;
+  --c2-text: #17231F;
+}
+
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: var(--c2-text); }
+

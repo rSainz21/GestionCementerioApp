@@ -1,0 +1,317 @@
+<template>
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="toolbar__left">
+        <span class="title">Sepulturas</span>
+        <span class="count" v-if="!loading">{{ items.length }} registros</span>
+      </div>
+      <div class="toolbar__right">
+        <Button label="Exportar CSV" icon="pi pi-download" severity="secondary" @click="exportCsv" />
+        <Button label="Nueva" icon="pi pi-plus" @click="openNew" />
+      </div>
+    </div>
+
+    <div v-if="loadError" class="error">{{ loadError }}</div>
+
+    <DataTable :value="items" filterDisplay="row" v-model:filters="filters" stripedRows :loading="loading" paginator :rows="15">
+      <Column field="id" header="ID" style="width:70px" />
+      <Column field="codigo" header="Código" style="width:150px" :showFilterMenu="false">
+        <template #filter="{ filterModel, filterCallback }">
+          <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="Filtrar…" class="col-filter" />
+        </template>
+      </Column>
+      <Column field="zona_nombre" header="Zona" :showFilterMenu="false">
+        <template #filter="{ filterModel, filterCallback }">
+          <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="Filtrar zona…" class="col-filter" />
+        </template>
+        <template #body="{ data }">
+          <button v-if="data.zona_nombre" type="button" class="nav-link" @click.stop="navigateToTab?.(1)">
+            {{ data.zona_nombre }}
+          </button>
+          <span v-else class="muted">—</span>
+        </template>
+      </Column>
+      <Column field="bloque_nombre" header="Bloque" :showFilterMenu="false">
+        <template #filter="{ filterModel, filterCallback }">
+          <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="Filtrar bloque…" class="col-filter" />
+        </template>
+        <template #body="{ data }">
+          <button v-if="data.bloque_nombre" type="button" class="nav-link" @click.stop="navigateToTab?.(2)">
+            {{ data.bloque_nombre }}
+          </button>
+          <span v-else class="muted">—</span>
+        </template>
+      </Column>
+      <Column field="fila" header="F" style="width:70px" />
+      <Column field="columna" header="C" style="width:70px" />
+      <Column field="estado" header="Estado" style="width:130px" :showFilterMenu="false">
+        <template #filter="{ filterModel, filterCallback }">
+          <InputText v-model="filterModel.value" @input="filterCallback()" placeholder="libre/ocupada…" class="col-filter" />
+        </template>
+      </Column>
+      <Column header="Acciones" style="width:180px">
+        <template #filter><span /></template>
+        <template #body="{ data }">
+          <div class="row-actions">
+            <Button label="Ver" size="small" severity="info" @click="openView(data)" />
+            <Button label="Editar" size="small" severity="secondary" @click="openEdit(data)" />
+            <Button label="Borrar" size="small" severity="danger" @click="remove(data)" />
+          </div>
+        </template>
+      </Column>
+    </DataTable>
+
+    <Dialog v-model:visible="viewDialog" modal header="Detalle de sepultura" :style="{ width: 'min(1400px, 96vw)' }">
+      <SepulturaInfoPanel :sepulturaId="viewSepulturaId" />
+      <template #footer>
+        <Button label="Cerrar" severity="secondary" @click="viewDialog=false" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="dialog" modal header="Sepultura" :style="{ width: '700px' }">
+      <div class="form">
+        <div class="grid2">
+          <div class="field">
+            <label>Zona</label>
+            <Dropdown v-model="form.zona_id" :options="zonas" optionLabel="nombre" optionValue="id" placeholder="Selecciona…" />
+          </div>
+          <div class="field">
+            <label>Bloque</label>
+            <Dropdown v-model="form.bloque_id" :options="bloquesFiltrados" optionLabel="nombre" optionValue="id" placeholder="Selecciona…" />
+          </div>
+        </div>
+
+        <div class="grid3">
+          <div class="field">
+            <label>Fila</label>
+            <InputText v-model.number="form.fila" />
+          </div>
+          <div class="field">
+            <label>Columna</label>
+            <InputText v-model.number="form.columna" />
+          </div>
+          <div class="field">
+            <label>Estado</label>
+            <Dropdown v-model="form.estado" :options="estados" />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label>Código</label>
+            <InputText v-model="form.codigo" placeholder="Opcional (si se deja vacío, se mantiene/auto)" />
+          </div>
+          <div class="field">
+            <label>Tipo</label>
+            <InputText v-model="form.tipo" placeholder="nicho/columbario/..." />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Notas</label>
+          <InputText v-model="form.notas" />
+        </div>
+
+        <div v-if="error" class="error">{{ error }}</div>
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" severity="secondary" @click="dialog=false" />
+        <Button label="Guardar" :loading="saving" @click="save" />
+      </template>
+    </Dialog>
+  </div>
+</template>
+
+<script setup>
+import { computed, inject, onMounted, reactive, ref, watch } from 'vue';
+import api from '@/services/api';
+import { toApiErrorMessage } from './crudUi';
+
+import DataTable from 'primevue/datatable';
+import { FilterMatchMode } from '@primevue/core/api';
+import Column from 'primevue/column';
+import Button from 'primevue/button';
+import Dialog from 'primevue/dialog';
+import InputText from 'primevue/inputtext';
+import Dropdown from 'primevue/dropdown';
+import SepulturaInfoPanel from '@/components/cementerio/SepulturaInfoPanel.vue';
+
+const navigateToTab = inject('navigateToTab', null);
+
+const items = ref([]);
+const zonas = ref([]);
+const bloques = ref([]);
+const estados = ['libre', 'ocupada'];
+
+const loading = ref(false);
+const loadError = ref(null);
+const dialog = ref(false);
+const saving = ref(false);
+const error = ref(null);
+const viewDialog = ref(false);
+const viewSepulturaId = ref(null);
+
+const filters = ref({
+  codigo:       { value: null, matchMode: FilterMatchMode.CONTAINS },
+  zona_nombre:  { value: null, matchMode: FilterMatchMode.CONTAINS },
+  bloque_nombre:{ value: null, matchMode: FilterMatchMode.CONTAINS },
+  estado:       { value: null, matchMode: FilterMatchMode.CONTAINS },
+});
+
+const form = reactive({
+  id: null,
+  zona_id: null,
+  bloque_id: null,
+  fila: 1,
+  columna: 1,
+  codigo: '',
+  tipo: 'nicho',
+  estado: 'libre',
+  notas: '',
+});
+
+const bloquesFiltrados = computed(() => bloques.value.filter((b) => b.zona_id === form.zona_id));
+
+watch(
+  () => form.zona_id,
+  () => {
+    const first = bloquesFiltrados.value[0]?.id ?? null;
+    if (first && !bloquesFiltrados.value.some((b) => b.id === form.bloque_id)) {
+      form.bloque_id = first;
+    }
+  }
+);
+
+async function loadCatalogos() {
+  try {
+    const [rz, rb] = await Promise.all([
+      api.get('/api/cementerio/admin/zonas'),
+      api.get('/api/cementerio/admin/bloques'),
+    ]);
+    zonas.value = rz.data?.items?.map((z) => ({ id: z.id, nombre: z.nombre })) ?? [];
+    bloques.value = rb.data?.items?.map((b) => ({ id: b.id, nombre: b.nombre, zona_id: b.zona_id })) ?? [];
+  } catch (e) {
+    loadError.value = toApiErrorMessage(e, 'No se pudieron cargar los catálogos (¿permisos?).');
+  }
+}
+
+async function load() {
+  loading.value = true;
+  loadError.value = null;
+  try {
+    const res = await api.get('/api/cementerio/admin/sepulturas');
+    items.value = res.data?.items ?? [];
+  } catch (e) {
+    loadError.value = toApiErrorMessage(e, 'No se pudieron cargar las sepulturas (¿permisos?).');
+  } finally {
+    loading.value = false;
+  }
+}
+
+function openNew() {
+  Object.assign(form, {
+    id: null,
+    zona_id: zonas.value[0]?.id ?? null,
+    bloque_id: null,
+    fila: 1,
+    columna: 1,
+    codigo: '',
+    tipo: 'nicho',
+    estado: 'libre',
+    notas: '',
+  });
+  error.value = null;
+  dialog.value = true;
+}
+
+function openEdit(row) {
+  Object.assign(form, {
+    id: row.id,
+    zona_id: row.zona_id,
+    bloque_id: row.bloque_id,
+    fila: row.fila,
+    columna: row.columna,
+    codigo: row.codigo ?? '',
+    tipo: row.tipo ?? 'nicho',
+    estado: row.estado ?? 'libre',
+    notas: row.notas ?? '',
+  });
+  error.value = null;
+  dialog.value = true;
+}
+
+function openView(row) {
+  viewSepulturaId.value = row?.id ?? null;
+  viewDialog.value = true;
+}
+
+async function save() {
+  saving.value = true;
+  error.value = null;
+  try {
+    if (form.id) {
+      await api.put(`/api/cementerio/admin/sepulturas/${form.id}`, form);
+    } else {
+      await api.post('/api/cementerio/admin/sepulturas', form);
+    }
+    dialog.value = false;
+    await load();
+  } catch (e) {
+    error.value = toApiErrorMessage(e);
+  } finally {
+    saving.value = false;
+  }
+}
+
+function exportCsv() {
+  const headers = ['ID', 'Código', 'Zona', 'Bloque', 'Fila', 'Columna', 'Tipo', 'Estado', 'Notas'];
+  const rows = items.value.map((r) => [r.id, r.codigo, r.zona_nombre, r.bloque_nombre, r.fila, r.columna, r.tipo, r.estado, r.notas ?? '']);
+  downloadCsv('sepulturas.csv', headers, rows);
+}
+
+function downloadCsv(filename, headers, rows) {
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function remove(row) {
+  if (!confirm(`¿Borrar unidad "${row.codigo || row.id}"?`)) return;
+  await api.delete(`/api/cementerio/admin/sepulturas/${row.id}`);
+  await load();
+}
+
+onMounted(async () => {
+  await loadCatalogos();
+  await load();
+});
+</script>
+
+<style scoped>
+.wrap { display: grid; gap: 12px; padding: 12px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.toolbar__left { display: flex; align-items: baseline; gap: 10px; }
+.toolbar__right { display: flex; gap: 8px; }
+.title { font-weight: 900; }
+.count { font-size: 13px; color: #888; }
+.row-actions { display: flex; gap: 6px; }
+.form { display: grid; gap: 10px; }
+.field { display: grid; gap: 6px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.error { color: var(--c2-danger, #A61B1B); font-size: 13px; }
+.muted { color: #999; font-size: 13px; }
+.col-filter { width: 100%; font-size: 12px; }
+.nav-link {
+  background: none; border: none; padding: 2px 6px; border-radius: 6px;
+  cursor: pointer; font-size: 13px; color: var(--c2-tertiary, #1266A3);
+  font-weight: 600; transition: background .12s;
+}
+.nav-link:hover { background: rgba(18,102,163,.08); text-decoration: underline; }
+@media (max-width: 900px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+</style>

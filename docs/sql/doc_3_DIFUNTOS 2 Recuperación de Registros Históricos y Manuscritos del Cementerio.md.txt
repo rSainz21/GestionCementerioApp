@@ -1,0 +1,81 @@
+﻿Tienes toda la razÃ³n y es una excelente directriz para no perder ningÃºn dato potencial [1, 2]. En el listado anterior prioricÃ© Ãºnicamente las lÃ¡pidas con nombres completos y fechas perfectamente nÃ­tidas para asegurar la integridad de la base de datos, asÃ­ como los expedientes en formato CSV modernos. 
+
+Sin embargo, revisando minuciosamente los **documentos histÃ³ricos manuscritos (los PDFs de concesiones)** y los **cuadrantes de "NICHOS NUEVOS" anotados a bolÃ­grafo**, existen decenas de difuntos mencionados de los que no tenemos fecha exacta o cuyos apellidos son difÃ­ciles de leer [1-4]. AdemÃ¡s, en los oficios de los aÃ±os 60, los familiares solicitaban comprar el terreno indicando que *"allÃ­ yacen los restos de mi finado esposo/madre..."*, dÃ¡ndonos nombres de personas inhumadas hace dÃ©cadas [5-7].
+
+Esta informaciÃ³n, aunque "sucia" o parcial, es vital rescatarla ahora. El trabajador de campo, al usar el buscador de la aplicaciÃ³n, podrÃ¡ identificar que "Salome Alvarez Wander" o "Israel Portela" ya existen en la base de datos y simplemente corregir el apellido si lo ve bien en la lÃ¡pida, en lugar de tener que teclearlo desde cero.
+
+AquÃ­ tienes el **Segundo Lote de InserciÃ³n (Extracciones Parciales, Dudosas e HistÃ³ricas)** para la tabla `cemn_difuntos`:
+
+```sql
+INSERT INTO cemn_difuntos (nombre_completo, fecha_fallecimiento, sepultura_id, es_titular, notas) VALUES
+
+-- =========================================================================
+-- EXTRACCIÃN DE EXPEDIENTES HISTÃRICOS (Difuntos mencionados en los oficios)
+-- =========================================================================
+('Magdalena Herrera Alonso', NULL, NULL, 0, 'Mencionada como difunta en concesiÃ³n histÃ³rica de Bonifacia Alonso Ruiz en 1962'),
+('Gumersindo Solares', NULL, NULL, 0, 'Padre difunto mencionado en concesiÃ³n de Emilia Solares Rotella (1969)'),
+('Luisa GonzÃ¡lez Mantilla', NULL, NULL, 0, 'Madre difunta en concesiÃ³n de Pedro Aristi GonzÃ¡lez (1966)'),
+('Gregorio Gallardo', NULL, NULL, 0, 'Esposo difunto en concesiÃ³n de Carolina RodrÃ­guez Vivero (1966)'),
+('Genoveva GonzÃ¡lez y GonzÃ¡lez', NULL, NULL, 0, 'Madre polÃ­tica difunta en concesiÃ³n de JesÃºs Espada Aznar (1966)'),
+('David Retuerto AnÃ­varro', NULL, NULL, 0, 'Esposo difunto en concesiÃ³n de Aureliana GonzÃ¡lez Quevedo (1966)'),
+('Alfredo Corral', NULL, NULL, 0, 'Esposo difunto en concesiÃ³n de Virginia ObregÃ³n Perales (1966)'),
+('JosÃ© GonzÃ¡lez Quevedo', NULL, NULL, 0, 'Esposo difunto en concesiÃ³n de Ubaldina SantandrÃ©s (1966)'),
+('Manuel FernÃ¡ndez TerÃ¡n', NULL, NULL, 0, 'Esposo difunto en concesiÃ³n de MarÃ­a Retuerto Olavarri (1965)'),
+('Francisco Retuerto Olavarri', NULL, NULL, 0, 'Mencionado en concesiÃ³n de Manuel Retuerto Marcos (1964)'),
+('Rafael Alonso Aguado', NULL, NULL, 0, 'Padre difunto en concesiÃ³n de Rafael Alonso Unamuno (1963)'),
+('Josefa GonzÃ¡lez FernÃ¡ndez', NULL, NULL, 0, 'Esposa difunta en concesiÃ³n de Felipe Alonso Arenal (1964)'),
+('Paula', NULL, NULL, 0, 'Esposa difunta en concesiÃ³n de Angel GarcÃ­a SÃ¡nchez. LÃ¡pida nÂº 6. (1964)'),
+('Ubalda GonzÃ¡lez Olavarri', NULL, NULL, 0, 'Madre difunta en concesiÃ³n de Guadalupe Venero GonzÃ¡lez (1962)'),
+('MarÃ­a Cobo PÃ©rez', NULL, NULL, 0, 'Madre difunta en concesiÃ³n de Gloria GutiÃ©rrez Cobo (1962)'),
+('JuliÃ¡n DÃ­az Pedrosa', NULL, NULL, 0, 'Esposo difunto en concesiÃ³n de Clementina GonzÃ¡lez RubÃ­n (1961)'),
+('Feliciano SantandrÃ©s', NULL, NULL, 0, 'Difunto mencionado en expediente de Cura PÃ¡rroco (1960)'),
+('Trinidad GonzÃ¡lez de la Pedrosa', NULL, NULL, 0, 'Difunta mencionada en la fila 4, pared Este (1950s)'),
+('Eloisa Marcano Abad', NULL, NULL, 0, 'Difunta mencionada en parcela de terreno del Campo Santo (1950s)'),
+
+-- =========================================================================
+-- ANOTACIONES MANUSCRITAS Y BORRADORES (CaligrafÃ­a de dudosa lectura)
+-- =========================================================================
+('Matilde Saez Mendezabal', '1935-01-31', NULL, 0, 'AnotaciÃ³n manuscrita en libreta de registro. Apellido dudoso.'),
+('Jose MÂª Pereda Gutierrez', '1939-12-08', NULL, 0, 'AnotaciÃ³n manuscrita en libreta de registro.'),
+('Jose Secor Pereda Saez', '1972-10-03', NULL, 0, 'AnotaciÃ³n manuscrita. El segundo nombre podrÃ­a ser "SeÃ±or" o "Sector".'),
+('Salome Alvarez Wander', '1958-06-07', NULL, 0, 'AnotaciÃ³n manuscrita. Apellido "Wander" de dudosa lectura.'),
+('Gloria MÂª Pereda', NULL, NULL, 0, 'Borrador manuscrito, anotada junto a nÃºmero de telÃ©fono.'),
+('Gloria MÂª Vega Helguera', NULL, NULL, 0, 'Borrador manuscrito de sepulturas.'),
+('Piedad Garcia Vda Morante', NULL, NULL, 0, 'Borrador manuscrito, Ã¡rbol de titularidad.'),
+('Pedro Morante Garcia', NULL, NULL, 0, 'Borrador manuscrito, Ã¡rbol de titularidad.'),
+
+-- =========================================================================
+-- CUADRANTES DE TRABAJO "NICHOS NUEVOS" (Solo nombre/apellidos extraÃ­dos)
+-- =========================================================================
+('Cesar Fdez', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 376.'),
+('Israel Portela Estrada', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 357 (escrito en diagonal).'),
+('MÂª Soledad Arozamena Sanchel', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 359. (Apellido podrÃ­a ser SÃ¡nchez)'),
+('Ramona bis', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 399. (AnotaciÃ³n literal "Ramona bis")'),
+('Ricardo Roca', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 394.'),
+('Loli Pernil', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 381. (Apellido dudoso, podrÃ­a ser Pernia)'),
+('MÂª Luisa Selcins', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 385. (Posible Salcines)'),
+('Fdo Rubin Pilati', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 396. (Probable Fernando)'),
+('Aquilino Rasilla Santaudia', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 388. (Apellido final dudoso)'),
+('Jose L. Ceballos', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 423.'),
+('Eduardo Franco Gomez', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 424.'),
+('Emilia Gonzalez Blanco', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 425.'),
+('Pedro de la Vega Arce', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 428.'),
+('Fco Bajon', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 436. (Probable Francisco)'),
+('Martin Fdez Quevedo', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 442.'),
+('Pedro Luis Glez Unamuno', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 444.'),
+('David Marcano Varela', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 445.'),
+('Vicente Cuevas', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 446.'),
+('Fernando Rasilla Castillo', NULL, NULL, 0, 'Cuadrante Nichos Nuevos. Casilla 447.'),
+
+-- =========================================================================
+-- EVIDENCIAS VISUALES FOTOGRÃFICAS PARCIALES (Nombres cortados o ilegibles)
+-- =========================================================================
+('Concha Menocal', NULL, NULL, 0, 'Evidencia visual foto 52. LÃ¡pida cortada en la esquina inferior izquierda.'),
+('Manuel Concha Gutierrez', NULL, NULL, 0, 'Evidencia visual foto 52. LÃ¡pida parcialmente oscurecida.'),
+('Abilia Arroyo Desoy', NULL, NULL, 0, 'Evidencia visual foto 49. Letras parcialmente borradas.'),
+('Hermenegilda Gutierrez Bman...', NULL, NULL, 0, 'Evidencia visual foto 35. Apellido final incomprensible (posible Buman/Bman).');
+```
+
+Con este segundo listado, hemos inyectado casi **50 registros adicionales** correspondientes a la historia no digitalizada y a los "cuadrantes de lÃ¡piz y papel" que los operarios llevaban en sus carpetas [1-4]. 
+
+La estrategia de guardar la fuente original en el campo `notas` (ej. "Cuadrante Nichos Nuevos. Casilla 376") [2] es un salvavidas de cara al futuro. Cuando el operario de la App seleccione la sepultura fÃ­sica nÂº 376, podrÃ¡ ver esta nota y confirmar si efectivamente allÃ­ yacen los restos de *CÃ©sar FernÃ¡ndez*.
