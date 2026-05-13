@@ -62,7 +62,7 @@
     </DataTable>
 
     <Dialog v-model:visible="viewDialog" modal header="Detalle de sepultura" :style="{ width: 'min(1400px, 96vw)' }">
-      <SepulturaInfoPanel :sepulturaId="viewSepulturaId" />
+      <SepulturaInfoPanel :sepulturaId="viewSepulturaId" @navigate="id => viewSepulturaId = id" @changed="onSepChanged" />
       <template #footer>
         <Button label="Cerrar" severity="secondary" @click="viewDialog=false" />
       </template>
@@ -126,6 +126,7 @@
 <script setup>
 import { computed, inject, onMounted, reactive, ref, watch } from 'vue';
 import api from '@/services/api';
+import { useCementerioStore } from '@/stores/cementerio';
 import { toApiErrorMessage } from './crudUi';
 
 import DataTable from 'primevue/datatable';
@@ -138,6 +139,8 @@ import Dropdown from 'primevue/dropdown';
 import SepulturaInfoPanel from '@/components/cementerio/SepulturaInfoPanel.vue';
 
 const navigateToTab = inject('navigateToTab', null);
+const cemStore = useCementerioStore();
+const cid = computed(() => cemStore.activoId);
 
 const items = ref([]);
 const zonas = ref([]);
@@ -185,9 +188,10 @@ watch(
 
 async function loadCatalogos() {
   try {
+    const params = { cementerio_id: cid.value };
     const [rz, rb] = await Promise.all([
-      api.get('/api/cementerio/admin/zonas'),
-      api.get('/api/cementerio/admin/bloques'),
+      api.get('/api/cementerio/admin/zonas', { params }),
+      api.get('/api/cementerio/admin/bloques', { params }),
     ]);
     zonas.value = rz.data?.items?.map((z) => ({ id: z.id, nombre: z.nombre })) ?? [];
     bloques.value = rb.data?.items?.map((b) => ({ id: b.id, nombre: b.nombre, zona_id: b.zona_id })) ?? [];
@@ -200,7 +204,7 @@ async function load() {
   loading.value = true;
   loadError.value = null;
   try {
-    const res = await api.get('/api/cementerio/admin/sepulturas');
+    const res = await api.get('/api/cementerio/admin/sepulturas', { params: { cementerio_id: cid.value } });
     items.value = res.data?.items ?? [];
   } catch (e) {
     loadError.value = toApiErrorMessage(e, 'No se pudieron cargar las sepulturas (¿permisos?).');
@@ -246,6 +250,11 @@ function openView(row) {
   viewDialog.value = true;
 }
 
+function onSepChanged({ id, estado }) {
+  const row = items.value.find(s => s.id === id);
+  if (row) row.estado = estado;
+}
+
 async function save() {
   saving.value = true;
   error.value = null;
@@ -286,6 +295,7 @@ async function remove(row) {
   await load();
 }
 
+watch(cid, async (v, old) => { if (v && v !== old) { await loadCatalogos(); await load(); } });
 onMounted(async () => {
   await loadCatalogos();
   await load();

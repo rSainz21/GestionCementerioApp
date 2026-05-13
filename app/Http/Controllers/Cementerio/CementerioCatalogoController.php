@@ -17,16 +17,19 @@ class CementerioCatalogoController extends Controller
     public function catalogo(Request $request)
     {
         $zonaId = $request->integer('zona_id');
+        $cid    = $request->integer('cementerio_id') ?: null;
 
-        $zonas = CemnZona::query()
-            ->orderBy('nombre')
-            ->get();
+        $zonasQuery = CemnZona::query()->orderBy('nombre');
+        if ($cid) {
+            $zonasQuery->where('cementerio_id', $cid);
+        }
+        $zonas = $zonasQuery->get();
 
-        $bloquesQuery = CemnBloque::query()
-            ->orderBy('nombre');
-
+        $bloquesQuery = CemnBloque::query()->orderBy('nombre');
         if ($zonaId) {
             $bloquesQuery->where('zona_id', $zonaId);
+        } elseif ($cid) {
+            $bloquesQuery->whereHas('zona', fn ($q) => $q->where('cementerio_id', $cid));
         }
 
         $bloques = $bloquesQuery->get();

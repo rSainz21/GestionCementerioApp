@@ -13,12 +13,10 @@ class BloqueSepulturasController extends Controller
             ->where('bloque_id', $bloqueId)
             ->select(['id', 'bloque_id', 'zona_id', 'tipo', 'numero', 'fila', 'columna', 'codigo', 'estado'])
             ->with([
-                // Difunto titular enlazado directamente a la sepultura (inhumaciones directas)
-                'difuntoTitular:id,sepultura_id,nombre_completo,fecha_inhumacion,es_titular,foto_path',
-                // Concesión activa con sus terceros y difuntos (datos históricos)
+                'difuntoTitular:id,tipo,sepultura_id,nombre_completo,nombre,apellido1,apellido2,fecha_inhumacion,es_principal,foto_path',
                 'concesionVigente:id,sepultura_id,numero_expediente,tipo,estado,fecha_concesion,fecha_vencimiento,notas',
-                'concesionVigente.terceros:id,nombre,apellido1,apellido2,dni,nombre_original',
-                'concesionVigente.difuntos:id,concesion_id,nombre_completo,fecha_inhumacion,es_titular',
+                'concesionVigente.personas:id,tipo,nombre,apellido1,apellido2,nombre_completo,nombre_original,dni',
+                'concesionVigente.difuntos:id,tipo,concesion_id,nombre_completo,nombre,apellido1,apellido2,fecha_inhumacion,es_principal',
             ])
             ->get()
             ->map(function (CemnSepultura $s) {
@@ -31,10 +29,10 @@ class BloqueSepulturasController extends Controller
                     $tooltipNombre = $difunto->nombre_completo;
                 } elseif ($concesion?->difuntos?->isNotEmpty()) {
                     $tooltipNombre = $concesion->difuntos->first()->nombre_completo;
-                } elseif ($concesion?->terceros?->isNotEmpty()) {
-                    $concesionario = $concesion->terceros->firstWhere('pivot.rol', 'concesionario')
-                        ?? $concesion->terceros->first();
-                    $tooltipNombre = $concesionario->nombre_original
+                } elseif ($concesion?->personas?->isNotEmpty()) {
+                    $concesionario = $concesion->personas->firstWhere('pivot.rol', 'concesionario')
+                        ?? $concesion->personas->first();
+                    $tooltipNombre = $concesionario->nombre_display ?? $concesionario->nombre_original
                         ?? trim(($concesionario->nombre ?? '') . ' ' . ($concesionario->apellido1 ?? '') . ' ' . ($concesionario->apellido2 ?? ''));
                 }
 
@@ -49,10 +47,10 @@ class BloqueSepulturasController extends Controller
                     'codigo'         => $s->codigo,
                     'estado'         => $s->estado,
                     'difunto_titular' => $difunto ? [
-                        'id'             => $difunto->id,
-                        'nombre_completo'=> $difunto->nombre_completo,
-                        'fecha_inhumacion' => optional($difunto->fecha_inhumacion)->toDateString(),
-                        'foto_path'      => $difunto->foto_path,
+                        'id'              => $difunto->id,
+                        'nombre_completo' => $difunto->nombre_display ?? $difunto->nombre_completo,
+                        'fecha_inhumacion'=> optional($difunto->fecha_inhumacion)->toDateString(),
+                        'foto_path'       => $difunto->foto_path,
                     ] : null,
                     'concesion' => $concesion ? [
                         'id'                => $concesion->id,
@@ -62,7 +60,7 @@ class BloqueSepulturasController extends Controller
                         'concesionario'     => $tooltipNombre,
                         'difuntos'          => $concesion->difuntos?->map(fn ($d) => [
                             'id'              => $d->id,
-                            'nombre_completo' => $d->nombre_completo,
+                            'nombre_completo' => $d->nombre_display ?? $d->nombre_completo,
                         ])->values(),
                     ] : null,
                     'tooltip_nombre' => $tooltipNombre,

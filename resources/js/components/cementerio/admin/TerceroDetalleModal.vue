@@ -162,7 +162,7 @@ async function onShow() {
   loadError.value   = null;
   loadingConc.value = true;
   try {
-    const res = await api.get(`/api/cementerio/admin/terceros/${props.tercero.id}/concesiones`);
+    const res = await api.get(`/api/cementerio/admin/personas/${props.tercero.id}/concesiones`);
     concesiones.value = res.data?.items ?? [];
   } catch (e) {
     loadError.value = e?.response?.data?.message ?? 'Error al cargar las concesiones.';

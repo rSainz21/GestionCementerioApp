@@ -2,6 +2,7 @@
   <div class="mapa-wrap">
     <div class="grid-top">
       <SelectorNichosGrid
+        ref="gridRef"
         :zonas="zonas"
         :bloques="bloques"
         selectionMode="todas"
@@ -254,6 +255,7 @@ import SepulturaInfoPanel from '@/components/cementerio/SepulturaInfoPanel.vue';
 import MapaCementerioSomahoz from '@/components/cementerio/MapaCementerioSomahoz.vue';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
+import { putPersonaAsignarSepulturaConConfirmacionDoc } from '@/utils/cementerioPersonaAsignar.js';
 
 const zonas = ref([]);
 const bloques = ref([]);
@@ -305,7 +307,7 @@ async function _doFetch() {
   loadingPanel.value = true;
   try {
     const endpoint = panelMode.value === 'difuntos'
-      ? '/api/cementerio/difuntos/sin-asignar'
+      ? '/api/cementerio/personas/sin-sepultura'
       : '/api/cementerio/concesiones/sin-asignar';
     const res = await api.get(endpoint, {
       params: { q: busqueda.value || undefined },
@@ -396,7 +398,7 @@ function buscarTerceros() {
   if (qfTerceroQ.value.trim().length < 2) { terceroResults.value = []; return; }
   terceroTimer = setTimeout(async () => {
     try {
-      const res = await api.get('/api/cementerio/terceros', { params: { q: qfTerceroQ.value } });
+      const res = await api.get('/api/cementerio/personas', { params: { q: qfTerceroQ.value, tipo: 'titular' } });
       terceroResults.value = res.data?.items ?? [];
     } catch { terceroResults.value = []; }
   }, 280);
@@ -418,10 +420,11 @@ async function submitForm() {
     if (!qfNombre.value.trim()) { qfError.value = 'El nombre es obligatorio.'; return; }
     qfSaving.value = true;
     try {
-      const res = await api.post('/api/cementerio/difuntos', {
+      const res = await api.post('/api/cementerio/personas', {
+        tipo:                'difunto',
         nombre_completo:     qfNombre.value.trim(),
         fecha_fallecimiento: qfFecha.value || null,
-        es_titular:          qfTitular.value,
+        es_principal:        qfTitular.value,
       });
       difuntosSinAsignar.value.unshift(res.data.item);
       showMsg(true, `"${res.data.item.nombre_completo}" creado — arrástralo a una sepultura libre.`);
@@ -454,6 +457,7 @@ async function submitForm() {
   }
 }
 
+const gridRef = ref(null);
 const draggingEntity = ref(null);
 const asignMsg = ref(null);
 let msgTimer = null;
@@ -482,13 +486,16 @@ async function onDropDifunto({ difunto, sepultura }) {
       concesionesSinAsignar.value = concesionesSinAsignar.value.filter((c) => c.id !== difunto.id);
       showMsg(true, `Concesión #${difunto.id} asignada a ${sepultura.codigo}`);
     } else {
-      await api.put(`/api/cementerio/difuntos/${difunto.id}/asignar-sepultura`, {
-        sepultura_id: sepultura.id,
-      });
+      const resPut = await putPersonaAsignarSepulturaConConfirmacionDoc(difunto.id, sepultura.id);
+      if (resPut === null) {
+        showMsg(false, 'Asignación cancelada.');
+        return;
+      }
       difuntosSinAsignar.value = difuntosSinAsignar.value.filter((d) => d.id !== difunto.id);
       showMsg(true, `${difunto.nombre} asignado a ${sepultura.codigo}`);
     }
     await Promise.all([loadGeo(), loadSepulturas()]);
+    gridRef.value?.refresh();
   } catch (e) {
     showMsg(false, e?.response?.data?.message ?? 'Error al asignar.');
   }

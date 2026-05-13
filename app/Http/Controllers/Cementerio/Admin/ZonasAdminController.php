@@ -26,10 +26,12 @@ class ZonasAdminController extends Controller
         return ['lat' => $sumLat / $n, 'lon' => $sumLon / $n];
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $cid = $request->integer('cementerio_id') ?: null;
         $items = CemnZona::query()
             ->with('cementerio:id,nombre')
+            ->when($cid, fn ($q) => $q->where('cementerio_id', $cid))
             ->orderBy('nombre')
             ->get()
             ->map(function (CemnZona $z) {
@@ -48,6 +50,51 @@ class ZonasAdminController extends Controller
             ->values();
 
         return response()->json(['items' => $items]);
+    }
+
+    public function show(int $id): JsonResponse
+    {
+        $zona = CemnZona::with(['cementerio:id,nombre', 'bloques'])->findOrFail($id);
+
+        $bloques = $zona->bloques->map(function ($b) {
+            $total   = $b->sepulturas()->count();
+            $libres  = $b->sepulturas()->where('estado', 'libre')->count();
+            $ocupadas = $b->sepulturas()->where('estado', 'ocupada')->count();
+            return [
+                'id'       => $b->id,
+                'codigo'   => $b->codigo,
+                'nombre'   => $b->nombre,
+                'tipo'     => $b->tipo,
+                'filas'    => $b->filas,
+                'columnas' => $b->columnas,
+                'total'    => $total,
+                'libres'   => $libres,
+                'ocupadas' => $ocupadas,
+            ];
+        })->values();
+
+        $totalSep   = $bloques->sum('total');
+        $libresSep  = $bloques->sum('libres');
+        $ocupadasSep = $bloques->sum('ocupadas');
+
+        return response()->json([
+            'id'                => $zona->id,
+            'cementerio_id'     => $zona->cementerio_id,
+            'cementerio_nombre' => $zona->cementerio?->nombre,
+            'codigo'            => $zona->codigo,
+            'nombre'            => $zona->nombre,
+            'descripcion'       => $zona->descripcion,
+            'lat'               => $zona->lat ? (float) $zona->lat : null,
+            'lon'               => $zona->lon ? (float) $zona->lon : null,
+            'polygon'           => $zona->polygon,
+            'bloques'           => $bloques,
+            'stats'             => [
+                'bloques'    => $bloques->count(),
+                'sepulturas' => $totalSep,
+                'libres'     => $libresSep,
+                'ocupadas'   => $ocupadasSep,
+            ],
+        ]);
     }
 
     public function store(Request $request): JsonResponse

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Cementerio;
 use App\Http\Controllers\Controller;
 use App\Models\CemnDocumento;
 use App\Models\CemnSepultura;
+use App\Models\CemnSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -16,8 +17,10 @@ class SepulturaDocumentoController extends Controller
         /** @var CemnSepultura $sepultura */
         $sepultura = CemnSepultura::query()->findOrFail($id);
 
+        $docKb = CemnSetting::intRange('documento_adjunto_max_kb', 10240, 512, 51200);
+
         $data = $request->validate([
-            'archivo' => ['required', 'file', 'max:10240'], // 10MB
+            'archivo' => ['required', 'file', 'max:'.$docKb],
             'tipo' => ['nullable', 'string', 'max:30'],
             'descripcion' => ['nullable', 'string', 'max:2000'],
         ]);

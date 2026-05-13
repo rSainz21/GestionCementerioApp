@@ -166,7 +166,7 @@ async function load() {
   loading.value = true;
   error.value = null;
   try {
-    const res = await api.get('/api/cementerio/admin/terceros');
+    const res = await api.get('/api/cementerio/admin/personas', { params: { tipo: 'titular' } });
     items.value = res.data?.items ?? [];
   } catch (e) {
     error.value = toApiErrorMessage(e, 'No se pudieron cargar los terceros.');
@@ -182,7 +182,7 @@ async function verConcesiones(tercero) {
   panelVisible.value = true;
   panelLoading.value = true;
   try {
-    const res = await api.get(`/api/cementerio/admin/terceros/${tercero.id}/concesiones`);
+    const res = await api.get(`/api/cementerio/admin/personas/${tercero.id}/concesiones`);
     panelConcesiones.value = res.data?.items ?? [];
   } catch (e) {
     panelError.value = toApiErrorMessage(e, 'No se pudieron cargar las concesiones.');

@@ -3,32 +3,34 @@
 namespace App\Http\Controllers\Cementerio\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\CemnTercero;
+use App\Models\CemnPersona;
 use Illuminate\Http\JsonResponse;
 
-class TerceroConcesionesController extends Controller
+class PersonaConcesionesController extends Controller
 {
     public function index(int $id): JsonResponse
     {
-        $tercero = CemnTercero::findOrFail($id);
+        $persona = CemnPersona::findOrFail($id);
 
-        $concesiones = $tercero->concesiones()
+        $concesiones = $persona->concesiones()
             ->with([
                 'sepultura:id,codigo,zona_id,bloque_id',
                 'sepultura.zona:id,nombre',
                 'sepultura.bloque:id,nombre',
-                'terceros:id,nombre,apellido1,apellido2,dni,nombre_original',
-                'difuntos:id,concesion_id,nombre_completo,fecha_fallecimiento,fecha_inhumacion,es_titular,parentesco',
+                'personas:id,nombre,apellido1,apellido2,nombre_completo,nombre_original,dni,tipo',
+                'difuntos:id,concesion_id,nombre_completo,nombre,apellido1,apellido2,fecha_fallecimiento,fecha_inhumacion,es_principal,parentesco',
             ])
             ->orderByDesc('fecha_concesion')
             ->get()
             ->map(fn ($c) => self::formatConcesion($c));
 
         return response()->json([
-            'tercero' => [
-                'id'             => $tercero->id,
-                'nombre_original'=> $tercero->nombre_original,
-                'dni'            => $tercero->dni,
+            'persona' => [
+                'id'             => $persona->id,
+                'tipo'           => $persona->tipo,
+                'nombre_display' => $persona->nombre_display,
+                'nombre_original'=> $persona->nombre_original,
+                'dni'            => $persona->dni,
             ],
             'items' => $concesiones,
         ]);
@@ -51,18 +53,21 @@ class TerceroConcesionesController extends Controller
             'sepultura_codigo'  => $c->sepultura?->codigo,
             'zona_nombre'       => $c->sepultura?->zona?->nombre,
             'bloque_nombre'     => $c->sepultura?->bloque?->nombre,
-            'terceros'          => $c->terceros->map(fn ($t) => [
-                'id'             => $t->id,
-                'nombre_original'=> $t->nombre_original,
-                'dni'            => $t->dni,
-                'rol'            => $t->pivot->rol ?? 'concesionario',
+            'personas'          => $c->personas->map(fn ($p) => [
+                'id'             => $p->id,
+                'tipo'           => $p->tipo,
+                'nombre_display' => $p->nombre_display,
+                'nombre_original'=> $p->nombre_original,
+                'dni'            => $p->dni,
+                'rol'            => $p->pivot->rol ?? 'concesionario',
             ])->values(),
             'difuntos'          => $c->difuntos->map(fn ($d) => [
                 'id'                  => $d->id,
+                'nombre_display'      => $d->nombre_display,
                 'nombre_completo'     => $d->nombre_completo,
                 'fecha_fallecimiento' => optional($d->fecha_fallecimiento)->toDateString(),
                 'fecha_inhumacion'    => optional($d->fecha_inhumacion)->toDateString(),
-                'es_titular'          => (bool) $d->es_titular,
+                'es_principal'        => (bool) $d->es_principal,
                 'parentesco'          => $d->parentesco,
             ])->values(),
         ];

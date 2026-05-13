@@ -10,7 +10,7 @@ class CemnMovimiento extends Model
     protected $table = 'cemn_movimientos';
 
     protected $fillable = [
-        'difunto_id',
+        'persona_id',
         'tipo',
         'fecha',
         'sepultura_origen_id',
@@ -23,9 +23,9 @@ class CemnMovimiento extends Model
         'fecha' => 'date',
     ];
 
-    public function difunto(): BelongsTo
+    public function persona(): BelongsTo
     {
-        return $this->belongsTo(CemnDifunto::class, 'difunto_id');
+        return $this->belongsTo(CemnPersona::class, 'persona_id');
     }
 
     public function sepulturaOrigen(): BelongsTo

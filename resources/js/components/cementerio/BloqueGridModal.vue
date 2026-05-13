@@ -39,7 +39,7 @@
     </div>
 
     <Dialog v-model:visible="sepDialog" modal header="Detalle de sepultura" :style="{ width: 'min(1400px,96vw)' }">
-      <SepulturaInfoPanel :sepulturaId="sepId" />
+      <SepulturaInfoPanel :sepulturaId="sepId" @navigate="id => sepId = id" @changed="onSepChanged" />
       <template #footer>
         <Button label="Cerrar" severity="secondary" @click="sepDialog = false" />
       </template>
@@ -149,6 +149,14 @@ function openSep(id) {
   sepId.value = id;
   sepDialog.value = true;
 }
+
+function onSepChanged({ id, estado, nombre }) {
+  const sep = sepulturas.value.find(s => s.id === id);
+  if (sep) {
+    sep.estado = estado;
+    sep.tooltip_nombre = nombre;
+  }
+}
 </script>
 
 <style scoped>
@@ -178,7 +186,7 @@ function openSep(id) {
 .gc {
   border: none; border-radius: 8px; min-height: 36px; padding: 2px;
   display: grid; place-items: center; cursor: pointer;
-  transition: transform 80ms, box-shadow 80ms, opacity 80ms;
+  transition: background-color 400ms ease, transform 80ms, box-shadow 80ms, opacity 80ms;
 }
 .gc:disabled { cursor: default; opacity: .75; }
 .gc:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(23,35,31,.18); }

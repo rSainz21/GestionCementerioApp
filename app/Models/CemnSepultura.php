@@ -93,16 +93,17 @@ class CemnSepultura extends Model
 
     public function difuntos(): HasMany
     {
-        return $this->hasMany(CemnDifunto::class, 'sepultura_id');
+        return $this->hasMany(CemnPersona::class, 'sepultura_id')
+                    ->whereIn('tipo', ['difunto', 'ambos']);
     }
 
-    /** Difunto principal (es_titular = true). */
+    /** Persona principal activa del nicho (es_principal = true, inhumado actualmente). */
     public function difuntoTitular(): HasOne
     {
-        // Evitamos `latestOfMany()` porque en SQLite puede generar subconsultas con
-        // columnas ambiguas (`sepultura_id`) cuando se combina con `where`.
-        return $this->hasOne(CemnDifunto::class, 'sepultura_id')
-            ->where('es_titular', true)
+        return $this->hasOne(CemnPersona::class, 'sepultura_id')
+            ->whereIn('tipo', ['difunto', 'ambos'])
+            ->where('es_principal', true)
+            ->where('estado_inhumacion', 'inhumado')
             ->orderByDesc('fecha_inhumacion');
     }
 

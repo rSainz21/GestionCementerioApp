@@ -55,7 +55,7 @@
       <Column header="Rol" style="width:110px">
         <template #filter><span /></template>
         <template #body="{ data }">
-          <Tag v-if="data.es_titular" value="Titular" severity="success" />
+          <Tag v-if="data.es_principal" value="Titular" severity="success" />
           <span v-else class="muted small">{{ data.parentesco ?? 'Otro' }}</span>
         </template>
       </Column>
@@ -121,7 +121,7 @@ async function load() {
   loading.value = true;
   error.value = null;
   try {
-    const res = await api.get('/api/cementerio/admin/difuntos');
+    const res = await api.get('/api/cementerio/admin/personas', { params: { tipo: 'difunto' } });
     items.value = res.data?.items ?? [];
   } catch (e) {
     error.value = toApiErrorMessage(e, 'No se pudieron cargar los difuntos.');
@@ -134,7 +134,7 @@ function exportCsv() {
   const headers = ['ID', 'Nombre completo', 'F. Fallecimiento', 'F. Inhumación', 'Sepultura', 'Titular', 'Parentesco', 'Notas'];
   const rows = filtered.value.map((r) => [
     r.id, r.nombre_completo, r.fecha_fallecimiento ?? '', r.fecha_inhumacion ?? '',
-    r.sepultura_codigo ?? '', r.es_titular ? 'Sí' : 'No', r.parentesco ?? '', r.notas ?? '',
+    r.sepultura_codigo ?? '', r.es_principal ? 'Sí' : 'No', r.parentesco ?? '', r.notas ?? '',
   ]);
   downloadCsv('difuntos.csv', headers, rows);
 }

@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\Cementerio;
 
 use App\Http\Controllers\Controller;
-use App\Models\CemnDifunto;
+use App\Models\CemnPersona;
+use App\Models\CemnSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,28 +14,30 @@ class SepulturaFotoController extends Controller
 {
     public function store(Request $request, int $id): JsonResponse
     {
-        /** @var CemnDifunto|null $difunto */
-        $difunto = CemnDifunto::query()
+        $difunto = CemnPersona::query()
+            ->difuntos()
             ->where('sepultura_id', $id)
-            ->where('es_titular', true)
+            ->where('es_principal', true)
             ->orderByDesc('id')
             ->first();
 
         if (!$difunto) {
             return response()->json([
-                'message' => 'No hay difunto titular asociado a esta sepultura.',
+                'message' => 'No hay persona principal asociada a esta sepultura.',
             ], 422);
         }
 
+        $fotoKb = CemnSetting::intRange('foto_max_kb', 5120, 1024, 20480);
+
         $data = $request->validate([
-            'foto' => ['required', 'file', 'image', 'max:5120'], // 5MB
+            'foto' => ['required', 'file', 'image', 'max:'.$fotoKb],
         ]);
 
         $file = $data['foto'];
         $ext = strtolower($file->getClientOriginalExtension() ?: 'jpg');
         $filename = Str::uuid()->toString() . '.' . $ext;
 
-        $dir = 'cementerio/difuntos/' . $difunto->id;
+        $dir = 'cementerio/personas/' . $difunto->id;
         $path = $file->storePubliclyAs($dir, $filename, 'public');
 
         $oldPath = $difunto->foto_path;

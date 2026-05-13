@@ -35,4 +35,20 @@ return [
         ],
     ],
 
+    'openai' => [
+        'key'          => env('OPENAI_API_KEY', ''),
+        'vision_model' => env('OPENAI_VISION_MODEL', 'gpt-4o'),
+    ],
+
+    /** auto | gemini | openai — en auto se prefiere Gemini si hay GEMINI_API_KEY. */
+    'ia_vision' => [
+        'provider' => env('IA_VISION_PROVIDER', 'auto'),
+    ],
+
+    /** Google AI Studio (https://aistudio.google.com/apikey) — capa gratuita con límites. */
+    'gemini' => [
+        'key'   => env('GEMINI_API_KEY', env('GOOGLE_AI_API_KEY', '')),
+        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+    ],
+
 ];

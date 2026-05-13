@@ -282,7 +282,7 @@ async function buscarTitulares() {
   }
   titularLoading.value = true;
   try {
-    const res = await api.get('/api/cementerio/terceros', { params: { q } });
+    const res = await api.get('/api/cementerio/personas', { params: { q, tipo: 'titular' } });
     titularItems.value = res.data?.items ?? [];
   } finally {
     titularLoading.value = false;

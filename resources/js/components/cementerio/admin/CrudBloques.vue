@@ -66,169 +66,12 @@
       </Column>
     </DataTable>
 
-    <!-- CRUD form Dialog -->
-    <Dialog v-model:visible="dialog" modal header="Crear bloque" :style="{ width: '680px' }">
-      <div class="form">
-        <div class="hint">
-          Define la disposición y previsualízala antes de guardar.
-        </div>
-
-        <div class="grid2">
-          <div class="field">
-            <label>Zona</label>
-            <Dropdown v-model="form.zona_id" :options="zonas" optionLabel="nombre" optionValue="id" placeholder="Selecciona…" />
-            <div class="zona-pill-row" v-if="zonasPills.length">
-              <button
-                v-for="z in zonasPills"
-                :key="z.id"
-                type="button"
-                class="zona-pill"
-                :class="form.zona_id === z.id ? 'zona-pill--active' : ''"
-                @click="form.zona_id = z.id"
-              >
-                {{ z.codigo }}
-              </button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Código</label>
-            <InputText v-model="form.codigo" placeholder="B-C" />
-          </div>
-        </div>
-
-        <div class="grid2">
-          <div class="field">
-            <label>Nombre</label>
-            <InputText v-model="form.nombre" placeholder="Ampliación 2020" />
-          </div>
-
-          <div class="field">
-            <label>Tipo</label>
-            <Dropdown v-model="form.tipo" :options="tipos" placeholder="Selecciona…" />
-          </div>
-        </div>
-
-        <div class="dimensiones">
-          <div class="dimensiones__title">Dimensiones</div>
-          <div class="dimensiones__grid">
-            <div class="dim-box">
-              <div class="dim-box__label">Filas</div>
-              <div class="stepper">
-                <Button icon="pi pi-minus" severity="secondary" text class="stepper__btn" @click="dec('filas')" />
-                <div class="stepper__value">{{ form.filas }}</div>
-                <Button icon="pi pi-plus" severity="secondary" text class="stepper__btn" @click="inc('filas')" />
-              </div>
-            </div>
-
-            <div class="dim-box">
-              <div class="dim-box__label">Columnas</div>
-              <div class="stepper">
-                <Button icon="pi pi-minus" severity="secondary" text class="stepper__btn" @click="dec('columnas')" />
-                <div class="stepper__value">{{ form.columnas }}</div>
-                <Button icon="pi pi-plus" severity="secondary" text class="stepper__btn" @click="inc('columnas')" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid2">
-          <div class="field">
-            <label>Nº primer nicho / sepultura del bloque</label>
-            <InputText v-model.number="form.numero_inicio" placeholder="(auto)" />
-            <div class="muted-mini">Si lo dejas vacío, se asigna automáticamente (max+1).</div>
-          </div>
-          <div class="field">
-            <label>Sentido de numeración</label>
-            <div class="dir-wrap">
-              <div class="dir-row">
-                <button
-                  type="button"
-                  class="dir-btn"
-                  :class="form.numeracion_horizontal === '->' ? 'dir-btn--active' : ''"
-                  @click="form.numeracion_horizontal = '->'"
-                >
-                  Horiz. →
-                </button>
-                <button
-                  type="button"
-                  class="dir-btn"
-                  :class="form.numeracion_horizontal === '<-' ? 'dir-btn--active' : ''"
-                  @click="form.numeracion_horizontal = '<-'"
-                >
-                  Horiz. ←
-                </button>
-              </div>
-              <div class="dir-row">
-                <button
-                  type="button"
-                  class="dir-btn"
-                  :class="form.numeracion_vertical === 'down' ? 'dir-btn--active' : ''"
-                  @click="form.numeracion_vertical = 'down'"
-                >
-                  Vert. ↓
-                </button>
-                <button
-                  type="button"
-                  class="dir-btn"
-                  :class="form.numeracion_vertical === 'up' ? 'dir-btn--active' : ''"
-                  @click="form.numeracion_vertical = 'up'"
-                >
-                  Vert. ↑
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Descripción</label>
-          <InputText v-model="form.descripcion" />
-        </div>
-
-        <div class="field">
-          <label class="label-map">
-            <i class="pi pi-map-marker" style="color:var(--c2-primary,#118652)" />
-            Ubicación en el mapa
-            <span class="label-map__hint">Opcional — clic en el mapa para marcar</span>
-          </label>
-          <MapaPicker
-            v-model:lat="form.lat"
-            v-model:lon="form.lon"
-            :defaultLat="43.248730"
-            :defaultLon="-4.057985"
-            :defaultZoom="17"
-          />
-        </div>
-
-        <div class="preview">
-          <div class="preview__head">
-            <div class="preview__title">
-              Previsualización · <strong>{{ totalCeldas }}</strong> sepulturas
-            </div>
-            <div class="muted-mini">
-              Muestra el número de nicho que se guardará en BD (campo <code>numero</code>).
-            </div>
-          </div>
-
-          <div
-            class="preview-grid"
-            :style="{ gridTemplateColumns: `repeat(${form.columnas}, minmax(38px, 1fr))` }"
-          >
-            <div v-for="cell in previewCells" :key="cell.key" class="preview-cell">
-              <div class="preview-cell__num">{{ cell.numero }}</div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="error" class="error">{{ error }}</div>
-      </div>
-
-      <template #footer>
-        <Button label="Cancelar" severity="secondary" @click="dialog=false" />
-        <Button label="Guardar" :loading="saving" @click="save" />
-      </template>
-    </Dialog>
+    <BloqueFormDialog
+      v-model="dialog"
+      :zonas="zonas"
+      :editData="editRow"
+      @saved="load"
+    />
 
     <!-- Grid del bloque (reutilizable) -->
     <BloqueGridView v-model="gridDialog" :bloque="gridBloque" />
@@ -236,33 +79,30 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, reactive, ref } from 'vue';
+import { computed, inject, onMounted, ref, watch } from 'vue';
 import api from '@/services/api';
+import { useCementerioStore } from '@/stores/cementerio';
 import { toApiErrorMessage } from './crudUi';
 import BloqueGridView from '@/components/cementerio/BloqueGridView.vue';
+import BloqueFormDialog from './BloqueFormDialog.vue';
 
 import DataTable from 'primevue/datatable';
 import { FilterMatchMode } from '@primevue/core/api';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
-import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
-import MapaPicker from '@/components/cementerio/MapaPicker.vue';
 
 const navigateToTab = inject('navigateToTab', null);
+const cemStore = useCementerioStore();
+const cid = computed(() => cemStore.activoId);
 
-// ── CRUD state ────────────────────────────────────────────────────────────────
-const items = ref([]);
-const zonas = ref([]);
-const tipos = ['nichos', 'columbarios', 'fosas', 'panteones', 'otros'];
-const loading = ref(false);
+const items     = ref([]);
+const zonas     = ref([]);
+const loading   = ref(false);
 const loadError = ref(null);
-const dialog = ref(false);
-const saving = ref(false);
-const error = ref(null);
+const dialog    = ref(false);
+const editRow   = ref(null);
 
-// ── Column filters ─────────────────────────────────────────────────────────
 const filters = ref({
   zona_nombre: { value: null, matchMode: FilterMatchMode.CONTAINS },
   codigo:      { value: null, matchMode: FilterMatchMode.CONTAINS },
@@ -270,167 +110,52 @@ const filters = ref({
   tipo:        { value: null, matchMode: FilterMatchMode.CONTAINS },
 });
 
-// ── Grid dialog state ─────────────────────────────────────────────────────
 const gridDialog = ref(false);
 const gridBloque = ref(null);
 
-// ── Form ──────────────────────────────────────────────────────────────────
-const form = reactive({
-  id: null,
-  zona_id: null,
-  codigo: '',
-  nombre: '',
-  tipo: 'nichos',
-  filas: 1,
-  columnas: 1,
-  numero_inicio: null,
-  numeracion_horizontal: '->',
-  numeracion_vertical: 'down',
-  descripcion: '',
-  lat: null,
-  lon: null,
-});
-
-const zonasPills = computed(() =>
-  (zonas.value ?? [])
-    .filter((z) => z?.codigo)
-    .map((z) => ({ id: z.id, codigo: z.codigo }))
-);
-
-const totalCeldas = computed(() => Number(form.filas || 0) * Number(form.columnas || 0));
-
-function clampInt(v, min, max) {
-  const n = Number.parseInt(String(v ?? ''), 10);
-  if (Number.isNaN(n)) return min;
-  return Math.max(min, Math.min(max, n));
-}
-
-function inc(field) {
-  form[field] = clampInt(form[field], 1, 200) + 1;
-  form[field] = clampInt(form[field], 1, 200);
-}
-
-function dec(field) {
-  form[field] = clampInt(form[field], 1, 200) - 1;
-  form[field] = clampInt(form[field], 1, 200);
-}
-
-const previewCells = computed(() => {
-  const filas = clampInt(form.filas, 1, 200);
-  const cols = clampInt(form.columnas, 1, 200);
-  const start = form.numero_inicio != null && String(form.numero_inicio).trim() !== ''
-    ? clampInt(form.numero_inicio, 1, 1000000)
-    : 1;
-
-  const colOrder = Array.from({ length: cols }, (_, i) => i + 1);
-  const rowOrder = Array.from({ length: filas }, (_, i) => i + 1);
-  if (form.numeracion_horizontal === '<-') colOrder.reverse();
-  if (form.numeracion_vertical === 'up') rowOrder.reverse();
-
-  const byPos = new Map();
-  let num = start;
-  for (const c of colOrder) {
-    for (const r of rowOrder) {
-      byPos.set(`${r}-${c}`, num++);
-    }
-  }
-
-  const out = [];
-  for (let r = 1; r <= filas; r++) {
-    for (let c = 1; c <= cols; c++) {
-      out.push({ key: `${r}-${c}`, fila: r, columna: c, numero: byPos.get(`${r}-${c}`) });
-    }
-  }
-  return out;
-});
-
-// ── Actions ───────────────────────────────────────────────────────────────
-function goToZonas() {
-  navigateToTab?.(1);
-}
+function goToZonas() { navigateToTab?.(1); }
 
 function openGrid(bloque) {
   gridBloque.value = bloque;
   gridDialog.value = true;
 }
 
+function openNew() {
+  editRow.value = null;
+  dialog.value  = true;
+}
+
+function openEdit(row) {
+  editRow.value = row;
+  dialog.value  = true;
+}
+
 async function loadCatalogos() {
   try {
-    const res = await api.get('/api/cementerio/admin/zonas');
-    zonas.value = res.data?.items?.map((z) => ({ id: z.id, nombre: z.nombre, codigo: z.codigo })) ?? [];
+    const res = await api.get('/api/cementerio/admin/zonas', { params: { cementerio_id: cid.value } });
+    zonas.value = res.data?.items?.map((z) => ({
+      id:      z.id,
+      nombre:  z.nombre,
+      codigo:  z.codigo,
+      lat:     z.lat,
+      lon:     z.lon,
+      polygon: typeof z.polygon === 'string' ? JSON.parse(z.polygon) : (z.polygon ?? null),
+    })) ?? [];
   } catch (e) {
     loadError.value = toApiErrorMessage(e, 'No se pudieron cargar los catálogos (¿permisos?).');
   }
 }
 
 async function load() {
-  loading.value = true;
+  loading.value   = true;
   loadError.value = null;
   try {
-    const res = await api.get('/api/cementerio/admin/bloques');
+    const res = await api.get('/api/cementerio/admin/bloques', { params: { cementerio_id: cid.value } });
     items.value = res.data?.items ?? [];
   } catch (e) {
     loadError.value = toApiErrorMessage(e, 'No se pudieron cargar los bloques (¿permisos?).');
   } finally {
     loading.value = false;
-  }
-}
-
-function openNew() {
-  Object.assign(form, {
-    id: null,
-    zona_id: zonas.value[0]?.id ?? null,
-    codigo: '',
-    nombre: '',
-    tipo: 'nichos',
-    filas: 1,
-    columnas: 1,
-    numero_inicio: null,
-    numeracion_horizontal: '->',
-    numeracion_vertical: 'down',
-    descripcion: '',
-    lat: null,
-    lon: null,
-  });
-  error.value = null;
-  dialog.value = true;
-}
-
-function openEdit(row) {
-  Object.assign(form, {
-    id: row.id,
-    zona_id: row.zona_id,
-    codigo: row.codigo,
-    nombre: row.nombre,
-    tipo: row.tipo,
-    filas: row.filas,
-    columnas: row.columnas,
-    numero_inicio: row.numero_inicio ?? null,
-    numeracion_horizontal: row.numeracion_horizontal ?? '->',
-    numeracion_vertical: row.numeracion_vertical ?? 'down',
-    descripcion: row.descripcion,
-    lat: row.lat ?? null,
-    lon: row.lon ?? null,
-  });
-  error.value = null;
-  dialog.value = true;
-}
-
-async function save() {
-  saving.value = true;
-  error.value = null;
-  try {
-    if (form.id) {
-      await api.put(`/api/cementerio/admin/bloques/${form.id}`, form);
-    } else {
-      await api.post('/api/cementerio/admin/bloques', form);
-    }
-    dialog.value = false;
-    await load();
-  } catch (e) {
-    error.value = toApiErrorMessage(e);
-  } finally {
-    saving.value = false;
   }
 }
 
@@ -440,6 +165,7 @@ async function remove(row) {
   await load();
 }
 
+watch(cid, async (v, old) => { if (v && v !== old) { await loadCatalogos(); await load(); } });
 onMounted(async () => {
   await loadCatalogos();
   await load();
@@ -564,4 +290,19 @@ onMounted(async () => {
   .grid2 { grid-template-columns: 1fr; }
   .dimensiones__grid { grid-template-columns: 1fr; }
 }
+
+.zona-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: rgba(201, 162, 39, 0.10);
+  border: 1px solid rgba(201, 162, 39, 0.40);
+  color: #7a5c00;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.zona-warning .pi { color: #C9A227; font-size: 13px; flex-shrink: 0; margin-top: 1px; }
 </style>

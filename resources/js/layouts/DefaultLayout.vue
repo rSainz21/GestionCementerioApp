@@ -7,8 +7,8 @@
       <div class="brand">
         <i class="pi pi-building brand__icon" />
         <div>
-          <div class="brand__title">Cementerio</div>
-          <div class="brand__subtitle">Somahoz</div>
+          <div class="brand__title">{{ settings.get('nombre', 'Cementerio') }}</div>
+          <div class="brand__subtitle">{{ settings.get('subtitulo', 'Somahoz') }}</div>
         </div>
       </div>
 
@@ -27,12 +27,29 @@
           <span>Nuevo caso</span>
         </router-link>
 
+        <div v-if="auth.hasPermission('cementerio.admin')" class="nav__section" style="margin-top:8px">ADMINISTRACIÓN</div>
+        <router-link v-if="auth.hasPermission('cementerio.admin')" class="nav__item" to="/cementerio/usuarios" active-class="nav__item--active">
+          <i class="pi pi-users" />
+          <span>Usuarios</span>
+        </router-link>
+
         <div class="nav__section" style="margin-top:8px">SOPORTE</div>
+        <router-link class="nav__item" to="/cementerio/regularizacion" active-class="nav__item--active">
+          <i class="pi pi-link" />
+          <span>Regularización</span>
+          <span v-if="pendientesReg > 0" class="nav__badge nav__badge--warn">{{ pendientesReg }}</span>
+        </router-link>
+        <router-link class="nav__item" to="/cementerio/papelera" active-class="nav__item--active">
+          <i class="pi pi-trash" />
+          <span>Papelera</span>
+        </router-link>
         <router-link class="nav__item" to="/cementerio/ayuda" active-class="nav__item--active">
           <i class="pi pi-book" />
           <span>Ayuda</span>
         </router-link>
       </nav>
+
+      <SidebarAlertas />
 
       <div class="sidebar__footer">
         <div class="user" v-if="auth.user">
@@ -42,11 +59,18 @@
             <div class="user__meta">{{ auth.user.username || auth.user.email }}</div>
           </div>
         </div>
-        <button class="logout-btn" type="button" @click="logout">
-          <i class="pi pi-sign-out" />
-          <span>Salir</span>
-        </button>
+        <div class="footer-actions">
+          <button class="footer-icon-btn" type="button" @click="configOpen = true" title="Configuración">
+            <i class="pi pi-cog" />
+          </button>
+          <button class="logout-btn" type="button" @click="logout">
+            <i class="pi pi-sign-out" />
+            <span>Salir</span>
+          </button>
+        </div>
       </div>
+
+      <PanelConfiguracion :open="configOpen" @close="configOpen = false" />
     </aside>
 
     <div class="main-wrap">
@@ -55,6 +79,28 @@
           <i class="pi pi-bars" />
         </button>
         <div class="topbar__title">{{ title }}</div>
+
+        <!-- Selector de cementerio -->
+        <div class="topbar__cem-selector" v-if="cementerio.lista.length > 1">
+          <i class="pi pi-building topbar__cem-icon" />
+          <select
+            class="topbar__cem-select"
+            :value="cementerio.activoId"
+            @change="cementerio.seleccionar(Number($event.target.value))"
+          >
+            <option v-for="c in cementerio.lista" :key="c.id" :value="c.id">
+              {{ c.nombre }}
+            </option>
+          </select>
+        </div>
+        <div class="topbar__cem-single" v-else-if="cementerio.activo">
+          <i class="pi pi-building" />
+          <span>{{ cementerio.activo.nombre }}</span>
+        </div>
+
+        <div class="topbar__right">
+          <BuscadorGlobal ref="buscadorRef" />
+        </div>
       </header>
       <main class="content">
         <router-view />
@@ -64,13 +110,45 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { useAlertasStore } from '@/stores/alertas';
+import { useSettingsStore } from '@/stores/settings';
+import { useCementerioStore } from '@/stores/cementerio';
+import SidebarAlertas from '@/components/cementerio/SidebarAlertas.vue';
+import PanelConfiguracion from '@/components/cementerio/PanelConfiguracion.vue';
+import BuscadorGlobal from '@/components/cementerio/BuscadorGlobal.vue';
 
 const route = useRoute();
 const auth = useAuthStore();
-const sidebarOpen = ref(false);
+const alertas = useAlertasStore();
+const settings = useSettingsStore();
+const cementerio = useCementerioStore();
+const sidebarOpen  = ref(false);
+const configOpen   = ref(false);
+const buscadorRef  = ref(null);
+
+const pendientesReg = computed(() => {
+  const sinUbicar = alertas.grupos.find?.(g => g?.clave === 'sin_ubicar')?.total ?? 0;
+  const sinAsig   = alertas.grupos.find?.(g => g?.clave === 'concesiones_sin_asignar')?.total ?? 0;
+  return sinUbicar + sinAsig;
+});
+
+function onKeydown(e) {
+  if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+    e.preventDefault();
+    buscadorRef.value?.focus();
+  }
+}
+onMounted(() => window.addEventListener('keydown', onKeydown));
+onUnmounted(() => window.removeEventListener('keydown', onKeydown));
+
+onMounted(() => {
+  settings.fetch();
+  alertas.fetch();
+  cementerio.cargar();
+});
 
 const title = computed(() => route.meta?.title || 'Cementerio');
 
@@ -191,6 +269,13 @@ watch(() => route.fullPath, () => {
   opacity: 1;
 }
 
+.nav__badge {
+  font-size: 10px; font-weight: 800;
+  padding: 1px 5px; border-radius: 999px;
+  line-height: 1.4; margin-left: auto;
+}
+.nav__badge--warn { background: #f97316; color: #fff; }
+
 /* ── Footer ──────────────────────────────────────── */
 .sidebar__footer {
   padding: 10px 10px 14px;
@@ -219,11 +304,36 @@ watch(() => route.fullPath, () => {
   opacity: 0.55;
 }
 
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.footer-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .logout-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
   padding: 7px 10px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -261,7 +371,55 @@ watch(() => route.fullPath, () => {
   font-weight: 800;
   font-size: 14px;
   color: var(--c2-text, #17231F);
+  flex: 1;
 }
+
+/* ── Selector cementerio ─────────────────────────────────── */
+.topbar__cem-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-left: 1px solid rgba(23,35,31,0.09);
+  border-right: 1px solid rgba(23,35,31,0.09);
+  flex-shrink: 0;
+}
+.topbar__cem-icon {
+  font-size: 13px;
+  color: var(--c2-primary, #118652);
+  flex-shrink: 0;
+}
+.topbar__cem-select {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c2-text, #17231F);
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  max-width: 240px;
+  padding: 0 2px;
+}
+.topbar__cem-single {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-left: 1px solid rgba(23,35,31,0.09);
+  font-size: 13px;
+  font-weight: 600;
+  color: #374240;
+  flex-shrink: 0;
+}
+.topbar__cem-single .pi { font-size: 13px; color: var(--c2-primary, #118652); }
+
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 
 .hamburger {
   display: none;

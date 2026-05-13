@@ -331,6 +331,12 @@ function onDrop(cell) {
   if (!props.draggingDifunto || !cell.sepultura?.id) return;
   emit('drop-difunto', { difunto: props.draggingDifunto, sepultura: cell.sepultura });
 }
+
+function refresh() {
+  if (bloqueId.value) cargarSepulturasDelBloque(bloqueId.value);
+}
+
+defineExpose({ refresh });
 </script>
 
 <style scoped>

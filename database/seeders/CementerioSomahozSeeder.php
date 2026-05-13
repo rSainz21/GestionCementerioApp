@@ -5,10 +5,9 @@ namespace Database\Seeders;
 use App\Models\CemnBloque;
 use App\Models\CemnCementerio;
 use App\Models\CemnConcesion;
-use App\Models\CemnConcesionTercero;
-use App\Models\CemnDifunto;
+use App\Models\CemnConcesionPersona;
+use App\Models\CemnPersona;
 use App\Models\CemnSepultura;
-use App\Models\CemnTercero;
 use App\Models\CemnZona;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -20,14 +19,13 @@ class CementerioSomahozSeeder extends Seeder
     {
         DB::transaction(function () {
             // Limpieza (orden por FKs)
-            CemnConcesionTercero::query()->delete();
+            DB::table('cemn_concesion_personas')->delete();
             CemnConcesion::query()->delete();
-            CemnDifunto::query()->delete();
+            CemnPersona::query()->delete();
             CemnSepultura::query()->delete();
             CemnBloque::query()->delete();
             CemnZona::query()->delete();
             CemnCementerio::query()->delete();
-            CemnTercero::query()->delete();
 
             $cementerio = CemnCementerio::create([
                 'nombre' => 'Cementerio Municipal de Somahoz',
@@ -140,45 +138,47 @@ class CementerioSomahozSeeder extends Seeder
             ->get();
 
         foreach ($celdas as $celda) {
-            $titular = CemnTercero::create([
-                'dni' => strtoupper(Str::random(8)).'X',
-                'nombre' => 'Titular',
-                'apellido1' => 'Ejemplo',
-                'apellido2' => (string) rand(1, 99),
-                'telefono' => '600'.rand(100000, 999999),
-                'direccion' => 'Calle Ejemplo '.rand(1, 50),
-                'municipio' => 'Los Corrales de Buelna',
-                'provincia' => 'Cantabria',
-                'cp' => '39400',
+            $titular = CemnPersona::create([
+                'tipo'       => 'titular',
+                'dni'        => strtoupper(Str::random(8)).'X',
+                'nombre'     => 'Titular',
+                'apellido1'  => 'Ejemplo',
+                'apellido2'  => (string) rand(1, 99),
+                'telefono'   => '600'.rand(100000, 999999),
+                'direccion'  => 'Calle Ejemplo '.rand(1, 50),
+                'municipio'  => 'Los Corrales de Buelna',
+                'provincia'  => 'Cantabria',
+                'cp'         => '39400',
                 'es_empresa' => false,
             ]);
 
             $concesion = CemnConcesion::create([
-                'sepultura_id' => $celda->id,
+                'sepultura_id'      => $celda->id,
                 'numero_expediente' => 'EXP-'.date('Y').'-'.str_pad((string) rand(1, 9999), 4, '0', STR_PAD_LEFT),
-                'tipo' => 'temporal',
-                'fecha_concesion' => now()->subYears(rand(0, 10))->toDateString(),
-                'duracion_anos' => 10,
-                'estado' => 'vigente',
-                'importe' => 0,
-                'moneda' => 'euros',
+                'tipo'              => 'temporal',
+                'fecha_concesion'   => now()->subYears(rand(0, 10))->toDateString(),
+                'duracion_anos'     => 10,
+                'estado'            => 'vigente',
+                'importe'           => 0,
+                'moneda'            => 'euros',
             ]);
 
-            CemnConcesionTercero::create([
+            CemnConcesionPersona::create([
                 'concesion_id' => $concesion->id,
-                'tercero_id' => $titular->id,
-                'rol' => 'concesionario',
-                'fecha_desde' => $concesion->fecha_concesion,
-                'activo' => true,
+                'persona_id'   => $titular->id,
+                'rol'          => 'concesionario',
+                'fecha_desde'  => $concesion->fecha_concesion,
+                'activo'       => true,
             ]);
 
-            CemnDifunto::create([
-                'tercero_id' => null,
-                'nombre_completo' => 'Difunto '.Str::upper(Str::random(5)),
-                'fecha_fallecimiento' => now()->subDays(rand(5, 5000))->toDateString(),
-                'fecha_inhumacion' => now()->subDays(rand(1, 5000))->toDateString(),
-                'sepultura_id' => $celda->id,
-                'es_titular' => true,
+            CemnPersona::create([
+                'tipo'               => 'difunto',
+                'nombre_completo'    => 'Difunto '.Str::upper(Str::random(5)),
+                'fecha_fallecimiento'=> now()->subDays(rand(5, 5000))->toDateString(),
+                'fecha_inhumacion'   => now()->subDays(rand(1, 5000))->toDateString(),
+                'sepultura_id'       => $celda->id,
+                'es_principal'       => true,
+                'estado_inhumacion'  => 'inhumado',
             ]);
 
             $celda->estado = CemnSepultura::ESTADO_OCUPADA;

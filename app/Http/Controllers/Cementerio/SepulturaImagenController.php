@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Cementerio;
 
 use App\Http\Controllers\Controller;
 use App\Models\CemnSepultura;
+use App\Models\CemnSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -30,10 +31,12 @@ class SepulturaImagenController extends Controller
         /** @var CemnSepultura $sepultura */
         $sepultura = CemnSepultura::query()->findOrFail($id);
 
+        $fotoKb = CemnSetting::intRange('foto_max_kb', 5120, 1024, 20480);
+
         $data = $request->validate([
             // Validación mínima: algunos entornos reportan MIME genérico y rompen rules "image/mimes".
             // La validación real se hace con getimagesize() (contenido) justo debajo.
-            'imagen' => ['required', 'file', 'max:5120'], // 5MB
+            'imagen' => ['required', 'file', 'max:'.$fotoKb],
         ]);
 
         $file = $data['imagen'];

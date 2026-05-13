@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Cementerio;
 
 use App\Http\Controllers\Controller;
-use App\Models\CemnDifunto;
+use App\Models\CemnPersona;
 use App\Models\CemnMovimiento;
 use App\Models\CemnSepultura;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class WorkflowInhumacionController extends Controller
 {
@@ -19,10 +20,25 @@ class WorkflowInhumacionController extends Controller
             'nombre_completo' => ['required', 'string', 'max:200'],
             'fecha_fallecimiento' => ['nullable', 'date'],
             'fecha_inhumacion' => ['nullable', 'date'],
-            'es_titular' => ['nullable', 'boolean'],
+            'es_principal' => ['nullable', 'boolean'],
             'parentesco' => ['nullable', 'string', 'max:60'],
             'notas' => ['nullable', 'string'],
+            'confirmacion_documentacion_exhumacion' => ['nullable', 'boolean'],
         ]);
+
+        $hayInhumadoActivo = CemnPersona::query()
+            ->where('sepultura_id', $data['sepultura_id'])
+            ->whereIn('tipo', ['difunto', 'ambos'])
+            ->where('estado_inhumacion', 'inhumado')
+            ->exists();
+
+        if ($hayInhumadoActivo && ! $request->boolean('confirmacion_documentacion_exhumacion')) {
+            throw ValidationException::withMessages([
+                'confirmacion_documentacion_exhumacion' => [
+                    'Debe confirmar que dispone de la documentación de exhumación completa antes de inhumar a otra persona en un nicho ya ocupado.',
+                ],
+            ]);
+        }
 
         $res = DB::transaction(function () use ($data) {
             /** @var CemnSepultura $sepultura */
@@ -34,19 +50,26 @@ class WorkflowInhumacionController extends Controller
                 abort(422, 'No se puede inhumar en una sepultura clausurada.');
             }
 
-            $difunto = CemnDifunto::query()->create([
-                'tercero_id' => null,
-                'nombre_completo' => $data['nombre_completo'],
+            // Si ya hay inhumados activos en este nicho, pasan a ser "restos"
+            CemnPersona::query()
+                ->where('sepultura_id', $sepultura->id)
+                ->where('estado_inhumacion', 'inhumado')
+                ->update(['estado_inhumacion' => 'restos']);
+
+            $difunto = CemnPersona::query()->create([
+                'tipo'                => 'difunto',
+                'nombre_completo'     => $data['nombre_completo'],
                 'fecha_fallecimiento' => $data['fecha_fallecimiento'] ?? null,
-                'fecha_inhumacion' => $data['fecha_inhumacion'] ?? null,
-                'sepultura_id' => $sepultura->id,
-                'es_titular' => (bool) ($data['es_titular'] ?? true),
-                'parentesco' => $data['parentesco'] ?? null,
-                'notas' => $data['notas'] ?? null,
+                'fecha_inhumacion'    => $data['fecha_inhumacion'] ?? null,
+                'sepultura_id'        => $sepultura->id,
+                'estado_inhumacion'   => 'inhumado',
+                'es_principal'        => true,
+                'parentesco'          => $data['parentesco'] ?? null,
+                'notas'               => $data['notas'] ?? null,
             ]);
 
             $mov = CemnMovimiento::query()->create([
-                'difunto_id' => $difunto->id,
+                'persona_id' => $difunto->id,
                 'tipo' => 'inhumacion',
                 'fecha' => $data['fecha_inhumacion'] ?? null,
                 'sepultura_origen_id' => $sepultura->id,

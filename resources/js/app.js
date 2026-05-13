@@ -11,6 +11,9 @@ import { useAuthStore } from '@/stores/auth';
 import DefaultLayout from '@/layouts/DefaultLayout.vue';
 import GestionPage from '@/pages/cementerio/GestionPage.vue';
 import AyudaPage from '@/pages/cementerio/AyudaPage.vue';
+import PapeleraPage from '@/pages/cementerio/PapeleraPage.vue';
+import RegularizacionMasivaPage from '@/pages/cementerio/RegularizacionMasivaPage.vue';
+import UsuariosPage from '@/pages/cementerio/UsuariosPage.vue';
 import 'primeicons/primeicons.css';
 import './styles/app.css';
 
@@ -25,7 +28,10 @@ const routes = [
       { path: '',        component: DashboardPage,  meta: { requiresAuth: true, title: 'Cementerio · Inicio' } },
       { path: 'gestion', component: GestionPage,    meta: { requiresAuth: true, title: 'Cementerio · Gestión' } },
       { path: 'nuevo',   component: NuevoCasoWizard,meta: { requiresAuth: true, title: 'Cementerio · Nuevo caso' } },
-      { path: 'ayuda',   component: AyudaPage,      meta: { requiresAuth: true, title: 'Cementerio · Ayuda' } },
+      { path: 'ayuda',           component: AyudaPage,               meta: { requiresAuth: true, title: 'Cementerio · Ayuda' } },
+      { path: 'papelera',        component: PapeleraPage,            meta: { requiresAuth: true, title: 'Cementerio · Papelera' } },
+      { path: 'regularizacion',  component: RegularizacionMasivaPage,meta: { requiresAuth: true, title: 'Cementerio · Regularización' } },
+      { path: 'usuarios',        component: UsuariosPage,             meta: { requiresAuth: true, title: 'Cementerio · Usuarios' } },
     ],
   },
 ];

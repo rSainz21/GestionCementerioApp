@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Cementerio;
 
 use App\Http\Controllers\Controller;
 use App\Models\CemnConcesion;
-use App\Models\CemnConcesionTercero;
+use App\Models\CemnConcesionPersona;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -22,11 +22,11 @@ class ConcesionCreateController extends Controller
             'importe'           => ['nullable', 'numeric', 'min:0'],
             'moneda'            => ['nullable', Rule::in(['euros', 'pesetas'])],
             'notas'             => ['nullable', 'string'],
-            'tercero_id'        => ['nullable', 'integer', 'exists:cemn_terceros,id'],
+            'persona_id'        => ['nullable', 'integer', 'exists:cemn_personas,id'],
         ]);
 
-        $terceroId = $data['tercero_id'] ?? null;
-        unset($data['tercero_id']);
+        $personaId = $data['persona_id'] ?? null;
+        unset($data['persona_id']);
 
         $data['tipo']        = $data['tipo']   ?? 'perpetua';
         $data['estado']      = $data['estado'] ?? 'vigente';
@@ -34,10 +34,10 @@ class ConcesionCreateController extends Controller
 
         $concesion = CemnConcesion::create($data);
 
-        if ($terceroId) {
-            CemnConcesionTercero::create([
+        if ($personaId) {
+            CemnConcesionPersona::create([
                 'concesion_id' => $concesion->id,
-                'tercero_id'   => $terceroId,
+                'persona_id'   => $personaId,
                 'rol'          => 'concesionario',
                 'activo'       => true,
             ]);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Cementerio;
 
 use App\Http\Controllers\Controller;
 use App\Models\CemnSepultura;
+use App\Models\CemnSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,13 +17,15 @@ class SepulturasSearchController extends Controller
             return response()->json(['items' => []]);
         }
 
+        $lim = CemnSetting::intRange('autocomplete_sepulturas_limite', 25, 5, 100);
+
         $query = CemnSepultura::query()
             ->with([
                 'bloque:id,codigo',
                 'zona:id,nombre',
             ])
             ->orderBy('id')
-            ->limit(25);
+            ->limit($lim);
 
         if (preg_match('/^\d+$/', $q)) {
             $n = (int) $q;

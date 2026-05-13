@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Cementerio;
 
 use App\Http\Controllers\Controller;
 use App\Models\CemnConcesion;
+use App\Models\CemnSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -17,13 +18,16 @@ class ConcesionesSearchController extends Controller
             return response()->json(['items' => []]);
         }
 
+        $lim = CemnSetting::intRange('busqueda_inline_limite', 15, 5, 50);
+
         $items = CemnConcesion::query()
             ->where(function ($query) use ($q) {
-                $query->whereHas('terceros', function ($qq) use ($q) {
+                $query->whereHas('personas', function ($qq) use ($q) {
                     $qq->where('dni', 'like', "%{$q}%")
                         ->orWhere('nombre', 'like', "%{$q}%")
                         ->orWhere('apellido1', 'like', "%{$q}%")
                         ->orWhere('apellido2', 'like', "%{$q}%")
+                        ->orWhere('nombre_completo', 'like', "%{$q}%")
                         ->orWhere('nombre_original', 'like', "%{$q}%");
                 })->orWhereHas('difuntos', function ($qq) use ($q) {
                     $qq->where('nombre_completo', 'like', "%{$q}%");
@@ -33,20 +37,17 @@ class ConcesionesSearchController extends Controller
                 'sepultura:id,codigo,zona_id,bloque_id,fila,columna,estado',
                 'sepultura.zona:id,nombre',
                 'sepultura.bloque:id,nombre,codigo',
-                'terceros:id,nombre,apellido1,apellido2,dni,nombre_original',
-                'difuntos:id,concesion_id,nombre_completo,fecha_fallecimiento,fecha_inhumacion,es_titular,parentesco',
+                'personas:id,tipo,nombre,apellido1,apellido2,nombre_completo,nombre_original,dni',
+                'difuntos:id,tipo,concesion_id,nombre_completo,nombre,apellido1,apellido2,fecha_fallecimiento,fecha_inhumacion,es_principal,parentesco',
             ])
             ->orderByDesc('id')
-            ->limit(15)
+            ->limit($lim)
             ->get()
             ->map(function (CemnConcesion $c) {
-                $concesionario = $c->terceros->firstWhere('pivot.rol', 'concesionario')
-                    ?? $c->terceros->first();
+                $concesionario = $c->personas->firstWhere('pivot.rol', 'concesionario')
+                    ?? $c->personas->first();
 
-                $concesionarioNombre = $concesionario
-                    ? trim($concesionario->nombre_original
-                        ?? (($concesionario->nombre ?? '').' '.($concesionario->apellido1 ?? '').' '.($concesionario->apellido2 ?? '')))
-                    : null;
+                $concesionarioNombre = $concesionario?->nombre_display;
 
                 $ubicacion = trim(implode(' · ', array_filter([
                     $c->sepultura?->codigo ? ('Unidad '.$c->sepultura->codigo) : null,
@@ -56,10 +57,11 @@ class ConcesionesSearchController extends Controller
 
                 $difuntos = $c->difuntos->map(fn ($d) => [
                     'id'                  => $d->id,
+                    'nombre_display'      => $d->nombre_display,
                     'nombre_completo'     => $d->nombre_completo,
                     'fecha_fallecimiento' => optional($d->fecha_fallecimiento)->toDateString(),
                     'fecha_inhumacion'    => optional($d->fecha_inhumacion)->toDateString(),
-                    'es_titular'          => (bool) $d->es_titular,
+                    'es_principal'        => (bool) $d->es_principal,
                     'parentesco'          => $d->parentesco,
                 ])->values();
 
@@ -80,7 +82,7 @@ class ConcesionesSearchController extends Controller
                     'difuntos'          => $difuntos,
                     'label'             => trim(implode(' — ', array_filter([
                         $concesionarioNombre ? ($concesionarioNombre.($concesionario?->dni ? ' ('.$concesionario->dni.')' : '')) : null,
-                        $difuntos->isNotEmpty() ? $difuntos->pluck('nombre_completo')->implode(', ') : null,
+                        $difuntos->isNotEmpty() ? $difuntos->pluck('nombre_display')->implode(', ') : null,
                         $ubicacion ?: null,
                         $c->numero_expediente ? ('Exp. '.$c->numero_expediente) : null,
                     ]))),

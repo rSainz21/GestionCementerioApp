@@ -100,7 +100,8 @@
         </div>
       </router-link>
 
-      <div class="quick__tile">
+      <!-- Buscar concesiones -->
+      <div class="quick__tile" :class="{ 'quick__tile--expanded': selectedConcesion }">
         <div class="quick__icon"><i class="pi pi-search" /></div>
         <div class="quick__text">
           <div class="quick__title">Buscar concesiones</div>
@@ -112,6 +113,7 @@
             class="input"
             placeholder="Ej: García o 12345678Z"
             @input="onConcesionSearchInput"
+            @focus="if (selectedConcesion) { concesionSearch = ''; selectedConcesion = null; }"
           />
           <div v-if="concesionLoading" class="help muted">Buscando…</div>
           <div v-else-if="concesionItems.length" class="dropdown">
@@ -125,11 +127,71 @@
               {{ it.label }}
             </button>
           </div>
-          <div v-else class="help muted">Escribe al menos 2 caracteres.</div>
+          <div v-else-if="!selectedConcesion" class="help muted">Escribe al menos 2 caracteres.</div>
         </div>
+
+        <!-- Resultado inline -->
+        <transition name="res-fade">
+          <div v-if="selectedConcesion" class="inline-result">
+            <button class="inline-result__close" type="button" @click="clearSelectedConcesion" title="Nueva búsqueda">
+              <i class="pi pi-times" />
+            </button>
+
+            <div class="ir-nombre">
+              {{ selectedConcesion.concesionario || 'Sin concesionario' }}
+              <span v-if="selectedConcesion.concesionario_dni" class="ir-dni">{{ selectedConcesion.concesionario_dni }}</span>
+            </div>
+
+            <div class="ir-pills">
+              <span class="ir-pill" v-if="selectedConcesion.tipo">{{ selectedConcesion.tipo }}</span>
+              <span class="ir-pill ir-pill--estado" :class="`ir-pill--${selectedConcesion.estado}`" v-if="selectedConcesion.estado">{{ selectedConcesion.estado }}</span>
+            </div>
+
+            <div class="ir-rows">
+              <div v-if="selectedConcesion.numero_expediente" class="ir-row">
+                <i class="pi pi-file ir-icon" />{{ selectedConcesion.numero_expediente }}
+              </div>
+              <div v-if="selectedConcesion.sepultura_codigo" class="ir-row ir-row--loc">
+                <i class="pi pi-map-marker ir-icon" />
+                <span>{{ selectedConcesion.sepultura_codigo }}</span>
+                <span v-if="selectedConcesion.bloque_nombre" class="ir-muted">· {{ selectedConcesion.bloque_nombre }}</span>
+                <span v-if="selectedConcesion.zona_nombre" class="ir-muted">· {{ selectedConcesion.zona_nombre }}</span>
+              </div>
+              <div v-else class="ir-row ir-muted"><i class="pi pi-exclamation-circle ir-icon" />Sin sepultura asignada</div>
+              <div v-if="selectedConcesion.fecha_concesion" class="ir-row">
+                <i class="pi pi-calendar ir-icon" />Concedida: {{ selectedConcesion.fecha_concesion }}
+              </div>
+              <div v-if="selectedConcesion.fecha_vencimiento" class="ir-row">
+                <i class="pi pi-clock ir-icon" />Vence: {{ selectedConcesion.fecha_vencimiento }}
+              </div>
+            </div>
+
+            <div v-if="selectedConcesion.difuntos?.length" class="ir-difuntos">
+              <div class="ir-difuntos__label">Difuntos</div>
+              <div v-for="d in selectedConcesion.difuntos" :key="d.id" class="ir-difunto">
+                <i class="pi pi-user ir-icon" />
+                <span>{{ d.nombre_completo }}</span>
+                <span v-if="d.fecha_fallecimiento" class="ir-muted">† {{ d.fecha_fallecimiento }}</span>
+                <span v-if="d.es_titular" class="ir-titular">titular</span>
+              </div>
+            </div>
+
+            <div class="ir-actions">
+              <button
+                v-if="selectedConcesion.sepultura_id"
+                class="ir-btn ir-btn--primary"
+                type="button"
+                @click="openSepultura(selectedConcesion.sepultura_id)"
+              >
+                <i class="pi pi-external-link" /> Ver nicho
+              </button>
+            </div>
+          </div>
+        </transition>
       </div>
 
-      <div class="quick__tile">
+      <!-- Buscar difunto -->
+      <div class="quick__tile" :class="{ 'quick__tile--expanded': selectedDifunto }">
         <div class="quick__icon"><i class="pi pi-user" /></div>
         <div class="quick__text">
           <div class="quick__title">Buscar difunto</div>
@@ -141,6 +203,7 @@
             class="input"
             placeholder="Ej: Hernández o 12345678Z"
             @input="onDifuntoSearchInput"
+            @focus="if (selectedDifunto) { difuntoSearch = ''; selectedDifunto = null; }"
           />
           <div v-if="difuntoLoading" class="help muted">Buscando…</div>
           <div v-else-if="difuntoItems.length" class="dropdown">
@@ -154,8 +217,51 @@
               {{ it.label }}
             </button>
           </div>
-          <div v-else class="help muted">Escribe al menos 2 caracteres.</div>
+          <div v-else-if="!selectedDifunto" class="help muted">Escribe al menos 2 caracteres.</div>
         </div>
+
+        <!-- Resultado inline -->
+        <transition name="res-fade">
+          <div v-if="selectedDifunto" class="inline-result">
+            <button class="inline-result__close" type="button" @click="clearSelectedDifunto" title="Nueva búsqueda">
+              <i class="pi pi-times" />
+            </button>
+
+            <div class="ir-nombre">
+              {{ selectedDifunto.nombre_completo || '—' }}
+              <span v-if="selectedDifunto.dni" class="ir-dni">{{ selectedDifunto.dni }}</span>
+            </div>
+
+            <div class="ir-rows">
+              <div v-if="selectedDifunto.fecha_fallecimiento" class="ir-row">
+                <i class="pi pi-heart-fill ir-icon" style="color:#A61B1B" />Fallecido: {{ selectedDifunto.fecha_fallecimiento }}
+              </div>
+              <div v-if="selectedDifunto.fecha_inhumacion" class="ir-row">
+                <i class="pi pi-calendar ir-icon" />Inhumado: {{ selectedDifunto.fecha_inhumacion }}
+              </div>
+              <div v-if="selectedDifunto.sepultura_codigo" class="ir-row ir-row--loc">
+                <i class="pi pi-map-marker ir-icon" />
+                <span>{{ selectedDifunto.sepultura_codigo }}</span>
+                <span v-if="selectedDifunto.bloque_nombre" class="ir-muted">· {{ selectedDifunto.bloque_nombre }}</span>
+                <span v-if="selectedDifunto.zona_nombre" class="ir-muted">· {{ selectedDifunto.zona_nombre }}</span>
+              </div>
+              <div v-else class="ir-row ir-muted">
+                <i class="pi pi-exclamation-circle ir-icon" />Sin sepultura asignada
+              </div>
+            </div>
+
+            <div class="ir-actions">
+              <button
+                v-if="selectedDifunto.sepultura_id"
+                class="ir-btn ir-btn--primary"
+                type="button"
+                @click="openSepultura(selectedDifunto.sepultura_id)"
+              >
+                <i class="pi pi-external-link" /> Ver nicho
+              </button>
+            </div>
+          </div>
+        </transition>
       </div>
 
       <button class="quick__tile quick__tile--reg" type="button" @click="regVisible = true">
@@ -168,92 +274,69 @@
     </div>
 
     <!-- ── Fila 4: Mapa ──────────────────────────────────────────────────── -->
-    <section class="card mapa-card">
+    <section class="card mapa-card" :class="{ 'mapa-card--fullscreen': mapaFullscreen }">
       <div class="mapa-card__head">
         <div class="card__title" style="margin:0">Mapa del cementerio</div>
-        <div class="capas">
-          <span class="capas__label">Capas:</span>
-          <label class="capa-check capa-check--zona">
-            <input type="checkbox" v-model="capasActivas" value="zona" />
-            Zonas
-          </label>
-          <label class="capa-check capa-check--bloque">
-            <input type="checkbox" v-model="capasActivas" value="bloque" />
-            Bloques
-          </label>
+        <div class="mapa-toolbar">
+          <div class="capas">
+            <span class="capas__label">Capas:</span>
+            <label class="capa-check capa-check--zona">
+              <input type="checkbox" v-model="capasActivas" value="zona" />
+              Zonas
+            </label>
+            <label class="capa-check capa-check--bloque">
+              <input type="checkbox" v-model="capasActivas" value="bloque" />
+              Bloques
+            </label>
+          </div>
+          <div class="mapa-actions">
+            <button type="button" class="mapa-btn" @click="abrirNuevaZona" title="Nueva zona">
+              <i class="pi pi-map" /> Nueva zona
+            </button>
+            <button type="button" class="mapa-btn" @click="abrirNuevoBloque" title="Nuevo bloque">
+              <i class="pi pi-th-large" /> Nuevo bloque
+            </button>
+            <button type="button" class="mapa-btn mapa-btn--icon" @click="mapaFullscreen = !mapaFullscreen"
+                    :title="mapaFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'">
+              <i :class="mapaFullscreen ? 'pi pi-compress' : 'pi pi-expand'" />
+            </button>
+          </div>
         </div>
       </div>
-      <MapaCementerioSomahoz
-        :centerLat="LAT"
-        :centerLon="LON"
-        :zoom="18"
-        :items="[]"
-        :capasActivas="capasActivas"
-        :zonas="zonasGeo"
-        :bloques="bloquesGeo"
-        @select="onMapSelect"
-      />
+      <div class="mapa-card__map-wrap">
+        <MapaCementerioSomahoz
+          ref="mapaRef"
+          :fullscreen="mapaFullscreen"
+          :centerLat="LAT"
+          :centerLon="LON"
+          :zoom="18"
+          :items="[]"
+          :capasActivas="capasActivas"
+          :zonas="zonasGeo"
+          :bloques="bloquesGeo"
+          @select="onMapSelect"
+        />
+      </div>
       <div class="mapa-foot muted">
         Cementerio de Somahoz · Los Corrales de Buelna · Clic en una zona o bloque para ver su contenido
+        <span v-if="mapaFullscreen"> · <button type="button" class="mapa-esc-hint" @click="mapaFullscreen=false">ESC para salir</button></span>
       </div>
     </section>
 
-    <!-- ── Resultados de búsqueda ────────────────────────────────────────── -->
-    <section v-if="selectedConcesion" class="card card--result">
-      <div class="card__body">
-        <div class="card__title">Resultado de búsqueda</div>
-        <div class="result">
-          <div class="result__main">
-            <div class="result__name">
-              {{ selectedConcesion.concesionario || '—' }}
-              <span v-if="selectedConcesion.concesionario_dni" class="muted">({{ selectedConcesion.concesionario_dni }})</span>
-            </div>
-            <div class="muted">
-              Concesión #{{ selectedConcesion.id }}
-              <span v-if="selectedConcesion.sepultura_codigo"> · Sepultura {{ selectedConcesion.sepultura_codigo }}</span>
-              <span v-if="selectedConcesion.bloque_nombre"> · Bloque {{ selectedConcesion.bloque_nombre }}</span>
-              <span v-if="selectedConcesion.zona_nombre"> · Zona {{ selectedConcesion.zona_nombre }}</span>
-            </div>
-          </div>
-          <div class="result__actions">
-            <button
-              v-if="selectedConcesion.sepultura_id"
-              class="btn btn--primary"
-              type="button"
-              @click="openSepultura(selectedConcesion.sepultura_id)"
-            >
-              Ver sepultura
-            </button>
-            <button class="btn btn--ghost" type="button" @click="clearSelectedConcesion">Cerrar</button>
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- ── Dialog nueva zona (formulario completo idéntico a Gestión) ──────── -->
+    <ZonaFormDialog
+      v-model="nuevaZonaDialog"
+      :cementerios="cementeriosList"
+      @saved="onZonaGuardada"
+    />
 
-    <section v-if="selectedDifunto" class="card card--result">
-      <div class="card__body">
-        <div class="card__title">Resultado de búsqueda</div>
-        <div class="result">
-          <div class="result__main">
-            <div class="result__name">
-              {{ selectedDifunto.nombre_completo || '—' }}
-              <span v-if="selectedDifunto.dni" class="muted">({{ selectedDifunto.dni }})</span>
-            </div>
-            <div class="muted">
-              <span v-if="selectedDifunto.sepultura_codigo"> Sepultura {{ selectedDifunto.sepultura_codigo }}</span>
-              <span v-if="selectedDifunto.bloque_nombre"> · Bloque {{ selectedDifunto.bloque_nombre }}</span>
-              <span v-if="selectedDifunto.fecha_inhumacion"> · Inh. {{ selectedDifunto.fecha_inhumacion }}</span>
-            </div>
-          </div>
-          <div class="result__actions">
-            <button v-if="selectedDifunto.sepultura_id" class="btn btn--primary" type="button" @click="openSepultura(selectedDifunto.sepultura_id)">
-              Ver sepultura
-            </button>
-            <button class="btn btn--ghost" type="button" @click="clearSelectedDifunto">Cerrar</button>
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- ── Dialog nuevo bloque (formulario completo idéntico a Gestión) ──── -->
+    <BloqueFormDialog
+      v-model="nuevoBloqueDialog"
+      :zonas="zonasParaBloque"
+      @saved="onBloqueGuardado"
+    />
+
 
     <div v-if="error" class="error">{{ error }}</div>
 
@@ -262,7 +345,7 @@
 
     <!-- ── Dialog detalle sepultura ──────────────────────────────────────── -->
     <Dialog v-model:visible="sepDialog" modal header="Detalle de sepultura" :style="{ width: 'min(1400px, 96vw)' }">
-      <SepulturaInfoPanel :sepulturaId="sepDialogId" @navigate="onSepNavigate" />
+      <SepulturaInfoPanel :sepulturaId="sepDialogId" @navigate="onSepNavigate" @changed="onSepChanged" />
       <template #footer>
         <Button label="Cerrar" severity="secondary" @click="sepDialog = false" />
       </template>
@@ -311,18 +394,24 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import api from '@/services/api';
+import { useCementerioStore } from '@/stores/cementerio';
 import ApexChart from 'vue3-apexcharts';
 import RegularizacionesModal from '@/components/cementerio/RegularizacionesModal.vue';
 import SepulturaInfoPanel from '@/components/cementerio/SepulturaInfoPanel.vue';
 import MapaCementerioSomahoz from '@/components/cementerio/MapaCementerioSomahoz.vue';
 import BloqueGridView from '@/components/cementerio/BloqueGridView.vue';
+import ZonaFormDialog from '@/components/cementerio/admin/ZonaFormDialog.vue';
+import BloqueFormDialog from '@/components/cementerio/admin/BloqueFormDialog.vue';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 
 const router = useRouter();
+const route  = useRoute();
+const cemStore = useCementerioStore();
+const cid = computed(() => cemStore.activoId);
 const stats = reactive({});
 const error = ref(null);
 
@@ -451,7 +540,7 @@ async function buscarConcesiones() {
   if (q.length < 2) { concesionItems.value = []; return; }
   concesionLoading.value = true;
   try {
-    const res = await api.get('/api/cementerio/concesiones', { params: { q } });
+    const res = await api.get('/api/cementerio/concesiones', { params: { q, cementerio_id: cid.value } });
     concesionItems.value = res.data?.items ?? [];
   } finally { concesionLoading.value = false; }
 }
@@ -460,9 +549,6 @@ function selectConcesion(it) {
   selectedConcesion.value = it;
   concesionSearch.value = it?.concesionario || it?.label || '';
   concesionItems.value = [];
-  if (it?.sepultura_id) {
-    openSepultura(it.sepultura_id);
-  }
 }
 function clearSelectedConcesion() { selectedConcesion.value = null; }
 
@@ -483,7 +569,7 @@ async function buscarDifuntos() {
   if (q.length < 2) { difuntoItems.value = []; return; }
   difuntoLoading.value = true;
   try {
-    const res = await api.get('/api/cementerio/difuntos', { params: { q } });
+    const res = await api.get('/api/cementerio/personas', { params: { q, tipo: 'difunto', cementerio_id: cid.value } });
     difuntoItems.value = res.data?.items ?? [];
   } finally { difuntoLoading.value = false; }
 }
@@ -492,9 +578,6 @@ function selectDifunto(it) {
   selectedDifunto.value = it;
   difuntoSearch.value = it?.nombre_completo || it?.label || '';
   difuntoItems.value = [];
-  if (it?.sepultura_id) {
-    openSepultura(it.sepultura_id);
-  }
 }
 function clearSelectedDifunto() { selectedDifunto.value = null; }
 
@@ -511,14 +594,14 @@ const bloquesGeo = ref([]);
 
 async function loadZonasGeo() {
   try {
-    const res = await api.get('/api/cementerio/zonas/geo');
+    const res = await api.get('/api/cementerio/zonas/geo', { params: { cementerio_id: cid.value } });
     zonasGeo.value = res.data?.items ?? [];
   } catch { zonasGeo.value = []; }
 }
 
 async function loadBloquesGeo() {
   try {
-    const res = await api.get('/api/cementerio/bloques/geo');
+    const res = await api.get('/api/cementerio/bloques/geo', { params: { cementerio_id: cid.value } });
     bloquesGeo.value = res.data?.items ?? [];
   } catch { bloquesGeo.value = []; }
 }
@@ -528,7 +611,7 @@ const allSepulturas = ref([]);
 
 async function loadSepulturas() {
   try {
-    const res = await api.get('/api/cementerio/admin/sepulturas');
+    const res = await api.get('/api/cementerio/admin/sepulturas', { params: { cementerio_id: cid.value } });
     allSepulturas.value = res.data?.items ?? [];
   } catch { allSepulturas.value = []; }
 }
@@ -542,6 +625,14 @@ function openSepultura(id) {
   if (!Number.isFinite(v) || v <= 0) return;
   sepDialogId.value = v;
   sepDialog.value = true;
+}
+
+function onSepChanged({ id, estado, nombre }) {
+  const sep = allSepulturas.value.find(s => s.id === id);
+  if (sep) {
+    sep.estado = estado;
+    sep.tooltip_nombre = nombre;
+  }
 }
 
 function onSepNavigate(id) {
@@ -559,6 +650,58 @@ const selectedBloque = ref(null);
 
 const zonaDialog = ref(false);
 const selectedZona = ref(null);
+
+// ── Mapa fullscreen + toolbar ────────────────────────────────────────────────
+const mapaFullscreen = ref(false);
+const mapaRef = ref(null);
+
+function onMapaFsKeydown(e) {
+  if (e.key === 'Escape') mapaFullscreen.value = false;
+}
+
+watch(mapaFullscreen, async (full) => {
+  if (full) {
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onMapaFsKeydown);
+  } else {
+    document.body.style.overflow = '';
+    window.removeEventListener('keydown', onMapaFsKeydown);
+  }
+  await nextTick();
+  requestAnimationFrame(() => mapaRef.value?.invalidateSize?.());
+  setTimeout(() => mapaRef.value?.invalidateSize?.(), 200);
+  setTimeout(() => mapaRef.value?.invalidateSize?.(), 500);
+});
+
+onUnmounted(() => {
+  document.body.style.overflow = '';
+  window.removeEventListener('keydown', onMapaFsKeydown);
+});
+
+const nuevaZonaDialog  = ref(false);
+const nuevoBloqueDialog = ref(false);
+const cementeriosList   = ref([]);
+
+function abrirNuevaZona() { nuevaZonaDialog.value = true; }
+function abrirNuevoBloque() { nuevoBloqueDialog.value = true; }
+
+async function onZonaGuardada() { await loadGeo(); }
+async function onBloqueGuardado() { await loadGeo(); }
+
+async function loadCementerios() {
+  try {
+    const res = await api.get('/api/cementerio/admin/cementerios');
+    cementeriosList.value = res.data?.items ?? [];
+  } catch { /* silencioso */ }
+}
+
+// Zonas con el formato completo que necesita BloqueFormDialog (polygon parseado)
+const zonasParaBloque = computed(() =>
+  (zonasGeo.value ?? []).map((z) => ({
+    ...z,
+    polygon: typeof z.polygon === 'string' ? JSON.parse(z.polygon) : (z.polygon ?? null),
+  }))
+);
 
 const zonaBloques = computed(() => {
   const zid = selectedZona.value?.id;
@@ -605,11 +748,12 @@ function onMapSelect(it) {
 async function loadStats() {
   error.value = null;
   try {
+    const params = { cementerio_id: cid.value };
     const [resStats, resBloques, resTipos, resZonas] = await Promise.all([
-      api.get('/api/cementerio/stats'),
-      api.get('/api/cementerio/stats/bloques'),
-      api.get('/api/cementerio/stats/tipos'),
-      api.get('/api/cementerio/stats/zonas'),
+      api.get('/api/cementerio/stats',        { params }),
+      api.get('/api/cementerio/stats/bloques', { params }),
+      api.get('/api/cementerio/stats/tipos',   { params }),
+      api.get('/api/cementerio/stats/zonas',   { params }),
     ]);
     Object.assign(stats, resStats.data ?? {});
     bloqueItems.value = resBloques.data?.items ?? [];
@@ -620,8 +764,41 @@ async function loadStats() {
   }
 }
 
+// ── Deep-link desde alertas del sidebar ─────────────────────────────────────
+// Escucha query params emitidos por el sidebar de alertas
+// Se usan ?t=timestamp para que siempre dispare aunque el param anterior sea igual
+watch(
+  () => [route.query.sepultura, route.query.t],
+  ([id]) => {
+    const v = Number(id);
+    if (Number.isFinite(v) && v > 0) {
+      openSepultura(v);
+      router.replace({ path: '/cementerio' });
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [route.query.regularizaciones, route.query.t],
+  ([v]) => {
+    if (v) {
+      regVisible.value = true;
+      router.replace({ path: '/cementerio' });
+    }
+  },
+  { immediate: true },
+);
+
+// Recargar todo cuando cambie el cementerio activo
+watch(cid, async (newVal, oldVal) => {
+  if (newVal !== oldVal && newVal) {
+    await Promise.all([loadStats(), loadSepulturas(), loadZonasGeo(), loadBloquesGeo()]);
+  }
+});
+
 onMounted(async () => {
-  await Promise.all([loadStats(), loadSepulturas(), loadZonasGeo(), loadBloquesGeo()]);
+  await Promise.all([loadStats(), loadSepulturas(), loadZonasGeo(), loadBloquesGeo(), loadCementerios()]);
 });
 </script>
 
@@ -733,14 +910,87 @@ onMounted(async () => {
 /* ── Mapa ── */
 .mapa-card { overflow: hidden; }
 
+.mapa-card__map-wrap {
+  position: relative;
+  min-height: 0;
+}
+
+.mapa-card--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  border-radius: 0 !important;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100dvh;
+  max-height: 100dvh;
+  width: 100vw;
+  max-width: 100vw;
+  background: #fff;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.mapa-card--fullscreen .mapa-card__head {
+  grid-row: 1;
+}
+
+.mapa-card--fullscreen .mapa-card__map-wrap {
+  grid-row: 2;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mapa-card--fullscreen .mapa-foot {
+  grid-row: 3;
+}
+
 .mapa-card__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-bottom: 1px solid rgba(23,35,31,0.08);
+}
+
+.mapa-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mapa-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mapa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(23,35,31,.14);
+  background: #f5f7f4;
+  color: #374240;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.mapa-btn:hover { background: #e8eceb; border-color: rgba(23,35,31,.22); }
+.mapa-btn .pi { font-size: 12px; color: var(--c2-primary, #118652); }
+.mapa-btn--icon { padding: 5px 8px; }
+
+.mapa-esc-hint {
+  background: none; border: none; color: var(--c2-primary, #118652);
+  cursor: pointer; font-size: 12px; text-decoration: underline;
 }
 
 .capas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -767,16 +1017,151 @@ onMounted(async () => {
 }
 
 
-/* ── Resultados ── */
-.card--result { }
-.result {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+
+/* ── Tile expandido con resultado ── */
+.quick__tile--expanded {
+  border-color: rgba(17, 134, 82, 0.45);
+  box-shadow: 0 0 0 3px rgba(17, 134, 82, 0.08), 0 6px 18px rgba(23,35,31,0.08);
 }
-.result__name { font-weight: 900; }
-.result__actions { display: flex; gap: 10px; align-items: center; }
+
+/* ── Resultado inline ── */
+.inline-result {
+  position: relative;
+  border-top: 1px solid rgba(23, 35, 31, 0.08);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inline-result__close {
+  position: absolute;
+  top: 10px;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(23, 35, 31, 0.12);
+  background: rgba(23, 35, 31, 0.04);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: rgba(23, 35, 31, 0.55);
+  transition: background 100ms;
+}
+.inline-result__close:hover { background: rgba(23, 35, 31, 0.10); }
+
+.ir-nombre {
+  font-weight: 900;
+  font-size: 14px;
+  color: #1c2d29;
+  padding-right: 28px;
+  line-height: 1.3;
+}
+.ir-dni {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(23, 35, 31, 0.50);
+  margin-left: 4px;
+}
+
+.ir-pills {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.ir-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(23, 35, 31, 0.07);
+  color: rgba(23, 35, 31, 0.70);
+  text-transform: capitalize;
+}
+.ir-pill--vigente   { background: rgba(15, 122, 74, 0.12); color: #0F7A4A; }
+.ir-pill--caducada,
+.ir-pill--vencida   { background: rgba(166, 27, 27, 0.10); color: #A61B1B; }
+.ir-pill--renovada  { background: rgba(18, 102, 163, 0.10); color: #1266A3; }
+
+.ir-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ir-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 12px;
+  color: #2c3e39;
+  flex-wrap: wrap;
+}
+.ir-row--loc { color: var(--c2-primary, #118652); font-weight: 600; }
+.ir-icon { font-size: 11px; opacity: 0.70; flex-shrink: 0; }
+.ir-muted { font-size: 11px; color: rgba(23, 35, 31, 0.50); }
+
+.ir-difuntos {
+  border-top: 1px solid rgba(23, 35, 31, 0.06);
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ir-difuntos__label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(23, 35, 31, 0.45);
+  margin-bottom: 2px;
+}
+.ir-difunto {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.ir-titular {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(17, 134, 82, 0.10);
+  color: var(--c2-primary, #118652);
+}
+
+.ir-actions {
+  display: flex;
+  gap: 6px;
+}
+.ir-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: filter 100ms;
+}
+.ir-btn--primary {
+  background: var(--c2-primary, #118652);
+  color: #fff;
+}
+.ir-btn--primary:hover { filter: brightness(1.08); }
+
+/* ── Transición fade ── */
+.res-fade-enter-active { transition: opacity 150ms ease, transform 150ms ease; }
+.res-fade-leave-active { transition: opacity 100ms ease; }
+.res-fade-enter-from { opacity: 0; transform: translateY(-4px); }
+.res-fade-leave-to  { opacity: 0; }
 
 /* ── Inputs y botones ── */
 .btn {

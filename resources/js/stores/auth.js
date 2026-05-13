@@ -9,8 +9,22 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isAuthed: (s) => !!s.token,
+    roles: (s) => s.user?.roles ?? [],
+    permissions: (s) => s.user?.permissions ?? [],
   },
   actions: {
+    hasRole(role) {
+      return this.roles.includes(role);
+    },
+    hasPermission(perm) {
+      // super_admin tiene todos los permisos
+      if (this.roles.includes('super_admin')) return true;
+      return this.permissions.includes(perm);
+    },
+    can(perm) {
+      return this.hasPermission(perm);
+    },
+
     async login({ username, password }) {
       const res = await api.post('/api/login', { username, password });
       const token = res.data?.token;
@@ -42,4 +56,3 @@ export const useAuthStore = defineStore('auth', {
     },
   },
 });
-

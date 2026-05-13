@@ -5,13 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CemnConcesionTercero extends Model
+class CemnConcesionPersona extends Model
 {
-    protected $table = 'cemn_concesion_terceros';
+    protected $table = 'cemn_concesion_personas';
 
     protected $fillable = [
         'concesion_id',
-        'tercero_id',
+        'persona_id',
         'rol',
         'fecha_desde',
         'fecha_hasta',
@@ -20,9 +20,9 @@ class CemnConcesionTercero extends Model
     ];
 
     protected $casts = [
+        'activo'      => 'boolean',
         'fecha_desde' => 'date',
         'fecha_hasta' => 'date',
-        'activo'      => 'boolean',
     ];
 
     public function concesion(): BelongsTo
@@ -30,8 +30,8 @@ class CemnConcesionTercero extends Model
         return $this->belongsTo(CemnConcesion::class, 'concesion_id');
     }
 
-    public function tercero(): BelongsTo
+    public function persona(): BelongsTo
     {
-        return $this->belongsTo(CemnTercero::class, 'tercero_id');
+        return $this->belongsTo(CemnPersona::class, 'persona_id');
     }
 }

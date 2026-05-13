@@ -3,12 +3,11 @@
 namespace App\Http\Controllers\Cementerio;
 
 use App\Http\Controllers\Controller;
-use App\Models\CemnBloque;
 use App\Models\CemnConcesion;
-use App\Models\CemnConcesionTercero;
-use App\Models\CemnDifunto;
+use App\Models\CemnConcesionPersona;
+use App\Models\CemnPersona;
 use App\Models\CemnSepultura;
-use App\Models\CemnTercero;
+use App\Models\CemnSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,9 +21,11 @@ class NuevoCasoController extends Controller
      */
     public function store(Request $request)
     {
+        $fotoKb = CemnSetting::intRange('foto_max_kb', 5120, 1024, 20480);
+
         $data = $request->validate([
             // Titular (tercero)
-            'titular.id' => ['nullable', 'integer', 'exists:cemn_terceros,id'],
+            'titular.id' => ['nullable', 'integer', 'exists:cemn_personas,id'],
             'titular.dni' => ['nullable', 'string', 'max:15'],
             'titular.nombre' => ['required_without:titular.id', 'nullable', 'string', 'max:60'],
             'titular.apellido1' => ['nullable', 'string', 'max:60'],
@@ -42,7 +43,7 @@ class NuevoCasoController extends Controller
             'difunto.fecha_inhumacion' => ['nullable', 'date'],
             'difunto.parentesco' => ['nullable', 'string', 'max:60'],
             'difunto.notas' => ['nullable', 'string'],
-            'difunto.foto' => ['nullable', 'file', 'image', 'max:5120'], // 5MB
+            'difunto.foto' => ['nullable', 'file', 'image', 'max:'.$fotoKb],
 
             // Selección de unidad
             'sepultura_id' => ['required', 'integer', 'exists:cemn_sepulturas,id'],
@@ -87,21 +88,21 @@ class NuevoCasoController extends Controller
             // Titular: existente o nuevo
             $titularId = data_get($data, 'titular.id');
             if ($titularId) {
-                /** @var CemnTercero $titular */
-                $titular = CemnTercero::query()->findOrFail($titularId);
+                $titular = CemnPersona::query()->findOrFail($titularId);
             } else {
-                $titular = CemnTercero::create([
-                    'dni' => data_get($data, 'titular.dni'),
-                    'nombre' => data_get($data, 'titular.nombre'),
+                $titular = CemnPersona::create([
+                    'tipo'      => 'titular',
+                    'dni'       => data_get($data, 'titular.dni'),
+                    'nombre'    => data_get($data, 'titular.nombre'),
                     'apellido1' => data_get($data, 'titular.apellido1'),
                     'apellido2' => data_get($data, 'titular.apellido2'),
-                    'telefono' => data_get($data, 'titular.telefono'),
-                    'email' => data_get($data, 'titular.email'),
+                    'telefono'  => data_get($data, 'titular.telefono'),
+                    'email'     => data_get($data, 'titular.email'),
                     'direccion' => data_get($data, 'titular.direccion'),
                     'municipio' => data_get($data, 'titular.municipio'),
                     'provincia' => data_get($data, 'titular.provincia'),
-                    'cp' => data_get($data, 'titular.cp'),
-                    'es_empresa' => false,
+                    'cp'        => data_get($data, 'titular.cp'),
+                    'es_empresa'=> false,
                 ]);
             }
 
@@ -121,31 +122,31 @@ class NuevoCasoController extends Controller
             ]);
 
             // Relación concesionario (pivot)
-            CemnConcesionTercero::create([
+            CemnConcesionPersona::create([
                 'concesion_id' => $concesion->id,
-                'tercero_id' => $titular->id,
-                'rol' => 'concesionario',
-                'fecha_desde' => data_get($data, 'concesion.fecha_concesion'),
-                'fecha_hasta' => data_get($data, 'concesion.fecha_vencimiento'),
-                'activo' => true,
+                'persona_id'   => $titular->id,
+                'rol'          => 'concesionario',
+                'fecha_desde'  => data_get($data, 'concesion.fecha_concesion'),
+                'fecha_hasta'  => data_get($data, 'concesion.fecha_vencimiento'),
+                'activo'       => true,
             ]);
 
             // Difunto (asignado físicamente a la sepultura)
-            $difunto = CemnDifunto::create([
-                'tercero_id' => null,
-                'nombre_completo' => data_get($data, 'difunto.nombre_completo'),
+            $difunto = CemnPersona::create([
+                'tipo'                => 'difunto',
+                'nombre_completo'     => data_get($data, 'difunto.nombre_completo'),
                 'fecha_fallecimiento' => data_get($data, 'difunto.fecha_fallecimiento'),
-                'fecha_inhumacion' => data_get($data, 'difunto.fecha_inhumacion'),
-                'sepultura_id' => $sepultura->id,
-                'es_titular' => true,
-                'parentesco' => data_get($data, 'difunto.parentesco'),
-                'notas' => data_get($data, 'difunto.notas'),
+                'fecha_inhumacion'    => data_get($data, 'difunto.fecha_inhumacion'),
+                'sepultura_id'        => $sepultura->id,
+                'es_principal'        => true,
+                'parentesco'          => data_get($data, 'difunto.parentesco'),
+                'notas'               => data_get($data, 'difunto.notas'),
             ]);
 
             if ($fotoFile) {
                 $ext = strtolower($fotoFile->getClientOriginalExtension() ?: 'jpg');
                 $filename = Str::uuid()->toString().'.'.$ext;
-                $dir = 'cementerio/difuntos/'.$difunto->id;
+                $dir = 'cementerio/personas/'.$difunto->id;
                 $path = $fotoFile->storePubliclyAs($dir, $filename, 'public');
                 $difunto->foto_path = $path;
                 $difunto->save();

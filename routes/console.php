@@ -2,7 +2,7 @@
 
 use App\Models\CemnBloque;
 use App\Models\CemnConcesion;
-use App\Models\CemnDifunto;
+use App\Models\CemnPersona;
 use App\Models\CemnSepultura;
 use App\Models\CemnZona;
 use Illuminate\Support\Facades\Artisan;
@@ -224,8 +224,9 @@ Artisan::command('cementerio:autovincular {--dry-run : No escribe, solo muestra 
         }
     }
 
-    // 2) Difuntos (por notas: "nicho X", "casilla X", etc.)
-    $difuntos = CemnDifunto::query()
+    // 2) Personas-difunto (por notas: "nicho X", "casilla X", etc.)
+    $difuntos = CemnPersona::query()
+        ->whereIn('tipo', ['difunto', 'ambos'])
         ->whereNull('sepultura_id')
         ->whereNotNull('notas')
         ->orderBy('id')

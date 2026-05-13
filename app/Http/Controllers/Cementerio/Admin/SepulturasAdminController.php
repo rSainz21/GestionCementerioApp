@@ -4,17 +4,21 @@ namespace App\Http\Controllers\Cementerio\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\CemnSepultura;
+use App\Models\CemnSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SepulturasAdminController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $cid = $request->integer('cementerio_id') ?: null;
+        $lim = CemnSetting::intRange('admin_listado_busqueda_limite', 500, 100, 2000);
         $items = CemnSepultura::query()
-            ->with(['zona:id,nombre', 'bloque:id,nombre'])
+            ->with(['zona:id,nombre,cementerio_id', 'bloque:id,nombre'])
+            ->when($cid, fn ($q) => $q->whereHas('zona', fn ($zq) => $zq->where('cementerio_id', $cid)))
             ->orderBy('id', 'desc')
-            ->limit(500)
+            ->limit($lim)
             ->get()
             ->map(function (CemnSepultura $s) {
                 return [

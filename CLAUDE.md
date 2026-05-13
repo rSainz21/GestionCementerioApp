@@ -3,14 +3,167 @@
 > Fichero de contexto para agentes AI (Claude, Cursor, Copilot, etc.)
 > **Actualizar tras cada sprint o fase importante.**
 
-**Última actualización del contexto:** abril 2026.
+**Última actualización del contexto:** 2026-05-11 (Sesión 2 — tarde). **Nota 2026-05-13:** checklist hecho/pendiente del módulo cementerio en [`docs/cosas-pendientes.md`](docs/cosas-pendientes.md) (mantener alineado con el devlog al cerrar tareas).
 
-## Situación actual (abril 2026)
+## Situación actual (mayo 2026)
 
-- **Propuestas**, **Terceros**, **Notificaciones v2** y **administración base** están en uso y consolidados.
-- **Personal / Fichajes (v2)** está **operativo** para empleados y supervisión (ZKTime, cuadrantes, exportaciones PDF/CSV). Detalle: `docs/ESTADO_PROYECTO.md` (Sprint 6).
-- **Citas DNI** está **implementado** en la nueva stack (API Laravel + Vue): agenda por días habilitados, huecos, PDF de cita con texto HTML sanitizado, pantalla de ajustes separada. Permisos: `dni.ver`, `dni.editar`.
-- **Siguiente foco organizativo:** el equipo que desarrollará el **módulo de Cementerio** (tablas legacy `cemen_*`) está **a punto de incorporarse**. Conviene alinear convenciones del repo, permisos Spatie y revisión de `docs/ESTADO_PROYECTO.md` / `docs/CHANGELOG.md` antes de abrir desarrollo en rama dedicada.
+> **Atención:** Este repo (`/var/www/html`) es la **app independiente GestionCementerioApp**, no el trunk de Conect@ 2.0. El CLAUDE.md original describe Conect@ 2.0 como contexto de convenciones; la sección relevante para el trabajo activo es **"GestionCementerioApp — estado actual"** más abajo.
+
+- **Propuestas**, **Terceros**, **Notificaciones v2** y **administración base** de Conect@ 2.0 están en uso y consolidados (contexto de referencia).
+- **Personal / Fichajes (v2)** operativo en Conect@ 2.0.
+- **Citas DNI** implementado en Conect@ 2.0.
+- **GestionCementerioApp** — módulo de cementerio Somahoz **en desarrollo activo** como app standalone. Ver sección dedicada más abajo, `docs/devlog/DEVLOG_2026-04-16.md` y la checklist viva [`docs/cosas-pendientes.md`](docs/cosas-pendientes.md).
+
+---
+
+## GestionCementerioApp — estado actual (2026-05-11 Sesión 2)
+
+App web de gestión del Cementerio Municipal de Somahoz (y futuros cementerios). Stack: Laravel 12 + Vue 3 + PrimeVue 4 + Leaflet + ApexCharts. Auth Sanctum + Spatie. BD: MariaDB vía socket `/tmp/mariadb.sock`.
+
+### Módulos implementados
+
+| Módulo | Estado | Notas |
+|--------|--------|-------|
+| Auth (Sanctum + Spatie) | ✅ Operativo | `cementerio.ver / .editar / .admin` |
+| **Selector multi-cementerio** | ✅ Operativo | Dropdown en topbar; persiste en localStorage; filtra todos los datos por cementerio activo |
+| **Gestión de usuarios** | ✅ Operativo | CRUD completo + asignación roles/permisos; ruta `/cementerio/usuarios`; solo visible con `cementerio.admin` |
+| Dashboard (Inicio) | ✅ Operativo | KPIs, gráficas donut, buscadores inline, mapa GPS + toolbar nueva zona/bloque + pantalla completa |
+| Gestión CRUD | ✅ Operativo | Cementerios, Zonas, Bloques, Sepulturas, Difuntos, Concesiones, Terceros |
+| Formularios CRUD reutilizables | ✅ Operativo | `ZonaFormDialog.vue` y `BloqueFormDialog.vue` — usados en Gestión Y en toolbar del mapa |
+| Nuevo caso (wizard) | ✅ Operativo | 4 pasos: titular → difunto → unidad (grid) → resumen |
+| Detalle de sepultura | ✅ Operativo | Expediente digital, edición inline, fotos, docs, + difuntos/concesiones, historial movimientos |
+| Regularizaciones (drag&drop) | ✅ Operativo | Drag & drop difuntos/concesiones a nichos; grid se refresca post-drop |
+| Regularización masiva | ✅ Operativo | Página `/cementerio/regularizacion`; tabla paginada + SepulturaSearchInline; badge en sidebar |
+| Mapa GPS | ✅ Operativo | Leaflet con capas zonas/bloques/sepulturas, polígonos, selección directa |
+| Mapa toolbar | ✅ Operativo | Botones "Nueva zona" / "Nuevo bloque" (formulario completo) + "Pantalla completa" |
+| Alertas sidebar | ✅ Operativo | 4 grupos: caducadas, próximas (N días dinámico), difuntos sin ubicar, concesiones sin nicho |
+| **Configuración** | ✅ Operativo (rutas restauradas) | Panel drawer; 26 ajustes en BD; CSS vars en vivo; info sistema; backup. **Nota:** las rutas `/api/cementerio/settings`, `/sistema`, `/backup/download` no estaban registradas — corregido en Sesión 2. |
+| Papelera | ✅ Operativo (rutas restauradas) | Soft deletes en difuntos/concesiones/terceros; restaurar/borrar definitivo |
+| Backup SQL | ✅ Operativo (ruta restaurada) | Descarga .sql vía API con Bearer token |
+| MapaPicker con zonas | ✅ Operativo | Polígonos de zona en el picker; validación punto-en-polígono; aviso si fuera |
+| Buscador global | ✅ Operativo (ruta restaurada) | Topbar (botón + atajo `/`), resultados agrupados: sepulturas / difuntos / concesiones / terceros |
+| Renovación de concesiones | ✅ Operativo (rutas restauradas) | Botón "Renovar" en ConcesionDetalleModal + formulario inline + historial timeline de cadena |
+| Vistas detalle Gestión | ✅ Operativo | ZonaDetalleModal (stats + mini mapa Leaflet); Concesión / Difunto / Tercero con modales |
+| Flujo restos / exhumación | ✅ Operativo | Ver sección dedicada más abajo |
+| Cuadrícula reactiva | ✅ Operativo | Nichos cambian de verde↔rojo al instante sin recargar la grid; transición animada 400ms |
+
+### Flujo restos y exhumación (lógica clave)
+
+| Acción | Resultado |
+|--------|-----------|
+| **Añadir difunto a nicho ocupado** | Los inhumados anteriores pasan automáticamente a `estado_inhumacion = 'restos'` (conservan `sepultura_id`). El nuevo difunto es el inhumado activo (`es_titular = true`). Controlado en `DifuntoAsignarController` y `WorkflowInhumacionController`. |
+| **Botón "Exhumar"** en panel de sepultura | El difunto pasa a `estado_inhumacion = 'restos'` (conserva `sepultura_id`). El nicho pasa a `libre` (sin inhumados activos). El panel se recarga al instante. La cuadrícula de nichos cambia de rojo a verde automáticamente. |
+| **Nicho con restos** | Estado `libre` — puede recibir nuevas inhumaciones. Los restos siguen visibles en la sección "Restos en el nicho" del panel con badge visual. |
+| **Historial de movimientos** | Cargado por `sepultura_origen_id` (todos los movimientos del nicho, no solo del titular activo). Muestra nombre del difunto, tipo con color de dot y fecha. |
+
+**Campos en `cemn_difuntos` (migración 2026-05-11):**
+- `estado_inhumacion` — `'inhumado'` / `'restos'` (en nicho) / `'exhumado'` (fuera, `sepultura_id=null`)
+- `fecha_exhumacion`, `documento_sanidad_path`, `motivo_exhumacion`
+
+**Relación `CemnSepultura::difuntoTitular()`:** filtra `estado_inhumacion = 'inhumado'` → devuelve solo el activo.
+
+### Reactividad de la cuadrícula de nichos
+
+`SepulturaInfoPanel` emite `@changed { id, estado, nombre }` tras cada recarga. Los componentes padres actualizan la celda localmente:
+
+| Componente | Qué actualiza al recibir `@changed` |
+|---|---|
+| `BloqueGridView.vue` | `sepulturas[i].estado` → celda cambia verde/rojo al instante |
+| `BloqueGridModal.vue` | Ídem |
+| `DashboardPage.vue` | `allSepulturas[i].estado` → el mapa Leaflet refleja el cambio |
+| `CrudSepulturas.vue` | `items[i].estado` → columna Estado en la tabla |
+
+La transición de color es animada (`background-color 400ms ease`) para que sea visualmente obvia.
+
+### Sistema de usuarios y roles
+
+- **Roles disponibles (Spatie):** `super_admin` (único activo; más se pueden crear con `php artisan permission:create-role <nombre>`)
+- **Permisos del módulo:** `cementerio.ver`, `cementerio.crear`, `cementerio.editar`, `cementerio.admin`
+- **Superadmin:** siempre pasa todos los permisos (lógica en `auth.js → hasPermission()`).
+- **API usuarios:** `GET/POST /api/admin/users`, `PUT /api/admin/users/{id}`, `DELETE`, `PUT /roles`, `PUT /permissions` — requieren `cementerio.admin`.
+- **Frontend:** `UsuariosPage.vue` — tabla con avatar, badges de roles/permisos, modal edición, modal roles+permisos. Solo visible en sidebar si `auth.hasPermission('cementerio.admin')`.
+
+### Multi-cementerio
+
+- **Store:** `resources/js/stores/cementerio.js` — carga lista de cementerios, persiste selección en `localStorage` (`cementerio_activo_id`).
+- **Topbar:** dropdown selector aparece automáticamente cuando hay más de 1 cementerio en BD.
+- **Todos los endpoints** de stats, geo, catálogo, admin (zonas/bloques/sepulturas) aceptan `?cementerio_id=N` como filtro opcional — sin el parámetro devuelven todo (backward compatible).
+- **Frontend:** `DashboardPage`, `CrudZonas`, `CrudBloques`, `CrudSepulturas` pasan `cementerio_id` en cada llamada y tienen `watch(cid)` para recargar al cambiar.
+
+### Cementerios en BD
+
+| id | Nombre | Municipio | Tipo |
+|----|--------|-----------|------|
+| 1 | Cementerio Municipal de Somahoz | Los Corrales de Buelna | Producción (datos reales históricos) |
+| 4 | Cementerio Municipal de Bárcena de Pie de Concha | Bárcena de Pie de Concha | Demo (creado con `CementerioDemoSeeder`) |
+
+### Rutas frontend
+
+| Ruta | Página |
+|------|--------|
+| `/login` | LoginPage |
+| `/cementerio` | DashboardPage (Inicio) |
+| `/cementerio/gestion` | GestionPage (tabs CRUD) |
+| `/cementerio/nuevo` | NuevoCasoWizard |
+| `/cementerio/regularizacion` | RegularizacionMasivaPage |
+| `/cementerio/papelera` | PapeleraPage |
+| `/cementerio/ayuda` | AyudaPage |
+| `/cementerio/usuarios` | UsuariosPage (requiere `cementerio.admin`) |
+
+### BD — estado de datos (2026-05-11 Sesión 2)
+
+```
+cemn_cementerios:         2  (Somahoz real + Bárcena demo)
+cemn_zonas:              12  (4 de Somahoz + 2 Bárcena + historicas)
+cemn_bloques:            17  (11 Somahoz + 5 Bárcena + pruebas)
+cemn_sepulturas:        398  (224 Somahoz reales + 174 Bárcena demo)
+cemn_terceros:          187  (históricos reales)
+cemn_concesiones:        50  (1963-2025, históricas reales)
+cemn_difuntos:          461  (históricos reales, sepultura_id=NULL pendiente)
+cemn_settings:           26  (configuración de la app)
+users:                    2  (admin + usuario de prueba)
+```
+
+### Pendientes de deuda técnica
+
+La tabla siguiente resume deuda técnica; el detalle por funcionalidad (qué está ✅ y qué ⏳), estudios y doc del repo desfasada está en **[`docs/cosas-pendientes.md`](docs/cosas-pendientes.md)**.
+
+1. **`sepultura_id` en difuntos/concesiones históricos** — usar `/cementerio/regularizacion` para asignar los ~458 difuntos y 50 concesiones históricas de Somahoz.
+2. **`cemn_concesion_terceros`** — pivot vacío, pendiente repoblar desde detalle de tercero → Concesiones.
+3. **Zonas sin polígono** — ZV y ZN de Somahoz sin `polygon`; trazar desde Gestión → Zonas → Editar.
+4. **Warnings PrimeVue "Deprecated"** — Tabs/Select; no bloquean.
+5. **`CementerioDemoSeeder` no es idempotente** — si se ejecuta dos veces crea duplicados; añadir guard `if (CemnCementerio::where('municipio','Bárcena...')->exists()) return;`.
+6. **Stats multi-cementerio** — `CementerioStatsBloqueController`, `CementerioStatsZonaController`, `CementerioStatsTipoController` sin filtro `cementerio_id` (hoy asumen Somahoz si no se pasa nada coherente).
+7. **Roles intermedios** — solo `super_admin` en uso; pendiente definir p. ej. `operario` / `consulta` con permisos reducidos.
+
+### Comandos útiles (GestionCementerioApp)
+
+```bash
+php artisan migrate --force
+php artisan db:seed --class=CemnSettingsSeeder --force
+php artisan db:seed --class=CemeteryHistoricalDataSeeder --force
+php artisan db:seed --class=CementerioDemoSeeder --force   # 2º cementerio demo
+node node_modules/vite/bin/vite.js build
+php artisan route:list --path=api/cementerio | wc -l       # contar rutas módulo
+php artisan route:list --path=api/admin                    # rutas gestión usuarios
+```
+
+### Archivos clave a revisar
+
+```
+app/Http/Controllers/Cementerio/         # Todos los controladores del módulo
+app/Http/Controllers/Admin/              # UsersAdminController (gestión usuarios)
+app/Models/Cemn*.php                     # Modelos (CemnSepultura, CemnDifunto, etc.)
+resources/js/pages/cementerio/           # Páginas Vue (incluye UsuariosPage.vue)
+resources/js/components/cementerio/      # Componentes (SepulturaInfoPanel, etc.)
+resources/js/stores/                     # alertas.js, settings.js, auth.js, cementerio.js
+database/seeders/CemnSettingsSeeder.php
+database/seeders/CementerioDemoSeeder.php
+docs/devlog/DEVLOG_2026-04-16.md         # Historial completo de sesiones
+docs/cosas-pendientes.md                 # Checklist hecho/pendiente (actualizar al cerrar tareas)
+```
+
+---
 
 ## Guía UX
 
@@ -193,7 +346,7 @@ conecta2/
 
 | Módulo | Estado | Notas / legacy |
 |--------|--------|----------------|
-| **Cementerio** | **Próximo desarrollo** | Tablas legacy `cemen_*`. **Equipo a punto de incorporarse** — acordar alcance, permisos (`cementerio.*`) y convenciones de carpetas antes del primer merge. Ver `docs/ESTADO_PROYECTO.md` (Fase Cementerio). |
+| **Cementerio** | **En desarrollo activo (standalone)** | App independiente en `/var/www/html`. Tablas `cemn_*`, permisos `cementerio.{ver,editar,admin}`. Ver sección "GestionCementerioApp" en este CLAUDE.md y `docs/devlog/DEVLOG_2026-04-16.md`. |
 | Personal / Fichajes | En producción (v2) | BD `zktime`, lógica en `app/Http/Controllers/Personal/`, `app/Services/Personal/` |
 | Citas DNI | En producción | Tablas `dni_*`, `DniController`, permisos `dni.ver` / `dni.editar` |
 | Residuos | Planificado | `residuos_*` |
@@ -201,12 +354,27 @@ conecta2/
 | Locales + licencias | Planificado | `locales_*`, `ep_licencia_*` |
 | Notificaciones (módulo legado municipio) | Planificado | Distinto de la bandeja in-app ya implementada |
 
-### Módulo Cementerio — pistas para el equipo que entra
+### Módulo Cementerio — referencia rápida para agentes AI
 
-1. **Documentación**: `docs/ESTADO_PROYECTO.md`, `docs/CHANGELOG.md`, paleta `docs/PALETA_COLORES.md` si aplica UI.
-2. **Patrones del repo**: controladores por dominio bajo `app/Http/Controllers/`, rutas en `routes/api.php` con `middleware('permission:…')`, páginas Vue bajo `resources/js/pages/`, registro en `router/index.js` y entradas de menú en `DefaultLayout.vue` (grupos `registro`, etc.).
-3. **Permisos**: extender `database/seeders/RolesAndPermissionsSeeder.php` (o migraciones de permisos) de forma coherente con el resto de módulos.
-4. **Coexistencia**: la app v1 sigue en paralelo; migración/importación legacy cuando se defina (similar a `ImportDataCommand` / importadores existentes).
+El módulo está implementado como app standalone en `/var/www/html`. Para trabajar en él:
+
+1. **Devlog completo**: `docs/devlog/DEVLOG_2026-04-16.md` — historial día a día con decisiones técnicas, bugs resueltos y estado de la BD.
+2. **Checklist hecho/pendiente**: `docs/cosas-pendientes.md` — mantener alineada con el devlog al cerrar tareas (incluye doc del repo desfasada).
+3. **Convenciones clave**:
+   - Controladores cementerio: `app/Http/Controllers/Cementerio/` y `Admin/`
+   - Controladores admin global: `app/Http/Controllers/Admin/` (`UsersAdminController`)
+   - Modelos: `app/Models/Cemn*.php` (prefijo `cemn_` en tablas)
+   - Rutas cementerio: `routes/api.php` grupo `prefix('cementerio')` con `auth:sanctum`
+   - Rutas admin usuarios: `routes/api.php` grupo `prefix('admin')` con `permission:cementerio.admin`
+   - Páginas Vue: `resources/js/pages/cementerio/`
+   - Componentes Vue: `resources/js/components/cementerio/` y `admin/`
+   - Stores: `resources/js/stores/` (alertas.js, settings.js, auth.js, **cementerio.js**)
+4. **Multi-cementerio**: el store `useCementerioStore()` expone `activoId` — todos los endpoints de listado aceptan `?cementerio_id=N`. Los componentes `CrudZonas`, `CrudBloques`, `CrudSepulturas` y `DashboardPage` tienen watcher sobre `cid` para recargarse al cambiar.
+5. **Soft deletes activos** en `CemnDifunto`, `CemnConcesion`, `CemnTercero` — usar `withTrashed()` / `onlyTrashed()` si necesitas ver eliminados; el `delete()` normal es siempre soft.
+6. **Settings**: leer ajustes con `CemnSetting::get('clave', 'default')` en backend; `useSettingsStore().get('clave', 'default')` en frontend.
+7. **Build**: `node node_modules/vite/bin/vite.js build` (npx no tiene permisos en este entorno).
+8. **Auth store helpers**: `auth.hasRole('super_admin')`, `auth.hasPermission('cementerio.admin')`, `auth.can('cementerio.ver')`. Superadmin siempre pasa todos los permisos.
+9. **Coexistencia**: la app v1 sigue en paralelo; migración/importación legacy cuando se defina.
 
 ## Comandos útiles
 

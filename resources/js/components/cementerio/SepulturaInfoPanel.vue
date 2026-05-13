@@ -156,16 +156,17 @@
           <div v-if="!historia.length" class="muted">—</div>
           <ol v-else class="timeline">
             <li v-for="m in historia" :key="m.id" class="tl">
-              <div class="tl__dot"></div>
+              <div class="tl__dot" :class="`tl__dot--${m.tipo}`"></div>
               <div class="tl__content">
                 <div class="tl__title">
                   <strong>{{ movimientoLabel(m.tipo) }}</strong>
+                  <span v-if="m.difunto_nombre" class="tl__difunto">{{ m.difunto_nombre }}</span>
                   <span class="muted" v-if="m.fecha">· {{ m.fecha }}</span>
                 </div>
                 <div class="tl__meta muted">
-                  <span v-if="m.sepultura_origen_codigo">Origen {{ m.sepultura_origen_codigo }}</span>
-                  <span v-if="m.sepultura_destino_codigo">· Destino {{ m.sepultura_destino_codigo }}</span>
-                  <span v-if="m.numero_expediente">· Exp. {{ m.numero_expediente }}</span>
+                  <span v-if="m.sepultura_origen_codigo">Origen: {{ m.sepultura_origen_codigo }}</span>
+                  <span v-if="m.sepultura_destino_codigo"> → {{ m.sepultura_destino_codigo }}</span>
+                  <span v-if="m.numero_expediente"> · Exp. {{ m.numero_expediente }}</span>
                 </div>
                 <div v-if="m.notas" class="tl__notes">{{ m.notas }}</div>
               </div>
@@ -176,13 +177,15 @@
           <div class="subcard">
             <div class="subcard__title-row">
               <div class="subcard__title">Difuntos</div>
-              <button
-                v-if="item.difunto_titular && !editDifunto"
-                class="edit-btn edit-btn--sm"
-                @click="startEditDifunto"
-              >
-                <i class="pi pi-pencil" /> Editar
-              </button>
+              <div v-if="!editDifunto" class="subcard__actions">
+                <button v-if="item.difunto_titular" class="edit-btn edit-btn--sm" @click="startEditDifunto">
+                  <i class="pi pi-pencil" /> Editar
+                </button>
+                <button class="edit-btn edit-btn--sm edit-btn--add" @click="toggleAddDifunto">
+                  <i :class="showAddDifunto ? 'pi pi-times' : 'pi pi-plus'" />
+                  {{ showAddDifunto ? 'Cerrar' : 'Añadir' }}
+                </button>
+              </div>
             </div>
 
             <!-- Edición difunto titular -->
@@ -222,25 +225,100 @@
 
             <!-- Vista difuntos -->
             <template v-else>
-              <div v-if="item.difunto_titular" class="difunto-row">
-                <span class="difunto-nombre">{{ item.difunto_titular.nombre_completo }}</span>
-                <span class="difunto-meta muted">
-                  <span v-if="item.difunto_titular.fecha_fallecimiento">† {{ item.difunto_titular.fecha_fallecimiento }}</span>
-                  <span v-if="item.difunto_titular.fecha_inhumacion"> · Inh. {{ item.difunto_titular.fecha_inhumacion }}</span>
-                </span>
-              </div>
-              <template v-if="difuntosConcesion.length">
-                <div v-for="d in difuntosConcesion" :key="d.id" class="difunto-row">
-                  <span class="difunto-nombre">{{ d.nombre_completo }}</span>
-                  <span class="difunto-meta muted">
-                    <span v-if="d.fecha_fallecimiento">† {{ d.fecha_fallecimiento }}</span>
-                    <span v-if="d.fecha_inhumacion"> · Inh. {{ d.fecha_inhumacion }}</span>
-                    <span v-if="d.parentesco"> · {{ d.parentesco }}</span>
-                  </span>
+              <!-- Difuntos inhumados activos -->
+              <template v-for="d in difuntosInhumados" :key="d.id">
+                <div class="difunto-row">
+                  <div class="difunto-row__info">
+                    <div class="difunto-row__head">
+                      <span class="difunto-nombre">{{ d.nombre_display || d.nombre_completo }}</span>
+                      <span v-if="d.es_principal" class="badge-titular">Titular</span>
+                    </div>
+                    <span class="difunto-meta muted">
+                      <span v-if="d.fecha_fallecimiento">† {{ d.fecha_fallecimiento }}</span>
+                      <span v-if="d.fecha_inhumacion"> · Inh. {{ d.fecha_inhumacion }}</span>
+                      <span v-if="d.parentesco"> · {{ d.parentesco }}</span>
+                    </span>
+                  </div>
+                  <button type="button" class="exhum-btn" @click="abrirExhumacion(d)" title="Registrar exhumación">
+                    <i class="pi pi-arrow-up-right" /> Exhumar
+                  </button>
                 </div>
               </template>
-              <div v-if="!item.difunto_titular && !difuntosConcesion.length" class="muted">Sin difuntos registrados.</div>
+
+              <!-- Restos en el nicho (permanecen vinculados tras exhumación parcial) -->
+              <template v-if="difuntosRestos.length">
+                <div class="restos-sep">
+                  <span>Restos en el nicho</span>
+                </div>
+                <div v-for="d in difuntosRestos" :key="d.id" class="difunto-row difunto-row--restos">
+                  <div class="difunto-row__info">
+                    <div class="difunto-row__head">
+                      <span class="difunto-nombre difunto-nombre--restos">{{ d.nombre_completo }}</span>
+                      <span class="badge-restos">Restos</span>
+                    </div>
+                    <span class="difunto-meta muted">
+                      <span v-if="d.fecha_fallecimiento">† {{ d.fecha_fallecimiento }}</span>
+                      <span v-if="d.fecha_exhumacion"> · Exh. {{ d.fecha_exhumacion }}</span>
+                    </span>
+                  </div>
+                </div>
+              </template>
+
+              <div v-if="!difuntosInhumados.length && !difuntosRestos.length" class="muted">Sin difuntos registrados.</div>
             </template>
+
+            <!-- Modal de exhumación -->
+            <ExhumacionModal
+              v-model="exhumacionVisible"
+              :sepulturaId="item?.id"
+              :difunto="exhumacionDifunto"
+              @exhumado="onExhumado"
+            />
+
+            <!-- Panel añadir difunto -->
+            <div v-if="showAddDifunto && !editDifunto" class="add-panel">
+              <div class="add-panel__tabs">
+                <button class="add-tab" :class="{ 'add-tab--active': addDifMode === 'existente' }" @click="addDifMode = 'existente'; ensureDifSinLoaded()">Existente</button>
+                <button class="add-tab" :class="{ 'add-tab--active': addDifMode === 'nuevo' }" @click="addDifMode = 'nuevo'">Nuevo</button>
+              </div>
+
+              <!-- Existente -->
+              <template v-if="addDifMode === 'existente'">
+                <input v-model="difSinQ" class="ef-input ef-input--sm" placeholder="Buscar por nombre…" @input="fetchDifSin" />
+                <div v-if="difSinLoading" class="muted add-panel__loading">Cargando…</div>
+                <div v-else-if="!difuntosSinSep.length" class="muted add-panel__empty">
+                  {{ difSinQ ? 'Sin resultados.' : 'No hay difuntos sin asignar.' }}
+                </div>
+                <div v-else class="add-panel__list">
+                  <div v-for="d in difuntosSinSep" :key="d.id" class="add-panel__item">
+                    <div class="add-panel__item-info">
+                      <span class="add-panel__item-name">{{ d.nombre_completo }}</span>
+                      <span class="add-panel__item-meta muted" v-if="d.fecha_fallecimiento">† {{ d.fecha_fallecimiento }}</span>
+                    </div>
+                    <button class="btnsmall btnsmall--primary" :disabled="savingDifHuerfano === d.id" @click="vincularYCerrarDif(d)">
+                      <i class="pi pi-link" /> {{ savingDifHuerfano === d.id ? '…' : 'Vincular' }}
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Nuevo -->
+              <template v-else>
+                <input v-model="addDifNombre" class="ef-input ef-input--sm" placeholder="Nombre completo *" :disabled="addDifSaving" />
+                <input v-model="addDifFecha" type="date" class="ef-input ef-input--sm" :disabled="addDifSaving" title="Fecha de fallecimiento" />
+                <label class="add-panel__check">
+                  <input type="checkbox" v-model="addDifTitular" :disabled="addDifSaving" />
+                  Es titular de la sepultura
+                </label>
+                <div v-if="addDifError" class="error ef-error">{{ addDifError }}</div>
+                <div class="ef-actions">
+                  <button class="btnsmall btnsmall--primary" :disabled="addDifSaving" @click="crearYVincularDifunto">
+                    <i v-if="addDifSaving" class="pi pi-spin pi-spinner" />
+                    {{ addDifSaving ? 'Creando…' : 'Crear y vincular' }}
+                  </button>
+                </div>
+              </template>
+            </div>
           </div>
         </section>
 
@@ -254,13 +332,15 @@
           <div class="subcard">
             <div class="subcard__title-row">
               <div class="subcard__title">Concesión y titularidad</div>
-              <button
-                v-if="item.concesion_vigente && !editConcesion"
-                class="edit-btn edit-btn--sm"
-                @click="startEditConcesion"
-              >
-                <i class="pi pi-pencil" /> Editar
-              </button>
+              <div v-if="!editConcesion" class="subcard__actions">
+                <button v-if="item.concesion_vigente" class="edit-btn edit-btn--sm" @click="startEditConcesion">
+                  <i class="pi pi-pencil" /> Editar
+                </button>
+                <button class="edit-btn edit-btn--sm edit-btn--add" @click="toggleAddConcesion">
+                  <i :class="showAddConcesion ? 'pi pi-times' : 'pi pi-plus'" />
+                  {{ showAddConcesion ? 'Cerrar' : 'Añadir' }}
+                </button>
+              </div>
             </div>
 
             <!-- Edición concesión -->
@@ -343,6 +423,50 @@
                 <div v-if="item.concesion_vigente.texto_concesion"><span class="k">Descripción</span><span class="v" style="font-style:italic">{{ item.concesion_vigente.texto_concesion }}</span></div>
                 <div v-if="item.concesion_vigente.notas"><span class="k">Notas</span><span class="v">{{ item.concesion_vigente.notas }}</span></div>
               </div>
+            </div>
+
+            <!-- Panel añadir concesión -->
+            <div v-if="showAddConcesion && !editConcesion" class="add-panel">
+              <div class="add-panel__tabs">
+                <button class="add-tab" :class="{ 'add-tab--active': addConcMode === 'existente' }" @click="addConcMode = 'existente'; ensureConcSinLoaded()">Existente</button>
+                <button class="add-tab" :class="{ 'add-tab--active': addConcMode === 'nuevo' }" @click="addConcMode = 'nuevo'">Nueva</button>
+              </div>
+
+              <!-- Existente -->
+              <template v-if="addConcMode === 'existente'">
+                <div v-if="concSinLoading" class="muted add-panel__loading">Cargando…</div>
+                <div v-else-if="!concesionesSinSep.length" class="muted add-panel__empty">
+                  No hay concesiones sin asignar.
+                </div>
+                <div v-else class="add-panel__list">
+                  <div v-for="c in concesionesSinSep" :key="c.id" class="add-panel__item">
+                    <div class="add-panel__item-info">
+                      <span class="add-panel__item-name">{{ c.concesionario || `Concesión #${c.id}` }}</span>
+                      <span class="add-panel__item-meta muted">{{ c.numero_expediente || '—' }} · {{ c.tipo }}</span>
+                    </div>
+                    <button class="btnsmall btnsmall--primary" :disabled="savingConcHuerfano === c.id" @click="vincularYCerrarConc(c)">
+                      <i class="pi pi-link" /> {{ savingConcHuerfano === c.id ? '…' : 'Vincular' }}
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Nueva -->
+              <template v-else>
+                <input v-model="addConcExp" class="ef-input ef-input--sm" placeholder="Nº expediente (opcional)" :disabled="addConcSaving" />
+                <div class="add-panel__tipo-row">
+                  <button type="button" class="add-tipo-btn" :class="{ 'add-tipo-btn--active': addConcTipo === 'perpetua' }" :disabled="addConcSaving" @click="addConcTipo = 'perpetua'">Perpetua</button>
+                  <button type="button" class="add-tipo-btn" :class="{ 'add-tipo-btn--active': addConcTipo === 'temporal' }" :disabled="addConcSaving" @click="addConcTipo = 'temporal'">Temporal</button>
+                </div>
+                <input v-model="addConcFecha" type="date" class="ef-input ef-input--sm" :disabled="addConcSaving" title="Fecha de concesión" />
+                <div v-if="addConcError" class="error ef-error">{{ addConcError }}</div>
+                <div class="ef-actions">
+                  <button class="btnsmall btnsmall--primary" :disabled="addConcSaving" @click="crearYVincularConcesion">
+                    <i v-if="addConcSaving" class="pi pi-spin pi-spinner" />
+                    {{ addConcSaving ? 'Creando…' : 'Crear y vincular' }}
+                  </button>
+                </div>
+              </template>
             </div>
           </div>
 
@@ -547,11 +671,13 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import api from '@/services/api';
 import MapaPicker from '@/components/cementerio/MapaPicker.vue';
+import ExhumacionModal from '@/components/cementerio/ExhumacionModal.vue';
+import { putPersonaAsignarSepulturaConConfirmacionDoc } from '@/utils/cementerioPersonaAsignar.js';
 
 const props = defineProps({
   sepulturaId: { type: Number, default: null },
 });
-const emit = defineEmits(['loaded', 'error', 'navigate']);
+const emit = defineEmits(['loaded', 'error', 'navigate', 'changed']);
 
 // ── Estado principal ─────────────────────────────────────────────────────────
 const loading = ref(false);
@@ -567,6 +693,19 @@ const imageCacheBust = ref(0);
 // ── Documentos ───────────────────────────────────────────────────────────────
 const docsSaving = ref(false);
 const docsError = ref(null);
+
+// ── Exhumación ───────────────────────────────────────────────────────────────
+const exhumacionVisible = ref(false);
+const exhumacionDifunto = ref(null);
+
+function abrirExhumacion(difunto) {
+  exhumacionDifunto.value = difunto;
+  exhumacionVisible.value = true;
+}
+
+function onExhumado() {
+  if (props.sepulturaId) load(props.sepulturaId);
+}
 
 // ── Edición: UNIDAD ──────────────────────────────────────────────────────────
 const editUnidad = ref(false);
@@ -631,7 +770,7 @@ async function saveDifunto() {
   savingDifunto.value = true;
   errDifunto.value = null;
   try {
-    const res = await api.put(`/api/cementerio/difuntos/${item.value.difunto_titular.id}`, {
+    const res = await api.put(`/api/cementerio/personas/${item.value.difunto_titular.id}`, {
       nombre_completo:     draftDifunto.nombre_completo || null,
       fecha_fallecimiento: draftDifunto.fecha_fallecimiento || null,
       fecha_inhumacion:    draftDifunto.fecha_inhumacion || null,
@@ -736,7 +875,7 @@ async function saveTercero() {
   errTercero.value = null;
   const tid = item.value.concesion_vigente.concesionario.id;
   try {
-    const res = await api.put(`/api/cementerio/terceros/${tid}`, {
+    const res = await api.put(`/api/cementerio/personas/${tid}`, {
       nombre_original: draftTercero.nombre_original || null,
       dni:             draftTercero.dni || null,
       telefono:        draftTercero.telefono || null,
@@ -824,6 +963,19 @@ const mapsUrl = computed(() => hasCoords.value ? `https://www.google.com/maps?q=
 const historia = computed(() => Array.isArray(item.value?.movimientos) ? item.value.movimientos : []);
 const documentos = computed(() => Array.isArray(item.value?.documentos) ? item.value.documentos : []);
 const difuntosConcesion = computed(() => Array.isArray(item.value?.concesion_vigente?.difuntos_concesion) ? item.value.concesion_vigente.difuntos_concesion : []);
+
+// Todos los difuntos del nicho (por sepultura_id), separados por estado
+const todosDifuntosNicho = computed(() => Array.isArray(item.value?.difuntos) ? item.value.difuntos : []);
+
+const difuntosInhumados = computed(() =>
+  todosDifuntosNicho.value
+    .filter(d => !d.estado_inhumacion || d.estado_inhumacion === 'inhumado')
+    .sort((a, b) => (b.es_principal ? 1 : 0) - (a.es_principal ? 1 : 0)) // principal primero
+);
+
+const difuntosRestos = computed(() =>
+  todosDifuntosNicho.value.filter(d => d.estado_inhumacion === 'restos')
+);
 const concesionarioNombre = computed(() => {
   const t = item.value?.concesion_vigente?.concesionario;
   if (!t) return null;
@@ -876,6 +1028,11 @@ async function load(id) {
     item.value = res.data?.item ?? null;
     if (item.value?.imagen_url || item.value?.difunto_titular?.foto_url) setFotoPreview(null);
     emit('loaded', item.value);
+    emit('changed', {
+      id:     item.value.id,
+      estado: item.value.estado,
+      nombre: item.value.difunto_titular?.nombre_completo ?? null,
+    });
     const bloqueId = item.value?.bloque?.id;
     if (bloqueId && loadedBloqueId.value !== bloqueId) loadSiblings(bloqueId);
     else if (!bloqueId) { siblingIds.value = []; siblingNums.value = []; loadedBloqueId.value = null; }
@@ -898,7 +1055,7 @@ async function onUploadFotoTitular(ev) {
     const fd = new FormData();
     if (item.value?.difunto_titular?.id) {
       fd.append('foto', file);
-      await api.post(`/api/cementerio/difuntos/${item.value.difunto_titular.id}/foto`, fd);
+      await api.post(`/api/cementerio/personas/${item.value.difunto_titular.id}/foto`, fd);
     } else {
       fd.append('imagen', file);
       await api.post(`/api/cementerio/sepulturas/${item.value.id}/imagen`, fd);
@@ -956,7 +1113,7 @@ function fetchDifSin() {
 async function _doFetchDifSin() {
   difSinLoading.value = true;
   try {
-    const res = await api.get('/api/cementerio/difuntos/sin-asignar', {
+    const res = await api.get('/api/cementerio/personas/sin-sepultura', {
       params: { q: difSinQ.value || undefined },
     });
     difuntosSinSep.value = res.data?.items ?? [];
@@ -987,7 +1144,8 @@ async function vincularDifunto(d) {
   if (!item.value?.id) return;
   savingDifHuerfano.value = d.id;
   try {
-    await api.put(`/api/cementerio/difuntos/${d.id}/asignar-sepultura`, { sepultura_id: item.value.id });
+    const res = await putPersonaAsignarSepulturaConConfirmacionDoc(d.id, item.value.id);
+    if (res === null) return;
     difuntosSinSep.value = difuntosSinSep.value.filter((x) => x.id !== d.id);
     await load(item.value.id);
     showHuerfanoMsg(true, `${d.nombre_completo} vinculado correctamente.`);
@@ -1007,6 +1165,108 @@ async function vincularConcesion(c) {
   } catch (e) {
     showHuerfanoMsg(false, e?.response?.data?.message ?? 'Error al vincular la concesión.');
   } finally { savingConcHuerfano.value = null; }
+}
+
+// ── Paneles de añadir ─────────────────────────────────────────────────────────
+const showAddDifunto  = ref(false);
+const addDifMode      = ref('existente');
+const addDifNombre    = ref('');
+const addDifFecha     = ref('');
+const addDifTitular   = ref(true);
+const addDifSaving    = ref(false);
+const addDifError     = ref(null);
+
+const showAddConcesion = ref(false);
+const addConcMode      = ref('existente');
+const addConcExp       = ref('');
+const addConcTipo      = ref('perpetua');
+const addConcFecha     = ref('');
+const addConcSaving    = ref(false);
+const addConcError     = ref(null);
+
+function toggleAddDifunto() {
+  showAddDifunto.value = !showAddDifunto.value;
+  if (showAddDifunto.value) {
+    addDifMode.value = 'existente';
+    addDifNombre.value = ''; addDifFecha.value = ''; addDifError.value = null;
+    ensureDifSinLoaded();
+  }
+}
+
+function toggleAddConcesion() {
+  showAddConcesion.value = !showAddConcesion.value;
+  if (showAddConcesion.value) {
+    addConcMode.value = 'existente';
+    addConcExp.value = ''; addConcFecha.value = ''; addConcError.value = null;
+    ensureConcSinLoaded();
+  }
+}
+
+function ensureDifSinLoaded() {
+  if (!difuntosSinSep.value.length && !difSinLoading.value) _doFetchDifSin();
+}
+
+function ensureConcSinLoaded() {
+  if (!concesionesSinSep.value.length && !concSinLoading.value) loadConcesionesSinSep();
+}
+
+async function vincularYCerrarDif(d) {
+  await vincularDifunto(d);
+  if (!huerfanoMsg.value || huerfanoMsg.value.ok) showAddDifunto.value = false;
+}
+
+async function vincularYCerrarConc(c) {
+  await vincularConcesion(c);
+  if (!huerfanoMsg.value || huerfanoMsg.value.ok) showAddConcesion.value = false;
+}
+
+async function crearYVincularDifunto() {
+  if (!addDifNombre.value.trim()) { addDifError.value = 'El nombre es obligatorio.'; return; }
+  addDifSaving.value = true;
+  addDifError.value = null;
+  try {
+    const res = await api.post('/api/cementerio/personas', {
+      tipo:                'difunto',
+      nombre_completo:     addDifNombre.value.trim(),
+      fecha_fallecimiento: addDifFecha.value || null,
+      es_principal:        addDifTitular.value,
+    });
+    const nuevo = res.data.item;
+    const assignRes = await putPersonaAsignarSepulturaConConfirmacionDoc(nuevo.id, item.value.id);
+    if (assignRes === null) {
+      addDifError.value =
+        'Operación cancelada. El difunto se ha creado sin asignar al nicho; puedes vincularlo después desde «Personas sin sepultura».';
+      await load(item.value.id);
+      showAddDifunto.value = false;
+      return;
+    }
+    await load(item.value.id);
+    showAddDifunto.value = false;
+  } catch (e) {
+    addDifError.value = e?.response?.data?.message ?? 'Error al crear el difunto.';
+  } finally {
+    addDifSaving.value = false;
+  }
+}
+
+async function crearYVincularConcesion() {
+  addConcSaving.value = true;
+  addConcError.value = null;
+  try {
+    const res = await api.post('/api/cementerio/concesiones', {
+      numero_expediente: addConcExp.value.trim() || null,
+      tipo:              addConcTipo.value,
+      fecha_concesion:   addConcFecha.value || null,
+    });
+    const nueva = res.data.item;
+    await api.put(`/api/cementerio/concesiones/${nueva.id}`, { sepultura_id: item.value.id });
+    await load(item.value.id);
+    showAddConcesion.value = false;
+  } catch (e) {
+    addConcError.value = e?.response?.data?.message ?? 'Error al crear la concesión.';
+  } finally {
+    addConcSaving.value = false;
+  }
 }
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
@@ -1149,12 +1409,51 @@ onBeforeUnmount(() => setFotoPreview(null));
 .timeline { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
 .tl { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: start; }
 .tl__dot { width: 10px; height: 10px; border-radius: 999px; background: var(--c2-primary,#118652); margin-top: 6px; box-shadow: 0 0 0 4px rgba(17,134,82,0.12); }
-.tl__title { font-size: 13px; }
+.tl__dot--exhumacion { background: #f97316; box-shadow: 0 0 0 4px rgba(249,115,22,0.15); }
+.tl__dot--traslado   { background: #1266A3; box-shadow: 0 0 0 4px rgba(18,102,163,0.15); }
+.tl__dot--inhumacion { background: var(--c2-primary,#118652); }
+.tl__title { font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tl__difunto { font-size: 12.5px; font-weight: 600; color: var(--c2-text,#17231f); background: rgba(23,35,31,0.06); padding: 1px 7px; border-radius: 5px; }
 .tl__meta { font-size: 12px; margin-top: 2px; }
 .tl__notes { margin-top: 6px; font-size: 12px; color: rgba(23,35,31,0.85); }
 
 /* Difuntos */
-.difunto-row { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-bottom: 1px dashed rgba(23,35,31,0.10); }
+.difunto-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px dashed rgba(23,35,31,0.10); }
+.difunto-row--restos { opacity: 0.75; }
+.difunto-row__info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.difunto-row__head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.difunto-nombre--restos { color: #6b7a77; }
+
+.badge-titular {
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px;
+  background: rgba(17,134,82,.12); color: var(--c2-primary, #118652);
+  text-transform: uppercase; letter-spacing: .03em;
+}
+.badge-restos {
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px;
+  background: rgba(120,100,70,.12); color: #78542a;
+  text-transform: uppercase; letter-spacing: .03em;
+}
+
+.restos-sep {
+  display: flex; align-items: center; gap: 8px; margin: 4px 0 2px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: rgba(23,35,31,.35);
+}
+.restos-sep::before, .restos-sep::after {
+  content: ''; flex: 1; height: 1px; background: rgba(23,35,31,.10);
+}
+
+.exhum-btn {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  padding: 3px 9px; border-radius: 6px; border: 1px solid rgba(180,83,9,.3);
+  background: #fff7ed; color: #c2410c; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; transition: background .12s, border-color .12s;
+  white-space: nowrap;
+}
+.exhum-btn:hover { background: #ffedd5; border-color: rgba(180,83,9,.5); }
+.exhum-btn .pi { font-size: 10px; }
 .difunto-row:last-child { border-bottom: none; }
 .difunto-nombre { font-weight: 700; font-size: 13px; }
 .difunto-meta { font-size: 12px; }
@@ -1204,4 +1503,137 @@ onBeforeUnmount(() => setFotoPreview(null));
   .ef-row--2col { grid-template-columns: 1fr; }
 }
 @media (min-width: 1400px) { .card { padding: 14px; } }
+
+/* ── Botón añadir ────────────────────────────────────────────────────────── */
+.subcard__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.edit-btn--add {
+  background: rgba(17, 134, 82, 0.08);
+  color: var(--c2-primary, #118652);
+  border-color: rgba(17, 134, 82, 0.25);
+}
+.edit-btn--add:hover {
+  background: rgba(17, 134, 82, 0.16);
+}
+
+/* ── Panel inline de añadir ──────────────────────────────────────────────── */
+.add-panel {
+  margin-top: 10px;
+  border: 1px solid rgba(17, 134, 82, 0.22);
+  border-radius: 10px;
+  background: rgba(17, 134, 82, 0.03);
+  overflow: hidden;
+}
+
+.add-panel__tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(17, 134, 82, 0.15);
+}
+.add-tab {
+  flex: 1;
+  padding: 7px 10px;
+  background: none;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  color: rgba(23, 35, 31, 0.55);
+  transition: background 100ms, color 100ms;
+}
+.add-tab:hover { background: rgba(17, 134, 82, 0.06); color: var(--c2-primary, #118652); }
+.add-tab--active {
+  color: var(--c2-primary, #118652);
+  background: rgba(17, 134, 82, 0.08);
+  border-bottom: 2px solid var(--c2-primary, #118652);
+}
+
+.add-panel__loading,
+.add-panel__empty {
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.add-panel__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  gap: 4px;
+}
+.add-panel__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: #fff;
+  border: 1px solid rgba(23, 35, 31, 0.08);
+}
+.add-panel__item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.add-panel__item-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1c2d29;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.add-panel__item-meta { font-size: 11px; }
+
+.add-panel template,
+.add-panel > * { padding: 0 12px 10px; }
+.add-panel__tabs { padding: 0; }
+.add-panel__list { padding: 6px; }
+
+.add-panel .ef-input--sm {
+  margin-top: 10px;
+  height: 30px;
+  font-size: 12px;
+}
+.add-panel .ef-actions { margin-top: 8px; padding-bottom: 12px; }
+
+.add-panel__check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 6px;
+  padding: 0 12px;
+  color: rgba(23, 35, 31, 0.75);
+}
+.add-panel__check input { accent-color: var(--c2-primary, #118652); }
+
+.add-panel__tipo-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 0 12px;
+}
+.add-tipo-btn {
+  padding: 6px;
+  border-radius: 7px;
+  border: 1px solid rgba(23, 35, 31, 0.18);
+  background: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+.add-tipo-btn--active {
+  background: rgba(23, 35, 31, 0.88);
+  color: #fff;
+  border-color: transparent;
+}
 </style>

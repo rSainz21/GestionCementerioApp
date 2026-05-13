@@ -126,7 +126,7 @@
 
     <!-- Dialog: sepultura -->
     <Dialog v-model:visible="sepDialog" modal header="Detalle de sepultura" :style="{ width: 'min(1400px,96vw)' }">
-      <SepulturaInfoPanel :sepulturaId="sepId" />
+      <SepulturaInfoPanel :sepulturaId="sepId" @navigate="id => sepId = id" />
       <template #footer>
         <Button label="Cerrar" severity="secondary" @click="sepDialog = false" />
       </template>
@@ -175,7 +175,7 @@ async function onShow() {
   loadError.value = null;
   loading.value   = true;
   try {
-    const res = await api.get(`/api/cementerio/difuntos/${props.difuntoId}`);
+    const res = await api.get(`/api/cementerio/personas/${props.difuntoId}`);
     data.value = res.data?.item ?? null;
   } catch (e) {
     loadError.value = e?.response?.data?.message ?? 'Error al cargar el difunto.';

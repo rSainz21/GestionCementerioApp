@@ -7,10 +7,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use App\Models\CemnDifunto;
-
+use Illuminate\Database\Eloquent\SoftDeletes;
 class CemnConcesion extends Model
 {
+    use SoftDeletes;
     protected $table = 'cemn_concesiones';
 
     protected $fillable = [
@@ -52,33 +52,40 @@ class CemnConcesion extends Model
         return $this->hasMany(CemnConcesion::class, 'concesion_previa_id');
     }
 
-    public function concesionTerceros(): HasMany
+    public function concesionPersonas(): HasMany
     {
-        return $this->hasMany(CemnConcesionTercero::class, 'concesion_id');
+        return $this->hasMany(CemnConcesionPersona::class, 'concesion_id');
     }
 
-    public function terceros(): BelongsToMany
+    public function personas(): BelongsToMany
     {
         return $this->belongsToMany(
-            CemnTercero::class,
-            'cemn_concesion_terceros',
+            CemnPersona::class,
+            'cemn_concesion_personas',
             'concesion_id',
-            'tercero_id'
+            'persona_id'
         )->withPivot(['rol', 'fecha_desde', 'fecha_hasta', 'activo', 'notas'])
          ->withTimestamps();
+    }
+
+    /** Titulares de la concesión (tipo titular/ambos en pivot). */
+    public function titulares(): BelongsToMany
+    {
+        return $this->personas()->whereIn('cemn_personas.tipo', ['titular', 'ambos']);
     }
 
     /** El concesionario activo (rol='concesionario', activo=true). */
     public function concesionario(): HasOne
     {
-        return $this->hasOne(CemnConcesionTercero::class, 'concesion_id')
+        return $this->hasOne(CemnConcesionPersona::class, 'concesion_id')
                     ->where('rol', 'concesionario')
                     ->where('activo', true);
     }
 
     public function difuntos(): HasMany
     {
-        return $this->hasMany(CemnDifunto::class, 'concesion_id');
+        return $this->hasMany(CemnPersona::class, 'concesion_id')
+                    ->whereIn('tipo', ['difunto', 'ambos']);
     }
 
     // ── Scopes ─────────────────────────────────────────────────────────────
